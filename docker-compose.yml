@@ -1,0 +1,43 @@
+version: '3.8'
+
+# Nedflix - NFS Video Browser
+# Docker Compose configuration
+
+services:
+  nedflix:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nedflix
+    image: nedflix:latest
+    ports:
+      - "3000:3000"   # HTTP (redirects to HTTPS)
+      - "3443:3443"   # HTTPS
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HTTPS_PORT=3443
+      - NFS_MOUNT_PATH=/mnt/nfs
+      - SESSION_SECRET=${SESSION_SECRET:-change-this-to-a-secure-random-string}
+      # OAuth credentials (set in .env file or environment)
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+      - CALLBACK_BASE_URL=${CALLBACK_BASE_URL:-https://localhost:3443}
+    volumes:
+      # Mount your NFS share or video directory
+      - ${NFS_PATH:-/mnt/nfs}:/mnt/nfs:ro
+      # Persist generated certificates
+      - nedflix-certs:/app/certs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "--no-check-certificate", "https://localhost:3443/api/auth-providers"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  nedflix-certs:
+    name: nedflix-certs
