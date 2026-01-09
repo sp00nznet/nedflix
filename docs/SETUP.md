@@ -7,7 +7,10 @@ Complete setup and configuration documentation for Nedflix.
 - [Prerequisites](#prerequisites)
 - [Docker Deployment](#docker-deployment)
 - [Manual Installation](#manual-installation)
-- [OAuth Configuration](#oauth-configuration)
+- [Authentication](#authentication)
+  - [Google OAuth](#google-oauth)
+  - [GitHub OAuth](#github-oauth)
+  - [Admin Local Login](#admin-local-login)
 - [Environment Variables](#environment-variables)
 - [Project Structure](#project-structure)
 - [Security Considerations](#security-considerations)
@@ -21,7 +24,7 @@ Complete setup and configuration documentation for Nedflix.
 - npm (Node Package Manager) - *or Docker*
 - OpenSSL (for generating SSL certificates) - *included in Docker image*
 - An NFS mount point or video directory (default: `/mnt/nfs`)
-- OAuth credentials from Google and/or GitHub
+- Authentication: OAuth credentials (Google/GitHub) OR admin local login
 - FFmpeg and FFprobe (optional, for audio track selection)
 
 ---
@@ -123,7 +126,7 @@ npm start
 
 ---
 
-## OAuth Configuration
+## Authentication
 
 ### Google OAuth
 
@@ -143,6 +146,29 @@ npm start
 4. Set Authorization callback URL: `https://localhost:3443/auth/github/callback`
 5. Copy Client ID and Client Secret to your `.env` file
 
+### Admin Local Login
+
+For environments where OAuth is not available, you can configure a local admin account:
+
+1. **Generate a password hash:**
+```bash
+node -e "console.log(require('bcrypt').hashSync('your-secure-password', 10))"
+```
+
+2. **Add credentials to your `.env` file:**
+```env
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD_HASH=$2b$10$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+3. **Restart the server** - the admin login form will appear on the login page.
+
+**Security notes:**
+- Use a strong, unique password
+- The password is never stored in plain text, only the bcrypt hash
+- Admin login can be used alongside OAuth providers
+- Consider using OAuth for production environments when possible
+
 ---
 
 ## Environment Variables
@@ -156,11 +182,13 @@ npm start
 | `GOOGLE_CLIENT_SECRET` | No* | - | Google OAuth client secret |
 | `GITHUB_CLIENT_ID` | No* | - | GitHub OAuth client ID |
 | `GITHUB_CLIENT_SECRET` | No* | - | GitHub OAuth client secret |
-| `CALLBACK_BASE_URL` | Yes | - | Base URL for OAuth callbacks |
+| `ADMIN_USERNAME` | No* | - | Admin local login username |
+| `ADMIN_PASSWORD_HASH` | No* | - | Admin password bcrypt hash |
+| `CALLBACK_BASE_URL` | No | - | Base URL for OAuth callbacks |
 | `NFS_MOUNT_PATH` | No | `/mnt/nfs` | Path to video files |
 | `OPENSUBTITLES_API_KEY` | No | - | API key for automatic subtitles |
 
-*At least one OAuth provider is required.
+*At least one authentication method is required (OAuth provider or admin credentials).
 
 ---
 

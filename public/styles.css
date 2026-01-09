@@ -219,6 +219,94 @@ body {
     font-family: var(--font-mono);
 }
 
+/* Admin Login Section */
+.admin-login-section {
+    margin-top: 24px;
+}
+
+.divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.divider span {
+    padding: 0 16px;
+    color: var(--color-text-dim);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.admin-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.form-group {
+    position: relative;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 14px 16px;
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    font-family: var(--font-display);
+    font-size: 15px;
+    transition: all var(--transition-normal);
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-glow);
+}
+
+.form-group input::placeholder {
+    color: var(--color-text-dim);
+}
+
+.admin-btn {
+    background: linear-gradient(135deg, var(--color-primary), #6b4ed4);
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+.admin-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, var(--color-primary-hover), #7c5fe5);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md), var(--shadow-glow);
+}
+
+.admin-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.error-text {
+    color: var(--color-danger);
+    font-size: 13px;
+    text-align: center;
+    padding: 8px;
+    background: rgba(255, 92, 92, 0.1);
+    border-radius: var(--radius-sm);
+    margin-top: 4px;
+}
+
 /* Background decoration */
 .background-decoration {
     position: fixed;

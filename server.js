@@ -9,6 +9,8 @@ const session = require('express-session');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const GitHubStrategy = require('passport-github2').Strategy;
+const LocalStrategy = require('passport-local').Strategy;
+const bcrypt = require('bcrypt');
 const { spawn, execSync } = require('child_process');
 
 const app = express();
@@ -747,6 +749,51 @@ if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
     }));
 }
 
+// Admin Local Authentication Strategy
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
+const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH;
+
+// Initialize admin user if credentials are configured
+if (ADMIN_USERNAME && ADMIN_PASSWORD_HASH) {
+    const adminId = 'admin_local';
+    if (!users.has(adminId)) {
+        users.set(adminId, {
+            id: adminId,
+            provider: 'local',
+            displayName: 'Admin',
+            email: null,
+            avatar: 'bear',
+            isAdmin: true
+        });
+        userSettings.set(adminId, getDefaultSettings());
+    }
+
+    passport.use(new LocalStrategy(
+        async (username, password, done) => {
+            try {
+                // Check if username matches
+                if (username !== ADMIN_USERNAME) {
+                    return done(null, false, { message: 'Invalid credentials' });
+                }
+
+                // Verify password against hash
+                const isValid = await bcrypt.compare(password, ADMIN_PASSWORD_HASH);
+                if (!isValid) {
+                    return done(null, false, { message: 'Invalid credentials' });
+                }
+
+                // Return admin user
+                const adminUser = users.get(adminId);
+                return done(null, adminUser);
+            } catch (error) {
+                return done(error);
+            }
+        }
+    ));
+
+    console.log('🔑 Admin local authentication enabled');
+}
+
 // Default user settings
 function getDefaultSettings() {
     return {
@@ -799,6 +846,28 @@ app.get('/auth/logout', (req, res) => {
         }
         res.redirect('/login.html');
     });
+});
+
+// Admin local login route
+app.post('/auth/admin/login', express.urlencoded({ extended: false }), (req, res, next) => {
+    if (!ADMIN_USERNAME || !ADMIN_PASSWORD_HASH) {
+        return res.status(403).json({ error: 'Admin login not configured' });
+    }
+
+    passport.authenticate('local', (err, user, info) => {
+        if (err) {
+            return res.status(500).json({ error: 'Authentication error' });
+        }
+        if (!user) {
+            return res.status(401).json({ error: info?.message || 'Invalid credentials' });
+        }
+        req.logIn(user, (err) => {
+            if (err) {
+                return res.status(500).json({ error: 'Login failed' });
+            }
+            return res.json({ success: true, redirect: '/' });
+        });
+    })(req, res, next);
 });
 
 // API: Get current user
@@ -1292,11 +1361,12 @@ function streamVideoFile(req, res, filePath) {
     }
 }
 
-// Check for available OAuth providers
+// Check for available auth providers
 app.get('/api/auth-providers', (req, res) => {
     const providers = [];
     if (process.env.GOOGLE_CLIENT_ID) providers.push('google');
     if (process.env.GITHUB_CLIENT_ID) providers.push('github');
+    if (ADMIN_USERNAME && ADMIN_PASSWORD_HASH) providers.push('admin');
     res.json(providers);
 });
 

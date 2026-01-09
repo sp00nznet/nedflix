@@ -25,7 +25,28 @@
             <div class="login-buttons" id="login-buttons">
                 <p class="loading-text">Loading authentication providers...</p>
             </div>
-            
+
+            <div class="admin-login-section" id="admin-login-section" style="display: none;">
+                <div class="divider">
+                    <span>or sign in as admin</span>
+                </div>
+                <form id="admin-login-form" class="admin-form">
+                    <div class="form-group">
+                        <input type="text" id="admin-username" name="username" placeholder="Username" required autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="admin-password" name="password" placeholder="Password" required autocomplete="current-password">
+                    </div>
+                    <button type="submit" class="auth-btn admin-btn">
+                        <svg viewBox="0 0 24 24" class="provider-icon" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        </svg>
+                        Sign in as Admin
+                    </button>
+                    <p class="error-text" id="admin-error" style="display: none;"></p>
+                </form>
+            </div>
+
             <div class="login-footer">
                 <p>Sign in to access your NFS mounted video library</p>
             </div>
@@ -47,25 +68,30 @@
                     window.location.href = '/';
                 }
             });
-        
+
         // Load available auth providers
         fetch('/api/auth-providers')
             .then(res => res.json())
             .then(providers => {
                 const container = document.getElementById('login-buttons');
-                
+                const adminSection = document.getElementById('admin-login-section');
+
+                // Check if admin login is available
+                const hasAdmin = providers.includes('admin');
+                const hasOAuth = providers.includes('google') || providers.includes('github');
+
                 if (providers.length === 0) {
                     container.innerHTML = `
                         <div class="no-providers">
                             <p>No authentication providers configured.</p>
-                            <p class="hint">Please configure OAuth in .env file</p>
+                            <p class="hint">Please configure OAuth or admin credentials in .env file</p>
                         </div>
                     `;
                     return;
                 }
-                
+
                 container.innerHTML = '';
-                
+
                 if (providers.includes('google')) {
                     const googleBtn = document.createElement('a');
                     googleBtn.href = '/auth/google';
@@ -81,7 +107,7 @@
                     `;
                     container.appendChild(googleBtn);
                 }
-                
+
                 if (providers.includes('github')) {
                     const githubBtn = document.createElement('a');
                     githubBtn.href = '/auth/github';
@@ -94,6 +120,19 @@
                     `;
                     container.appendChild(githubBtn);
                 }
+
+                // Show admin login section if enabled
+                if (hasAdmin) {
+                    adminSection.style.display = 'block';
+
+                    // Update divider text if no OAuth providers
+                    if (!hasOAuth) {
+                        const divider = adminSection.querySelector('.divider');
+                        if (divider) {
+                            divider.style.display = 'none';
+                        }
+                    }
+                }
             })
             .catch(err => {
                 document.getElementById('login-buttons').innerHTML = `
@@ -102,6 +141,54 @@
                     </div>
                 `;
             });
+
+        // Handle admin login form submission
+        document.getElementById('admin-login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('admin-username').value;
+            const password = document.getElementById('admin-password').value;
+            const errorEl = document.getElementById('admin-error');
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+
+            // Clear previous error
+            errorEl.style.display = 'none';
+            errorEl.textContent = '';
+
+            // Disable button during login
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Signing in...';
+
+            try {
+                const response = await fetch('/auth/admin/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    window.location.href = data.redirect || '/';
+                } else {
+                    errorEl.textContent = data.error || 'Login failed';
+                    errorEl.style.display = 'block';
+                }
+            } catch (err) {
+                errorEl.textContent = 'Connection error. Please try again.';
+                errorEl.style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = `
+                    <svg viewBox="0 0 24 24" class="provider-icon" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                    Sign in as Admin
+                `;
+            }
+        });
     </script>
 </body>
 </html>
