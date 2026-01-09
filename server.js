@@ -12,6 +12,400 @@ const GitHubStrategy = require('passport-github2').Strategy;
 
 const app = express();
 
+// Subtitle cache directory
+const SUBTITLE_CACHE_DIR = path.join(__dirname, 'subtitle_cache');
+if (!fs.existsSync(SUBTITLE_CACHE_DIR)) {
+    fs.mkdirSync(SUBTITLE_CACHE_DIR, { recursive: true });
+}
+
+// OpenSubtitles API configuration
+const OPENSUBTITLES_API_KEY = process.env.OPENSUBTITLES_API_KEY || '';
+const OPENSUBTITLES_API_URL = 'https://api.opensubtitles.com/api/v1';
+
+// ============================================
+// SUBTITLE UTILITY FUNCTIONS
+// ============================================
+
+/**
+ * Extract movie/show title and metadata from filename
+ */
+function extractTitleFromFilename(filename) {
+    // Remove file extension
+    let name = filename.replace(/\.(mp4|mkv|avi|webm|mov|m4v|ogg)$/i, '');
+
+    // Common patterns to extract
+    const patterns = {
+        // TV Show: "Show Name S01E02" or "Show Name 1x02"
+        tvShow: /^(.+?)[\.\s_-]+[Ss](\d{1,2})[Ee](\d{1,2})/,
+        tvShowAlt: /^(.+?)[\.\s_-]+(\d{1,2})x(\d{1,2})/,
+        // Movie with year: "Movie Name (2023)" or "Movie Name 2023"
+        movieWithYear: /^(.+?)[\.\s_-]*[\(\[]?(\d{4})[\)\]]?/,
+        // Clean up common tags
+        cleanupTags: /[\.\s_-]*(720p|1080p|2160p|4k|bluray|brrip|webrip|hdtv|dvdrip|x264|x265|hevc|aac|ac3|dts|proper|repack|extended|unrated|directors\.?cut).*$/i
+    };
+
+    let title = name;
+    let year = null;
+    let season = null;
+    let episode = null;
+    let type = 'movie';
+
+    // Try to match TV show pattern first
+    let match = name.match(patterns.tvShow) || name.match(patterns.tvShowAlt);
+    if (match) {
+        title = match[1];
+        season = parseInt(match[2], 10);
+        episode = parseInt(match[3], 10);
+        type = 'episode';
+    }
+
+    // Clean up the title - remove quality/codec tags
+    title = title.replace(patterns.cleanupTags, '');
+
+    // Try to extract year for movies
+    if (type === 'movie') {
+        match = title.match(patterns.movieWithYear);
+        if (match) {
+            title = match[1];
+            year = parseInt(match[2], 10);
+            // Validate year is reasonable (1900-2030)
+            if (year < 1900 || year > 2030) {
+                year = null;
+            }
+        }
+    }
+
+    // Clean up title: replace dots/underscores with spaces, trim
+    title = title
+        .replace(/[\._]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .replace(/-+$/, '')
+        .trim();
+
+    return {
+        title,
+        year,
+        season,
+        episode,
+        type,
+        originalFilename: filename
+    };
+}
+
+/**
+ * Convert SRT subtitle format to WebVTT
+ */
+function convertSrtToVtt(srtContent) {
+    // Start with WebVTT header
+    let vtt = 'WEBVTT\n\n';
+
+    // SRT uses comma for milliseconds, VTT uses period
+    // SRT format: 00:00:20,000 --> 00:00:24,400
+    // VTT format: 00:00:20.000 --> 00:00:24.400
+
+    const lines = srtContent.split(/\r?\n/);
+    let i = 0;
+
+    while (i < lines.length) {
+        const line = lines[i].trim();
+
+        // Skip empty lines
+        if (!line) {
+            i++;
+            continue;
+        }
+
+        // Skip subtitle number (just a number)
+        if (/^\d+$/.test(line)) {
+            i++;
+            continue;
+        }
+
+        // Check for timestamp line
+        const timestampMatch = line.match(/^(\d{2}:\d{2}:\d{2}[,\.]\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}[,\.]\d{3})(.*)$/);
+        if (timestampMatch) {
+            // Convert timestamps
+            const startTime = timestampMatch[1].replace(',', '.');
+            const endTime = timestampMatch[2].replace(',', '.');
+            const extra = timestampMatch[3] || '';
+
+            vtt += `${startTime} --> ${endTime}${extra}\n`;
+            i++;
+
+            // Collect text lines until empty line
+            while (i < lines.length && lines[i].trim()) {
+                vtt += lines[i] + '\n';
+                i++;
+            }
+            vtt += '\n';
+        } else {
+            i++;
+        }
+    }
+
+    return vtt;
+}
+
+/**
+ * Make HTTP/HTTPS request (Promise-based)
+ */
+function makeRequest(url, options = {}) {
+    return new Promise((resolve, reject) => {
+        const urlObj = new URL(url);
+        const protocol = urlObj.protocol === 'https:' ? https : http;
+
+        const requestOptions = {
+            hostname: urlObj.hostname,
+            port: urlObj.port || (urlObj.protocol === 'https:' ? 443 : 80),
+            path: urlObj.pathname + urlObj.search,
+            method: options.method || 'GET',
+            headers: {
+                'User-Agent': 'Nedflix/1.0',
+                ...options.headers
+            }
+        };
+
+        const req = protocol.request(requestOptions, (res) => {
+            let data = '';
+
+            // Handle redirects
+            if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                makeRequest(res.headers.location, options)
+                    .then(resolve)
+                    .catch(reject);
+                return;
+            }
+
+            res.on('data', (chunk) => {
+                data += chunk;
+            });
+
+            res.on('end', () => {
+                resolve({
+                    statusCode: res.statusCode,
+                    headers: res.headers,
+                    body: data
+                });
+            });
+        });
+
+        req.on('error', reject);
+        req.setTimeout(10000, () => {
+            req.destroy();
+            reject(new Error('Request timeout'));
+        });
+
+        if (options.body) {
+            req.write(options.body);
+        }
+
+        req.end();
+    });
+}
+
+/**
+ * Download file from URL
+ */
+function downloadFile(url) {
+    return new Promise((resolve, reject) => {
+        const urlObj = new URL(url);
+        const protocol = urlObj.protocol === 'https:' ? https : http;
+
+        const requestOptions = {
+            hostname: urlObj.hostname,
+            port: urlObj.port || (urlObj.protocol === 'https:' ? 443 : 80),
+            path: urlObj.pathname + urlObj.search,
+            method: 'GET',
+            headers: {
+                'User-Agent': 'Nedflix/1.0'
+            }
+        };
+
+        const req = protocol.request(requestOptions, (res) => {
+            // Handle redirects
+            if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                downloadFile(res.headers.location)
+                    .then(resolve)
+                    .catch(reject);
+                return;
+            }
+
+            const chunks = [];
+
+            res.on('data', (chunk) => {
+                chunks.push(chunk);
+            });
+
+            res.on('end', () => {
+                resolve(Buffer.concat(chunks));
+            });
+        });
+
+        req.on('error', reject);
+        req.setTimeout(30000, () => {
+            req.destroy();
+            reject(new Error('Download timeout'));
+        });
+
+        req.end();
+    });
+}
+
+/**
+ * Search OpenSubtitles for subtitles
+ */
+async function searchOpenSubtitles(metadata, language = 'en') {
+    if (!OPENSUBTITLES_API_KEY) {
+        console.log('OpenSubtitles API key not configured');
+        return [];
+    }
+
+    try {
+        const params = new URLSearchParams();
+        params.append('query', metadata.title);
+        params.append('languages', language);
+
+        if (metadata.type === 'episode' && metadata.season && metadata.episode) {
+            params.append('season_number', metadata.season);
+            params.append('episode_number', metadata.episode);
+        }
+
+        if (metadata.year) {
+            params.append('year', metadata.year);
+        }
+
+        const response = await makeRequest(
+            `${OPENSUBTITLES_API_URL}/subtitles?${params.toString()}`,
+            {
+                headers: {
+                    'Api-Key': OPENSUBTITLES_API_KEY,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+
+        if (response.statusCode !== 200) {
+            console.log(`OpenSubtitles API error: ${response.statusCode}`);
+            return [];
+        }
+
+        const data = JSON.parse(response.body);
+
+        if (!data.data || !Array.isArray(data.data)) {
+            return [];
+        }
+
+        // Map and score results
+        const results = data.data.map(item => {
+            const attrs = item.attributes;
+            return {
+                id: item.id,
+                fileId: attrs.files?.[0]?.file_id,
+                filename: attrs.files?.[0]?.file_name || 'Unknown',
+                language: attrs.language,
+                downloadCount: attrs.download_count || 0,
+                rating: attrs.ratings || 0,
+                hearing_impaired: attrs.hearing_impaired || false,
+                source: 'opensubtitles'
+            };
+        }).filter(r => r.fileId);
+
+        return results;
+    } catch (error) {
+        console.error('OpenSubtitles search error:', error.message);
+        return [];
+    }
+}
+
+/**
+ * Download subtitle from OpenSubtitles
+ */
+async function downloadFromOpenSubtitles(fileId) {
+    if (!OPENSUBTITLES_API_KEY) {
+        throw new Error('OpenSubtitles API key not configured');
+    }
+
+    try {
+        // First, get the download link
+        const response = await makeRequest(
+            `${OPENSUBTITLES_API_URL}/download`,
+            {
+                method: 'POST',
+                headers: {
+                    'Api-Key': OPENSUBTITLES_API_KEY,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ file_id: fileId })
+            }
+        );
+
+        if (response.statusCode !== 200) {
+            throw new Error(`Failed to get download link: ${response.statusCode}`);
+        }
+
+        const data = JSON.parse(response.body);
+
+        if (!data.link) {
+            throw new Error('No download link received');
+        }
+
+        // Download the subtitle file
+        const subtitleBuffer = await downloadFile(data.link);
+        return subtitleBuffer.toString('utf-8');
+    } catch (error) {
+        console.error('OpenSubtitles download error:', error.message);
+        throw error;
+    }
+}
+
+/**
+ * Select the best subtitle from a list of results
+ */
+function selectBestSubtitle(subtitles, metadata) {
+    if (!subtitles || subtitles.length === 0) {
+        return null;
+    }
+
+    // Score each subtitle
+    const scored = subtitles.map(sub => {
+        let score = 0;
+
+        // Prefer non-hearing impaired versions
+        if (!sub.hearing_impaired) {
+            score += 10;
+        }
+
+        // Prefer higher download counts (popularity)
+        score += Math.min(sub.downloadCount / 1000, 20);
+
+        // Prefer higher ratings
+        score += (sub.rating || 0) * 2;
+
+        // Check if filename contains the original filename parts
+        const originalParts = metadata.title.toLowerCase().split(/\s+/);
+        const subFilename = (sub.filename || '').toLowerCase();
+        const matchingParts = originalParts.filter(part =>
+            part.length > 2 && subFilename.includes(part)
+        );
+        score += matchingParts.length * 5;
+
+        return { ...sub, score };
+    });
+
+    // Sort by score descending
+    scored.sort((a, b) => b.score - a.score);
+
+    return scored[0];
+}
+
+/**
+ * Get cache file path for a video
+ */
+function getSubtitleCachePath(videoPath, language = 'en') {
+    const hash = Buffer.from(videoPath).toString('base64').replace(/[/+=]/g, '_');
+    return path.join(SUBTITLE_CACHE_DIR, `${hash}_${language}.vtt`);
+}
+
 // Configuration
 const PORT = process.env.PORT || 3000;
 const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
@@ -310,6 +704,140 @@ app.get('/api/video', ensureAuthenticated, (req, res) => {
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
+});
+
+// ============================================
+// SUBTITLE API ENDPOINTS
+// ============================================
+
+// API: Search and fetch subtitles for a video (protected)
+app.get('/api/subtitles/search', ensureAuthenticated, async (req, res) => {
+    const videoPath = req.query.path;
+    const language = req.query.language || 'en';
+
+    if (!videoPath) {
+        return res.status(400).json({ error: 'Video path is required' });
+    }
+
+    // Security: Ensure path is within NFS mount
+    const normalizedPath = path.normalize(videoPath);
+    if (!normalizedPath.startsWith(NFS_MOUNT_PATH)) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Check for cached subtitle first
+    const cachePath = getSubtitleCachePath(videoPath, language);
+    if (fs.existsSync(cachePath)) {
+        return res.json({
+            found: true,
+            cached: true,
+            subtitleUrl: `/api/subtitles/serve?path=${encodeURIComponent(videoPath)}&language=${language}`
+        });
+    }
+
+    // Extract metadata from filename
+    const filename = path.basename(videoPath);
+    const metadata = extractTitleFromFilename(filename);
+
+    console.log(`Searching subtitles for: "${metadata.title}" (${metadata.type})`);
+
+    try {
+        // Search OpenSubtitles
+        const results = await searchOpenSubtitles(metadata, language);
+
+        if (results.length === 0) {
+            return res.json({
+                found: false,
+                message: 'No subtitles found',
+                searchedTitle: metadata.title
+            });
+        }
+
+        // Select best subtitle
+        const best = selectBestSubtitle(results, metadata);
+
+        if (!best) {
+            return res.json({
+                found: false,
+                message: 'Could not select a suitable subtitle',
+                searchedTitle: metadata.title
+            });
+        }
+
+        console.log(`Selected subtitle: ${best.filename} (score: ${best.score})`);
+
+        // Download and cache the subtitle
+        let srtContent;
+        try {
+            srtContent = await downloadFromOpenSubtitles(best.fileId);
+        } catch (downloadError) {
+            return res.json({
+                found: false,
+                message: 'Failed to download subtitle',
+                error: downloadError.message
+            });
+        }
+
+        // Convert to VTT format
+        const vttContent = convertSrtToVtt(srtContent);
+
+        // Cache the VTT file
+        fs.writeFileSync(cachePath, vttContent, 'utf-8');
+
+        res.json({
+            found: true,
+            cached: false,
+            subtitleUrl: `/api/subtitles/serve?path=${encodeURIComponent(videoPath)}&language=${language}`,
+            metadata: {
+                filename: best.filename,
+                language: best.language,
+                source: best.source
+            }
+        });
+    } catch (error) {
+        console.error('Subtitle search error:', error);
+        res.status(500).json({
+            found: false,
+            error: error.message
+        });
+    }
+});
+
+// API: Serve cached subtitle file (protected)
+app.get('/api/subtitles/serve', ensureAuthenticated, (req, res) => {
+    const videoPath = req.query.path;
+    const language = req.query.language || 'en';
+
+    if (!videoPath) {
+        return res.status(400).send('Video path is required');
+    }
+
+    // Security: Ensure path is within NFS mount
+    const normalizedPath = path.normalize(videoPath);
+    if (!normalizedPath.startsWith(NFS_MOUNT_PATH)) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const cachePath = getSubtitleCachePath(videoPath, language);
+
+    if (!fs.existsSync(cachePath)) {
+        return res.status(404).json({ error: 'Subtitle not found' });
+    }
+
+    res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    fs.createReadStream(cachePath).pipe(res);
+});
+
+// API: Check subtitle configuration status
+app.get('/api/subtitles/status', ensureAuthenticated, (req, res) => {
+    res.json({
+        configured: !!OPENSUBTITLES_API_KEY,
+        provider: 'OpenSubtitles',
+        message: OPENSUBTITLES_API_KEY
+            ? 'Subtitle search is enabled'
+            : 'Set OPENSUBTITLES_API_KEY environment variable to enable automatic subtitle search'
+    });
 });
 
 // Check for available OAuth providers
