@@ -9,6 +9,7 @@ const session = require('express-session');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const GitHubStrategy = require('passport-github2').Strategy;
+const { spawn, execSync } = require('child_process');
 
 const app = express();
 
@@ -404,6 +405,258 @@ function selectBestSubtitle(subtitles, metadata) {
 function getSubtitleCachePath(videoPath, language = 'en') {
     const hash = Buffer.from(videoPath).toString('base64').replace(/[/+=]/g, '_');
     return path.join(SUBTITLE_CACHE_DIR, `${hash}_${language}.vtt`);
+}
+
+// ============================================
+// AUDIO TRACK UTILITY FUNCTIONS
+// ============================================
+
+// Check if FFprobe is available
+let ffprobeAvailable = false;
+let ffmpegAvailable = false;
+
+try {
+    execSync('ffprobe -version', { stdio: 'ignore' });
+    ffprobeAvailable = true;
+} catch {
+    console.log('⚠️  FFprobe not found. Audio track detection will be disabled.');
+}
+
+try {
+    execSync('ffmpeg -version', { stdio: 'ignore' });
+    ffmpegAvailable = true;
+} catch {
+    console.log('⚠️  FFmpeg not found. Audio track switching will be disabled.');
+}
+
+// Language code to name mapping
+const languageNames = {
+    'eng': 'English',
+    'en': 'English',
+    'fra': 'French',
+    'fre': 'French',
+    'fr': 'French',
+    'deu': 'German',
+    'ger': 'German',
+    'de': 'German',
+    'spa': 'Spanish',
+    'es': 'Spanish',
+    'ita': 'Italian',
+    'it': 'Italian',
+    'por': 'Portuguese',
+    'pt': 'Portuguese',
+    'rus': 'Russian',
+    'ru': 'Russian',
+    'jpn': 'Japanese',
+    'ja': 'Japanese',
+    'kor': 'Korean',
+    'ko': 'Korean',
+    'chi': 'Chinese',
+    'zho': 'Chinese',
+    'zh': 'Chinese',
+    'ara': 'Arabic',
+    'ar': 'Arabic',
+    'hin': 'Hindi',
+    'hi': 'Hindi',
+    'pol': 'Polish',
+    'pl': 'Polish',
+    'nld': 'Dutch',
+    'dut': 'Dutch',
+    'nl': 'Dutch',
+    'swe': 'Swedish',
+    'sv': 'Swedish',
+    'nor': 'Norwegian',
+    'no': 'Norwegian',
+    'dan': 'Danish',
+    'da': 'Danish',
+    'fin': 'Finnish',
+    'fi': 'Finnish',
+    'tur': 'Turkish',
+    'tr': 'Turkish',
+    'tha': 'Thai',
+    'th': 'Thai',
+    'vie': 'Vietnamese',
+    'vi': 'Vietnamese',
+    'und': 'Unknown',
+    '': 'Unknown'
+};
+
+/**
+ * Get human-readable language name from code
+ */
+function getLanguageName(code) {
+    if (!code) return 'Unknown';
+    const lowerCode = code.toLowerCase();
+    return languageNames[lowerCode] || code;
+}
+
+/**
+ * Get audio tracks from a video file using FFprobe
+ */
+function getAudioTracks(videoPath) {
+    return new Promise((resolve, reject) => {
+        if (!ffprobeAvailable) {
+            return resolve([]);
+        }
+
+        const args = [
+            '-v', 'quiet',
+            '-print_format', 'json',
+            '-show_streams',
+            '-select_streams', 'a',
+            videoPath
+        ];
+
+        const ffprobe = spawn('ffprobe', args);
+        let stdout = '';
+        let stderr = '';
+
+        ffprobe.stdout.on('data', (data) => {
+            stdout += data.toString();
+        });
+
+        ffprobe.stderr.on('data', (data) => {
+            stderr += data.toString();
+        });
+
+        ffprobe.on('close', (code) => {
+            if (code !== 0) {
+                console.error('FFprobe error:', stderr);
+                return resolve([]);
+            }
+
+            try {
+                const data = JSON.parse(stdout);
+                const streams = data.streams || [];
+
+                const audioTracks = streams.map((stream, index) => {
+                    const tags = stream.tags || {};
+                    const language = tags.language || '';
+                    const title = tags.title || '';
+
+                    // Build a descriptive label
+                    let label = getLanguageName(language);
+                    if (title && title !== label) {
+                        label += ` (${title})`;
+                    }
+
+                    // Add codec info
+                    const codec = stream.codec_name || '';
+                    const channels = stream.channels || 0;
+                    let channelDesc = '';
+                    if (channels === 1) channelDesc = 'Mono';
+                    else if (channels === 2) channelDesc = 'Stereo';
+                    else if (channels === 6) channelDesc = '5.1';
+                    else if (channels === 8) channelDesc = '7.1';
+                    else if (channels > 0) channelDesc = `${channels}ch`;
+
+                    if (channelDesc) {
+                        label += ` - ${channelDesc}`;
+                    }
+
+                    return {
+                        index: stream.index,
+                        streamIndex: index,
+                        codec: codec,
+                        language: language,
+                        languageName: getLanguageName(language),
+                        title: title,
+                        channels: channels,
+                        channelLayout: stream.channel_layout || '',
+                        sampleRate: stream.sample_rate || '',
+                        bitRate: stream.bit_rate || '',
+                        label: label,
+                        default: stream.disposition?.default === 1
+                    };
+                });
+
+                resolve(audioTracks);
+            } catch (error) {
+                console.error('FFprobe parse error:', error);
+                resolve([]);
+            }
+        });
+
+        ffprobe.on('error', (error) => {
+            console.error('FFprobe spawn error:', error);
+            resolve([]);
+        });
+    });
+}
+
+/**
+ * Get video metadata including duration
+ */
+function getVideoMetadata(videoPath) {
+    return new Promise((resolve, reject) => {
+        if (!ffprobeAvailable) {
+            return resolve(null);
+        }
+
+        const args = [
+            '-v', 'quiet',
+            '-print_format', 'json',
+            '-show_format',
+            '-show_streams',
+            '-select_streams', 'v:0',
+            videoPath
+        ];
+
+        const ffprobe = spawn('ffprobe', args);
+        let stdout = '';
+
+        ffprobe.stdout.on('data', (data) => {
+            stdout += data.toString();
+        });
+
+        ffprobe.on('close', (code) => {
+            if (code !== 0) {
+                return resolve(null);
+            }
+
+            try {
+                const data = JSON.parse(stdout);
+                const format = data.format || {};
+                const videoStream = (data.streams || [])[0] || {};
+
+                resolve({
+                    duration: parseFloat(format.duration) || 0,
+                    bitRate: parseInt(format.bit_rate) || 0,
+                    width: videoStream.width || 0,
+                    height: videoStream.height || 0,
+                    codec: videoStream.codec_name || ''
+                });
+            } catch (error) {
+                resolve(null);
+            }
+        });
+
+        ffprobe.on('error', () => {
+            resolve(null);
+        });
+    });
+}
+
+// Cache for audio track info (to avoid repeated ffprobe calls)
+const audioTrackCache = new Map();
+const AUDIO_CACHE_TTL = 3600000; // 1 hour
+
+/**
+ * Get audio tracks with caching
+ */
+async function getAudioTracksWithCache(videoPath) {
+    const cached = audioTrackCache.get(videoPath);
+    if (cached && Date.now() - cached.timestamp < AUDIO_CACHE_TTL) {
+        return cached.tracks;
+    }
+
+    const tracks = await getAudioTracks(videoPath);
+    audioTrackCache.set(videoPath, {
+        tracks,
+        timestamp: Date.now()
+    });
+
+    return tracks;
 }
 
 // Configuration
@@ -839,6 +1092,205 @@ app.get('/api/subtitles/status', ensureAuthenticated, (req, res) => {
             : 'Set OPENSUBTITLES_API_KEY environment variable to enable automatic subtitle search'
     });
 });
+
+// ============================================
+// AUDIO TRACK API ENDPOINTS
+// ============================================
+
+// API: Get audio tracks for a video (protected)
+app.get('/api/audio-tracks', ensureAuthenticated, async (req, res) => {
+    const videoPath = req.query.path;
+
+    if (!videoPath) {
+        return res.status(400).json({ error: 'Video path is required' });
+    }
+
+    // Security: Ensure path is within NFS mount
+    const normalizedPath = path.normalize(videoPath);
+    if (!normalizedPath.startsWith(NFS_MOUNT_PATH)) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Check if file exists
+    if (!fs.existsSync(normalizedPath)) {
+        return res.status(404).json({ error: 'Video file not found' });
+    }
+
+    try {
+        const tracks = await getAudioTracksWithCache(normalizedPath);
+
+        res.json({
+            available: ffprobeAvailable,
+            switchable: ffmpegAvailable,
+            tracks: tracks,
+            message: !ffprobeAvailable
+                ? 'FFprobe not installed - audio track detection unavailable'
+                : !ffmpegAvailable
+                    ? 'FFmpeg not installed - audio track switching unavailable'
+                    : tracks.length > 1
+                        ? `${tracks.length} audio tracks available`
+                        : tracks.length === 1
+                            ? '1 audio track available'
+                            : 'No audio tracks detected'
+        });
+    } catch (error) {
+        console.error('Audio track detection error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Check audio feature status
+app.get('/api/audio-tracks/status', ensureAuthenticated, (req, res) => {
+    res.json({
+        ffprobeAvailable,
+        ffmpegAvailable,
+        canDetect: ffprobeAvailable,
+        canSwitch: ffmpegAvailable,
+        message: ffprobeAvailable && ffmpegAvailable
+            ? 'Audio track switching is fully available'
+            : !ffprobeAvailable
+                ? 'Install FFprobe to enable audio track detection'
+                : 'Install FFmpeg to enable audio track switching'
+    });
+});
+
+// API: Stream video with specific audio track (protected)
+app.get('/api/video-stream', ensureAuthenticated, (req, res) => {
+    const videoPath = req.query.path;
+    const audioTrack = parseInt(req.query.audio, 10);
+    const startTime = parseFloat(req.query.start) || 0;
+
+    if (!videoPath) {
+        return res.status(400).send('Video path is required');
+    }
+
+    // Security: Ensure path is within NFS mount
+    const normalizedPath = path.normalize(videoPath);
+    if (!normalizedPath.startsWith(NFS_MOUNT_PATH)) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Check if file exists
+    if (!fs.existsSync(normalizedPath)) {
+        return res.status(404).json({ error: 'Video file not found' });
+    }
+
+    // If no audio track specified or FFmpeg not available, use regular streaming
+    if (isNaN(audioTrack) || !ffmpegAvailable) {
+        return streamVideoFile(req, res, normalizedPath);
+    }
+
+    // Use FFmpeg to transcode with specific audio track
+    try {
+        const args = [
+            '-hide_banner',
+            '-loglevel', 'error'
+        ];
+
+        // Add start time if seeking
+        if (startTime > 0) {
+            args.push('-ss', startTime.toString());
+        }
+
+        args.push(
+            '-i', normalizedPath,
+            '-map', '0:v:0',                    // First video stream
+            '-map', `0:a:${audioTrack}`,        // Selected audio stream
+            '-c:v', 'copy',                     // Copy video (no re-encode)
+            '-c:a', 'aac',                      // Transcode audio to AAC for compatibility
+            '-b:a', '192k',                     // Audio bitrate
+            '-movflags', 'frag_keyframe+empty_moov+faststart',
+            '-f', 'mp4',                        // Output format
+            'pipe:1'                            // Output to stdout
+        );
+
+        const ffmpeg = spawn('ffmpeg', args);
+
+        res.setHeader('Content-Type', 'video/mp4');
+        res.setHeader('Accept-Ranges', 'none'); // Disable range requests for transcoded streams
+        res.setHeader('Cache-Control', 'no-cache');
+
+        ffmpeg.stdout.pipe(res);
+
+        ffmpeg.stderr.on('data', (data) => {
+            console.error('FFmpeg stderr:', data.toString());
+        });
+
+        ffmpeg.on('error', (error) => {
+            console.error('FFmpeg error:', error);
+            if (!res.headersSent) {
+                res.status(500).json({ error: 'Transcoding failed' });
+            }
+        });
+
+        ffmpeg.on('close', (code) => {
+            if (code !== 0 && code !== 255) {
+                console.error(`FFmpeg exited with code ${code}`);
+            }
+        });
+
+        // Handle client disconnect
+        req.on('close', () => {
+            ffmpeg.kill('SIGTERM');
+        });
+
+    } catch (error) {
+        console.error('Video stream error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * Stream video file directly (without transcoding)
+ */
+function streamVideoFile(req, res, filePath) {
+    try {
+        const stat = fs.statSync(filePath);
+        const fileSize = stat.size;
+        const range = req.headers.range;
+
+        // Determine content type
+        const ext = path.extname(filePath).toLowerCase();
+        const contentTypes = {
+            '.mp4': 'video/mp4',
+            '.webm': 'video/webm',
+            '.ogg': 'video/ogg',
+            '.m4v': 'video/mp4',
+            '.mkv': 'video/x-matroska',
+            '.avi': 'video/x-msvideo',
+            '.mov': 'video/quicktime'
+        };
+        const contentType = contentTypes[ext] || 'video/mp4';
+
+        if (range) {
+            const parts = range.replace(/bytes=/, "").split("-");
+            const start = parseInt(parts[0], 10);
+            const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+            const chunksize = (end - start) + 1;
+            const file = fs.createReadStream(filePath, { start, end });
+
+            const head = {
+                'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+                'Accept-Ranges': 'bytes',
+                'Content-Length': chunksize,
+                'Content-Type': contentType,
+            };
+
+            res.writeHead(206, head);
+            file.pipe(res);
+        } else {
+            const head = {
+                'Content-Length': fileSize,
+                'Content-Type': contentType,
+            };
+
+            res.writeHead(200, head);
+            fs.createReadStream(filePath).pipe(res);
+        }
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+}
 
 // Check for available OAuth providers
 app.get('/api/auth-providers', (req, res) => {

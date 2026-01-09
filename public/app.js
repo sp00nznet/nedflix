@@ -7,7 +7,11 @@ let userSettings = null;
 let availableAvatars = [];
 let selectedAvatar = 'cat';
 let currentVideoPath = null;
+let currentVideoName = null;
 let subtitleStatus = { configured: false };
+let audioTrackStatus = { canDetect: false, canSwitch: false };
+let currentAudioTracks = [];
+let selectedAudioTrack = 0;
 
 // DOM Elements
 const fileList = document.getElementById('file-list');
@@ -65,6 +69,9 @@ async function checkAuth() {
 
         // Check subtitle configuration
         checkSubtitleStatus();
+
+        // Check audio track configuration
+        checkAudioTrackStatus();
     } catch (error) {
         console.error('Auth check failed:', error);
         window.location.href = '/login.html';
@@ -80,6 +87,18 @@ async function checkSubtitleStatus() {
     } catch (error) {
         console.error('Failed to check subtitle status:', error);
         subtitleStatus = { configured: false };
+    }
+}
+
+// Check if audio track switching is available
+async function checkAudioTrackStatus() {
+    try {
+        const response = await fetch('/api/audio-tracks/status');
+        audioTrackStatus = await response.json();
+        console.log('Audio track status:', audioTrackStatus.message);
+    } catch (error) {
+        console.error('Failed to check audio track status:', error);
+        audioTrackStatus = { canDetect: false, canSwitch: false };
     }
 }
 
@@ -358,11 +377,17 @@ function renderFileList(items) {
 async function playVideo(path, name) {
     const videoUrl = `/api/video?path=${encodeURIComponent(path)}`;
 
-    // Store current video path for subtitle operations
+    // Store current video path for subtitle and audio operations
     currentVideoPath = path;
+    currentVideoName = name;
+    selectedAudioTrack = 0;
+    currentAudioTracks = [];
 
     // Remove any existing subtitle tracks
     removeSubtitleTracks();
+
+    // Hide audio selector while loading
+    hideAudioTrackSelector();
 
     videoPlayer.src = videoUrl;
     videoName.textContent = name;
@@ -390,6 +415,195 @@ async function playVideo(path, name) {
     // Search and load subtitles if enabled
     if (userSettings?.streaming?.subtitles && subtitleStatus.configured) {
         await loadSubtitles(path);
+    }
+
+    // Load audio tracks if available
+    if (audioTrackStatus.canDetect) {
+        await loadAudioTracks(path);
+    }
+}
+
+// Load audio tracks for the current video
+async function loadAudioTracks(videoPath) {
+    try {
+        const response = await fetch(`/api/audio-tracks?path=${encodeURIComponent(videoPath)}`);
+        const data = await response.json();
+
+        if (data.tracks && data.tracks.length > 1) {
+            currentAudioTracks = data.tracks;
+            showAudioTrackSelector(data.tracks);
+            console.log(`Found ${data.tracks.length} audio tracks`);
+        } else {
+            hideAudioTrackSelector();
+            currentAudioTracks = data.tracks || [];
+        }
+    } catch (error) {
+        console.error('Failed to load audio tracks:', error);
+        hideAudioTrackSelector();
+    }
+}
+
+// Show the audio track selector UI
+function showAudioTrackSelector(tracks) {
+    let container = document.getElementById('audio-track-container');
+
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'audio-track-container';
+        container.className = 'audio-track-container';
+        document.querySelector('.video-header').appendChild(container);
+    }
+
+    container.innerHTML = `
+        <div class="audio-track-selector">
+            <label for="audio-track-select">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                    <line x1="12" y1="19" x2="12" y2="23"></line>
+                    <line x1="8" y1="23" x2="16" y2="23"></line>
+                </svg>
+                Audio
+            </label>
+            <select id="audio-track-select">
+                ${tracks.map((track, index) => `
+                    <option value="${index}" ${track.default ? 'selected' : ''}>
+                        ${escapeHtml(track.label)}
+                    </option>
+                `).join('')}
+            </select>
+        </div>
+    `;
+
+    container.style.display = 'flex';
+
+    // Add event listener for track selection
+    const select = document.getElementById('audio-track-select');
+    select.addEventListener('change', handleAudioTrackChange);
+
+    // Set initial selection to default track
+    const defaultTrack = tracks.findIndex(t => t.default);
+    if (defaultTrack >= 0) {
+        selectedAudioTrack = defaultTrack;
+        select.value = defaultTrack;
+    }
+}
+
+// Hide the audio track selector
+function hideAudioTrackSelector() {
+    const container = document.getElementById('audio-track-container');
+    if (container) {
+        container.style.display = 'none';
+    }
+}
+
+// Handle audio track change
+async function handleAudioTrackChange(event) {
+    const newTrack = parseInt(event.target.value, 10);
+
+    if (newTrack === selectedAudioTrack) {
+        return;
+    }
+
+    if (!audioTrackStatus.canSwitch) {
+        // Show message that switching is not available
+        showAudioTrackMessage('FFmpeg required for audio switching', 'error');
+        event.target.value = selectedAudioTrack;
+        return;
+    }
+
+    // Store current playback state
+    const currentTime = videoPlayer.currentTime;
+    const wasPlaying = !videoPlayer.paused;
+    const volume = videoPlayer.volume;
+    const playbackRate = videoPlayer.playbackRate;
+
+    // Show loading indicator
+    showAudioTrackMessage('Switching audio track...', 'loading');
+
+    // Update selected track
+    selectedAudioTrack = newTrack;
+
+    // Create new video URL with selected audio track
+    const videoUrl = `/api/video-stream?path=${encodeURIComponent(currentVideoPath)}&audio=${newTrack}&start=${currentTime}`;
+
+    // Remove subtitle tracks (they'll need to be re-added)
+    removeSubtitleTracks();
+
+    // Load new stream
+    videoPlayer.src = videoUrl;
+
+    // Restore settings
+    videoPlayer.volume = volume;
+    videoPlayer.playbackRate = playbackRate;
+
+    // Wait for video to be ready
+    videoPlayer.onloadeddata = async () => {
+        showAudioTrackMessage(`Audio: ${currentAudioTracks[newTrack]?.label || 'Track ' + (newTrack + 1)}`, 'success');
+
+        if (wasPlaying) {
+            videoPlayer.play().catch(e => console.log('Autoplay prevented:', e));
+        }
+
+        // Reload subtitles if enabled
+        if (userSettings?.streaming?.subtitles && subtitleStatus.configured) {
+            await loadSubtitles(currentVideoPath);
+        }
+    };
+
+    videoPlayer.onerror = () => {
+        showAudioTrackMessage('Failed to switch audio track', 'error');
+        // Revert to original stream
+        selectedAudioTrack = 0;
+        event.target.value = 0;
+        videoPlayer.src = `/api/video?path=${encodeURIComponent(currentVideoPath)}`;
+    };
+}
+
+// Show audio track status message
+function showAudioTrackMessage(message, type) {
+    let indicator = document.getElementById('audio-track-indicator');
+
+    if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'audio-track-indicator';
+        indicator.className = 'audio-track-indicator';
+        document.querySelector('.video-header').appendChild(indicator);
+    }
+
+    indicator.className = `audio-track-indicator ${type}`;
+
+    let icon = '';
+    switch (type) {
+        case 'loading':
+            icon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M12 6v6l4 2"></path>
+            </svg>`;
+            break;
+        case 'success':
+            icon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>`;
+            break;
+        case 'error':
+            icon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>`;
+            break;
+    }
+
+    indicator.innerHTML = `${icon}<span>${message}</span>`;
+    indicator.style.display = 'flex';
+
+    // Auto-hide after a delay (except for loading)
+    if (type !== 'loading') {
+        setTimeout(() => {
+            indicator.style.display = 'none';
+        }, 3000);
     }
 }
 
