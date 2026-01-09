@@ -6,6 +6,8 @@ let currentUser = null;
 let userSettings = null;
 let availableAvatars = [];
 let selectedAvatar = 'cat';
+let currentVideoPath = null;
+let subtitleStatus = { configured: false };
 
 // DOM Elements
 const fileList = document.getElementById('file-list');
@@ -48,21 +50,36 @@ async function checkAuth() {
     try {
         const response = await fetch('/api/user');
         const data = await response.json();
-        
+
         if (!data.authenticated) {
             window.location.href = '/login.html';
             return;
         }
-        
+
         currentUser = data.user;
         userSettings = data.settings;
-        
+
         updateUserDisplay();
         applySettings();
         loadDirectory(currentPath);
+
+        // Check subtitle configuration
+        checkSubtitleStatus();
     } catch (error) {
         console.error('Auth check failed:', error);
         window.location.href = '/login.html';
+    }
+}
+
+// Check if subtitle search is configured
+async function checkSubtitleStatus() {
+    try {
+        const response = await fetch('/api/subtitles/status');
+        subtitleStatus = await response.json();
+        console.log('Subtitle status:', subtitleStatus.message);
+    } catch (error) {
+        console.error('Failed to check subtitle status:', error);
+        subtitleStatus = { configured: false };
     }
 }
 
@@ -338,30 +355,162 @@ function renderFileList(items) {
 }
 
 // Play video
-function playVideo(path, name) {
+async function playVideo(path, name) {
     const videoUrl = `/api/video?path=${encodeURIComponent(path)}`;
-    
+
+    // Store current video path for subtitle operations
+    currentVideoPath = path;
+
+    // Remove any existing subtitle tracks
+    removeSubtitleTracks();
+
     videoPlayer.src = videoUrl;
     videoName.textContent = name;
-    
+
     videoPlaceholder.classList.add('hidden');
     videoPlayer.classList.add('active');
-    
+
     // Apply user settings
     if (userSettings?.streaming) {
         videoPlayer.volume = userSettings.streaming.volume / 100;
         videoPlayer.playbackRate = userSettings.streaming.playbackSpeed;
     }
-    
+
     videoPlayer.play().catch(e => console.log('Autoplay prevented:', e));
-    
+
     // Mark active item
     document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
     event.currentTarget.classList.add('active');
-    
+
     // Scroll to player on mobile
     if (window.innerWidth <= 1200) {
         document.getElementById('player-section').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Search and load subtitles if enabled
+    if (userSettings?.streaming?.subtitles && subtitleStatus.configured) {
+        await loadSubtitles(path);
+    }
+}
+
+// Remove all existing subtitle tracks from video player
+function removeSubtitleTracks() {
+    const tracks = videoPlayer.querySelectorAll('track');
+    tracks.forEach(track => track.remove());
+
+    // Also update subtitle indicator
+    updateSubtitleIndicator(null);
+}
+
+// Load subtitles for the current video
+async function loadSubtitles(videoPath) {
+    updateSubtitleIndicator('searching');
+
+    try {
+        const response = await fetch(`/api/subtitles/search?path=${encodeURIComponent(videoPath)}`);
+        const data = await response.json();
+
+        if (data.found && data.subtitleUrl) {
+            // Create and add subtitle track
+            const track = document.createElement('track');
+            track.kind = 'subtitles';
+            track.label = 'English';
+            track.srclang = 'en';
+            track.src = data.subtitleUrl;
+            track.default = true;
+
+            videoPlayer.appendChild(track);
+
+            // Enable the track
+            if (videoPlayer.textTracks.length > 0) {
+                videoPlayer.textTracks[0].mode = 'showing';
+            }
+
+            updateSubtitleIndicator('loaded', data.cached ? 'Cached' : 'Downloaded');
+            console.log('Subtitles loaded:', data.metadata?.filename || 'from cache');
+        } else {
+            updateSubtitleIndicator('not_found', data.message || 'No subtitles found');
+            console.log('No subtitles found:', data.message);
+        }
+    } catch (error) {
+        console.error('Failed to load subtitles:', error);
+        updateSubtitleIndicator('error', 'Failed to load subtitles');
+    }
+}
+
+// Update the subtitle status indicator
+function updateSubtitleIndicator(status, message) {
+    let indicator = document.getElementById('subtitle-indicator');
+
+    if (!indicator) {
+        // Create indicator if it doesn't exist
+        indicator = document.createElement('div');
+        indicator.id = 'subtitle-indicator';
+        indicator.className = 'subtitle-indicator';
+        document.querySelector('.video-header').appendChild(indicator);
+    }
+
+    switch (status) {
+        case 'searching':
+            indicator.className = 'subtitle-indicator searching';
+            indicator.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M12 6v6l4 2"></path>
+                </svg>
+                <span>Searching for subtitles...</span>
+            `;
+            indicator.style.display = 'flex';
+            break;
+        case 'loaded':
+            indicator.className = 'subtitle-indicator loaded';
+            indicator.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+                <span>Subtitles ${message || 'loaded'}</span>
+            `;
+            indicator.style.display = 'flex';
+            // Auto-hide after 3 seconds
+            setTimeout(() => {
+                indicator.style.display = 'none';
+            }, 3000);
+            break;
+        case 'not_found':
+            indicator.className = 'subtitle-indicator not-found';
+            indicator.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="15" y1="9" x2="9" y2="15"></line>
+                    <line x1="9" y1="9" x2="15" y2="15"></line>
+                </svg>
+                <span>${message || 'No subtitles found'}</span>
+            `;
+            indicator.style.display = 'flex';
+            // Auto-hide after 4 seconds
+            setTimeout(() => {
+                indicator.style.display = 'none';
+            }, 4000);
+            break;
+        case 'error':
+            indicator.className = 'subtitle-indicator error';
+            indicator.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span>${message || 'Error'}</span>
+            `;
+            indicator.style.display = 'flex';
+            // Auto-hide after 4 seconds
+            setTimeout(() => {
+                indicator.style.display = 'none';
+            }, 4000);
+            break;
+        default:
+            indicator.style.display = 'none';
     }
 }
 

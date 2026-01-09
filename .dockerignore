@@ -33,3 +33,6 @@ docker-compose*.yml
 *.log
 *.md
 !README.md
+
+# Subtitle cache
+subtitle_cache/
