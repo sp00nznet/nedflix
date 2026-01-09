@@ -1,6 +1,8 @@
-# NFS Video Browser
+# Nedflix - NFS Video Browser
 
 A secure HTML5 and CSS compliant web application for browsing NFS mount points and playing video files, featuring HTTPS support, OAuth authentication, and user profiles.
+
+> **Nedflix** - Your personal video streaming platform for NFS-mounted media libraries.
 
 ## Features
 
@@ -16,13 +18,94 @@ A secure HTML5 and CSS compliant web application for browsing NFS mount points a
 
 ## Prerequisites
 
-- Node.js (v14 or higher)
-- npm (Node Package Manager)
-- OpenSSL (for generating SSL certificates)
-- An NFS mount point (default: `/mnt/nfs`)
+- Node.js (v14 or higher) - *or Docker*
+- npm (Node Package Manager) - *or Docker*
+- OpenSSL (for generating SSL certificates) - *included in Docker image*
+- An NFS mount point or video directory (default: `/mnt/nfs`)
 - OAuth credentials from Google and/or GitHub
 
-## Installation
+---
+
+## Docker Deployment (Recommended)
+
+The easiest way to run Nedflix is with Docker.
+
+### Quick Start
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd nedflix
+
+# Create your environment file
+cp .env.example .env
+# Edit .env with your OAuth credentials
+
+# Run with Docker Compose
+docker compose up -d
+
+# Access the application
+# https://localhost:3443
+```
+
+### Docker Compose Configuration
+
+Create a `.env` file with your settings:
+
+```env
+# Required: Session secret (use a long random string)
+SESSION_SECRET=your-super-secret-random-string-here
+
+# OAuth Providers (at least one required)
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+
+# Callback URL for OAuth (change for production)
+CALLBACK_BASE_URL=https://localhost:3443
+
+# Path to your video files on the host
+NFS_PATH=/path/to/your/videos
+```
+
+Then run:
+
+```bash
+docker compose up -d
+```
+
+### Docker Run (Without Compose)
+
+```bash
+# Build the image
+docker build -t nedflix .
+
+# Run the container
+docker run -d \
+  --name nedflix \
+  -p 3000:3000 \
+  -p 3443:3443 \
+  -v /path/to/videos:/mnt/nfs:ro \
+  -v nedflix-certs:/app/certs \
+  -e SESSION_SECRET=your-secret \
+  -e GOOGLE_CLIENT_ID=xxx \
+  -e GOOGLE_CLIENT_SECRET=xxx \
+  nedflix
+```
+
+### Docker Features
+
+- **Auto-generates SSL certificates** on first run
+- **Persists certificates** in a Docker volume
+- **Read-only video mount** for security
+- **Non-root user** inside container
+- **Health checks** for container orchestration
+- **Alpine-based** for minimal image size
+
+---
+
+## Manual Installation
 
 1. **Install dependencies:**
 ```bash
@@ -118,11 +201,14 @@ npm start
 ## Project Structure
 
 ```
-nfs-video-browser/
+nedflix/
 ├── server.js              # Main Express server with OAuth
 ├── generate-certs.js      # SSL certificate generator
 ├── package.json           # Project dependencies
 ├── .env.example           # Environment template
+├── Dockerfile             # Container build configuration
+├── docker-compose.yml     # Docker Compose orchestration
+├── .dockerignore          # Files excluded from Docker build
 ├── certs/                 # SSL certificates (generated)
 │   ├── server.key
 │   └── server.cert
@@ -211,6 +297,30 @@ Note: Actual playback support depends on your browser's codec support. MP4 and W
 - Clear browser cookies
 - Restart the server
 - Check SESSION_SECRET is set
+
+### Docker Issues
+
+**Container won't start:**
+```bash
+# Check logs
+docker compose logs nedflix
+
+# Verify environment variables
+docker compose config
+```
+
+**Can't access videos:**
+- Ensure the NFS_PATH in `.env` points to valid directory
+- Check volume mount permissions
+- Verify the path exists on host: `ls -la /path/to/your/videos`
+
+**Certificate issues in Docker:**
+```bash
+# Regenerate certificates
+docker compose down
+docker volume rm nedflix-certs
+docker compose up -d
+```
 
 ## License
 
