@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFS Video Browser</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <div class="logo">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    <span>NFS Video Browser</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <button class="user-menu-toggle" id="user-menu-toggle" title="User Menu">
+                    <img src="" alt="Profile" id="header-avatar" class="header-avatar">
+                    <span id="header-username">User</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="dropdown-arrow">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- User Panel Overlay -->
+        <div class="user-panel-overlay" id="user-panel-overlay">
+            <div class="user-panel" id="user-panel">
+                <div class="panel-header">
+                    <h2>Settings</h2>
+                    <button class="close-panel" id="close-panel" title="Close">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="panel-content">
+                    <!-- Profile Section -->
+                    <section class="settings-section">
+                        <h3>Profile</h3>
+                        <div class="profile-info">
+                            <div class="current-avatar-display">
+                                <img src="" alt="Current Avatar" id="panel-avatar" class="panel-avatar">
+                            </div>
+                            <div class="user-details">
+                                <p class="user-name" id="panel-username">Username</p>
+                                <p class="user-email" id="panel-email">email@example.com</p>
+                                <p class="user-provider" id="panel-provider">Signed in with Google</p>
+                            </div>
+                        </div>
+                        
+                        <div class="avatar-selection">
+                            <label>Choose Avatar</label>
+                            <div class="avatar-grid" id="avatar-grid">
+                                <!-- Avatars loaded via JavaScript -->
+                            </div>
+                        </div>
+                    </section>
+                    
+                    <!-- Streaming Settings Section -->
+                    <section class="settings-section">
+                        <h3>Streaming Settings</h3>
+                        
+                        <div class="setting-item">
+                            <label for="quality-select">Video Quality</label>
+                            <select id="quality-select" class="setting-select">
+                                <option value="auto">Auto</option>
+                                <option value="high">High (1080p)</option>
+                                <option value="medium">Medium (720p)</option>
+                                <option value="low">Low (480p)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-item">
+                            <label for="volume-slider">Default Volume</label>
+                            <div class="slider-container">
+                                <input type="range" id="volume-slider" min="0" max="100" value="80" class="setting-slider">
+                                <span class="slider-value" id="volume-value">80%</span>
+                            </div>
+                        </div>
+                        
+                        <div class="setting-item">
+                            <label for="speed-select">Playback Speed</label>
+                            <select id="speed-select" class="setting-select">
+                                <option value="0.5">0.5x</option>
+                                <option value="0.75">0.75x</option>
+                                <option value="1" selected>1x (Normal)</option>
+                                <option value="1.25">1.25x</option>
+                                <option value="1.5">1.5x</option>
+                                <option value="2">2x</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-item toggle-item">
+                            <label for="autoplay-toggle">Autoplay Next Video</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="autoplay-toggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="setting-item toggle-item">
+                            <label for="subtitles-toggle">Show Subtitles (when available)</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="subtitles-toggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </section>
+                </div>
+                
+                <div class="panel-footer">
+                    <button class="save-settings-btn" id="save-settings">Save Settings</button>
+                    <a href="/auth/logout" class="logout-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                        Log Out
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="browser-section">
+                <div class="path-bar">
+                    <button id="parent-btn" class="nav-btn" title="Go to parent directory">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="19" y1="12" x2="5" y2="12"></line>
+                            <polyline points="12 19 5 12 12 5"></polyline>
+                        </svg>
+                    </button>
+                    <button id="refresh-btn" class="nav-btn" title="Refresh">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                        </svg>
+                    </button>
+                    <div class="path-display">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="folder-icon">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <span id="current-path">/mnt/nfs</span>
+                    </div>
+                </div>
+                
+                <div class="file-list" id="file-list">
+                    <div class="loading-state">
+                        <div class="spinner"></div>
+                        <p>Loading files...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="player-section" id="player-section">
+                <div class="video-header">
+                    <h2 id="video-name">Select a video to play</h2>
+                </div>
+                <div class="video-container">
+                    <video id="video-player" controls>
+                        Your browser does not support the video tag.
+                    </video>
+                    <div class="video-placeholder" id="video-placeholder">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polygon points="10 8 16 12 10 16 10 8" fill="currentColor"></polygon>
+                        </svg>
+                        <p>Select a video from the browser</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>

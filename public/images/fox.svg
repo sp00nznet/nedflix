@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#e74c3c" rx="12"/>
+  <!-- Face -->
+  <ellipse cx="50" cy="58" rx="28" ry="24" fill="#ff7043"/>
+  <!-- Ears -->
+  <polygon points="22,12 38,48 10,42" fill="#ff7043"/>
+  <polygon points="78,12 62,48 90,42" fill="#ff7043"/>
+  <polygon points="25,18 35,42 15,38" fill="#2c3e50"/>
+  <polygon points="75,18 65,42 85,38" fill="#2c3e50"/>
+  <!-- White face markings -->
+  <path d="M50 45 L35 75 L50 85 L65 75 Z" fill="#fff"/>
+  <!-- Eyes -->
+  <ellipse cx="38" cy="52" rx="6" ry="8" fill="#2c3e50"/>
+  <ellipse cx="62" cy="52" rx="6" ry="8" fill="#2c3e50"/>
+  <ellipse cx="40" cy="50" rx="2" ry="3" fill="#fff"/>
+  <ellipse cx="64" cy="50" rx="2" ry="3" fill="#fff"/>
+  <!-- Nose -->
+  <ellipse cx="50" cy="68" rx="5" ry="4" fill="#2c3e50"/>
+  <!-- Mouth -->
+  <path d="M50 72 Q44 78 42 76" fill="none" stroke="#2c3e50" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M50 72 Q56 78 58 76" fill="none" stroke="#2c3e50" stroke-width="1.5" stroke-linecap="round"/>
+</svg>
