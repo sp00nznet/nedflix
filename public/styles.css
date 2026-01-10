@@ -1252,13 +1252,13 @@ body {
 }
 
 .video-container {
-    flex: 1;
     position: relative;
     background: #000;
     display: flex;
     align-items: center;
     justify-content: center;
     min-height: 300px;
+    max-height: 600px;
 }
 
 #video-player {
@@ -1302,7 +1302,7 @@ body {
     top: 0;
     left: 0;
     width: 100%;
-    height: calc(100% - 50px); /* Leave space for controls */
+    height: 100%;
     pointer-events: none;
 }
 

@@ -1614,7 +1614,7 @@ function drawVisualizer() {
     const container = visualizerCanvas.parentElement;
     if (container) {
         visualizerCanvas.width = container.clientWidth;
-        visualizerCanvas.height = container.clientHeight - 50; // Leave space for controls
+        visualizerCanvas.height = container.clientHeight;
     }
 
     // Get frequency data
