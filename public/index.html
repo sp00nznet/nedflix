@@ -152,8 +152,26 @@
                             </select>
                         </div>
                     </section>
+
+                    <section class="settings-section">
+                        <h3>Library</h3>
+                        <div class="setting-item">
+                            <label>Metadata Scan</label>
+                            <p class="setting-description">Fetch movie and TV show information from online databases</p>
+                            <div class="scan-controls">
+                                <button class="scan-btn" id="scan-movies-btn" data-path="/mnt/nfs/Movies">Scan Movies</button>
+                                <button class="scan-btn" id="scan-tv-btn" data-path="/mnt/nfs/TV Shows">Scan TV Shows</button>
+                            </div>
+                            <div class="scan-progress" id="scan-progress" style="display: none;">
+                                <div class="scan-progress-bar">
+                                    <div class="scan-progress-fill" id="scan-progress-fill"></div>
+                                </div>
+                                <div class="scan-progress-text" id="scan-progress-text">Scanning...</div>
+                            </div>
+                        </div>
+                    </section>
                 </div>
-                
+
                 <div class="panel-footer">
                     <button class="save-settings-btn" id="save-settings">Save Settings</button>
                     <a href="/auth/logout" class="logout-btn">

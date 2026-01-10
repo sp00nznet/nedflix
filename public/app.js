@@ -286,6 +286,11 @@ function setupEventListeners() {
 
     saveSettingsBtn.addEventListener('click', saveSettings);
 
+    // Metadata scan buttons
+    document.querySelectorAll('.scan-btn').forEach(btn => {
+        btn.addEventListener('click', () => startMetadataScan(btn.dataset.path, btn));
+    });
+
     // Keyboard
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
@@ -378,7 +383,7 @@ async function loadDirectory(path) {
 // Render file list
 function renderFileList(items) {
     fileList.innerHTML = '';
-    
+
     if (items.length === 0) {
         fileList.innerHTML = `
             <div class="empty-state">
@@ -387,11 +392,31 @@ function renderFileList(items) {
         `;
         return;
     }
-    
+
     items.forEach(item => {
         const div = document.createElement('div');
         div.className = 'file-item';
-        
+
+        // Build display name from metadata
+        let displayName = item.cleanTitle || item.name;
+        let subtitle = '';
+
+        if (item.isVideo || item.isAudio) {
+            // For TV episodes, show "S01E02 - Episode Title"
+            if (item.season && item.episode) {
+                const epNum = `S${String(item.season).padStart(2, '0')}E${String(item.episode).padStart(2, '0')}`;
+                if (item.episodeTitle) {
+                    subtitle = `${epNum} - ${item.episodeTitle}`;
+                } else {
+                    subtitle = epNum;
+                }
+            }
+            // Add year for movies
+            if (item.year && !item.season) {
+                displayName = `${displayName} (${item.year})`;
+            }
+        }
+
         if (item.isDirectory) {
             div.classList.add('directory');
             div.innerHTML = `
@@ -408,34 +433,58 @@ function renderFileList(items) {
             div.addEventListener('click', () => loadDirectory(item.path));
         } else if (item.isVideo) {
             div.classList.add('video');
-            div.innerHTML = `
-                <div class="file-icon">
+            if (item.hasMetadata) div.classList.add('has-metadata');
+
+            // Use poster thumbnail if available
+            const iconHtml = item.poster
+                ? `<div class="file-poster"><img src="${escapeHtml(item.poster)}" alt="" loading="lazy"></div>`
+                : `<div class="file-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polygon points="5 3 19 12 5 21 5 3"></polygon>
                     </svg>
-                </div>
+                </div>`;
+
+            // Build meta line
+            let metaParts = [];
+            if (item.rating) metaParts.push(`<span class="rating">${item.rating}</span>`);
+            if (item.genre) metaParts.push(item.genre.split(',')[0].trim());
+            metaParts.push(formatFileSize(item.size));
+
+            div.innerHTML = `
+                ${iconHtml}
                 <div class="file-info">
-                    <div class="file-name">${escapeHtml(item.name)}</div>
-                    <div class="file-meta">${formatFileSize(item.size)}</div>
+                    <div class="file-name">${escapeHtml(displayName)}</div>
+                    ${subtitle ? `<div class="file-subtitle">${escapeHtml(subtitle)}</div>` : ''}
+                    <div class="file-meta">${metaParts.join(' &bull; ')}</div>
                 </div>
             `;
-            div.addEventListener('click', () => playVideo(item.path, item.name));
+
+            const itemDisplayName = subtitle ? `${displayName} - ${subtitle}` : displayName;
+            div.addEventListener('click', () => playVideo(item.path, itemDisplayName));
         } else if (item.isAudio) {
             div.classList.add('audio');
-            div.innerHTML = `
-                <div class="file-icon">
+            if (item.hasMetadata) div.classList.add('has-metadata');
+
+            const iconHtml = item.poster
+                ? `<div class="file-poster"><img src="${escapeHtml(item.poster)}" alt="" loading="lazy"></div>`
+                : `<div class="file-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M9 18V5l12-2v13"></path>
                         <circle cx="6" cy="18" r="3"></circle>
                         <circle cx="18" cy="16" r="3"></circle>
                     </svg>
-                </div>
+                </div>`;
+
+            div.innerHTML = `
+                ${iconHtml}
                 <div class="file-info">
-                    <div class="file-name">${escapeHtml(item.name)}</div>
+                    <div class="file-name">${escapeHtml(displayName)}</div>
+                    ${subtitle ? `<div class="file-subtitle">${escapeHtml(subtitle)}</div>` : ''}
                     <div class="file-meta">${formatFileSize(item.size)}</div>
                 </div>
             `;
-            div.addEventListener('click', () => playAudio(item.path, item.name));
+
+            div.addEventListener('click', () => playAudio(item.path, displayName));
         } else {
             div.classList.add('other');
             div.innerHTML = `
@@ -451,7 +500,7 @@ function renderFileList(items) {
                 </div>
             `;
         }
-        
+
         fileList.appendChild(div);
     });
 }
@@ -1119,6 +1168,97 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// ========== METADATA SCANNING ==========
+let scanPollInterval = null;
+
+async function startMetadataScan(dirPath, button) {
+    const progressDiv = document.getElementById('scan-progress');
+    const progressFill = document.getElementById('scan-progress-fill');
+    const progressText = document.getElementById('scan-progress-text');
+
+    // Disable all scan buttons
+    document.querySelectorAll('.scan-btn').forEach(btn => {
+        btn.disabled = true;
+    });
+    button.classList.add('scanning');
+    button.textContent = 'Scanning...';
+    progressDiv.style.display = 'block';
+    progressFill.style.width = '0%';
+    progressText.textContent = 'Starting scan...';
+
+    try {
+        const response = await fetch('/api/metadata/scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: dirPath })
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+            progressText.textContent = `Error: ${data.error}`;
+            resetScanButtons(button);
+            return;
+        }
+
+        // Start polling for progress
+        scanPollInterval = setInterval(() => pollScanProgress(button), 1000);
+    } catch (error) {
+        progressText.textContent = `Error: ${error.message}`;
+        resetScanButtons(button);
+    }
+}
+
+async function pollScanProgress(button) {
+    const progressFill = document.getElementById('scan-progress-fill');
+    const progressText = document.getElementById('scan-progress-text');
+
+    try {
+        const response = await fetch('/api/metadata/scan/progress');
+        const data = await response.json();
+
+        if (data.status === 'running') {
+            const percent = data.total > 0 ? Math.round((data.scanned / data.total) * 100) : 0;
+            progressFill.style.width = `${percent}%`;
+            progressText.textContent = `Scanning: ${data.scanned}/${data.total} - ${data.current || '...'}`;
+        } else if (data.status === 'completed') {
+            clearInterval(scanPollInterval);
+            scanPollInterval = null;
+            progressFill.style.width = '100%';
+            progressText.textContent = `Completed! Scanned ${data.scanned} files.`;
+            resetScanButtons(button);
+
+            // Reload current directory to show updated metadata
+            if (currentLibraryRoot) {
+                loadDirectory(currentPath);
+            }
+
+            // Hide progress after a delay
+            setTimeout(() => {
+                document.getElementById('scan-progress').style.display = 'none';
+            }, 3000);
+        } else if (data.status === 'error') {
+            clearInterval(scanPollInterval);
+            scanPollInterval = null;
+            progressText.textContent = `Error: ${data.error}`;
+            resetScanButtons(button);
+        }
+    } catch (error) {
+        clearInterval(scanPollInterval);
+        scanPollInterval = null;
+        progressText.textContent = `Error: ${error.message}`;
+        resetScanButtons(button);
+    }
+}
+
+function resetScanButtons(activeButton) {
+    document.querySelectorAll('.scan-btn').forEach(btn => {
+        btn.disabled = false;
+        btn.classList.remove('scanning');
+    });
+    activeButton.textContent = activeButton.id === 'scan-movies-btn' ? 'Scan Movies' : 'Scan TV Shows';
 }
 
 // ========== AUDIO VISUALIZER ==========
