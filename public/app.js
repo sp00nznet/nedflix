@@ -335,6 +335,16 @@ function setupEventListeners() {
 
     saveSettingsBtn.addEventListener('click', saveSettings);
 
+    // Change password toggle (collapsible)
+    const changePasswordToggle = document.getElementById('change-password-toggle');
+    const changePasswordContent = document.getElementById('change-password-content');
+    if (changePasswordToggle && changePasswordContent) {
+        changePasswordToggle.addEventListener('click', () => {
+            changePasswordToggle.classList.toggle('expanded');
+            changePasswordContent.classList.toggle('expanded');
+        });
+    }
+
     // Change password button
     const changePasswordBtn = document.getElementById('change-password-btn');
     if (changePasswordBtn) {
