@@ -12,6 +12,7 @@ let subtitleStatus = { configured: false };
 let audioTrackStatus = { canDetect: false, canSwitch: false };
 let currentAudioTracks = [];
 let selectedAudioTrack = 0;
+let videoDuration = null;
 
 // DOM Elements
 const fileList = document.getElementById('file-list');
@@ -382,9 +383,13 @@ async function playVideo(path, name) {
     currentVideoName = name;
     selectedAudioTrack = 0;
     currentAudioTracks = [];
+    videoDuration = null;
 
     // Remove any existing subtitle tracks
     removeSubtitleTracks();
+
+    // Hide custom time display until duration is loaded
+    hideCustomTimeDisplay();
 
     // Hide audio selector while loading
     hideAudioTrackSelector();
@@ -428,6 +433,12 @@ async function loadAudioTracks(videoPath) {
     try {
         const response = await fetch(`/api/audio-tracks?path=${encodeURIComponent(videoPath)}`);
         const data = await response.json();
+
+        // Store video duration for custom time display
+        if (data.duration) {
+            videoDuration = data.duration;
+            setupCustomTimeDisplay();
+        }
 
         if (data.tracks && data.tracks.length > 1) {
             currentAudioTracks = data.tracks;
@@ -745,4 +756,49 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// Format seconds to HH:MM:SS or MM:SS
+function formatTime(seconds) {
+    if (isNaN(seconds) || seconds < 0) return '0:00';
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    if (hrs > 0) {
+        return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Setup custom time display overlay
+function setupCustomTimeDisplay() {
+    if (!videoDuration) return;
+    let timeDisplay = document.getElementById('custom-time-display');
+    if (!timeDisplay) {
+        timeDisplay = document.createElement('div');
+        timeDisplay.id = 'custom-time-display';
+        timeDisplay.className = 'custom-time-display';
+        document.querySelector('.video-container').appendChild(timeDisplay);
+    }
+    timeDisplay.style.display = 'block';
+    updateTimeDisplay();
+    videoPlayer.removeEventListener('timeupdate', updateTimeDisplay);
+    videoPlayer.addEventListener('timeupdate', updateTimeDisplay);
+}
+
+// Update the custom time display
+function updateTimeDisplay() {
+    const timeDisplay = document.getElementById('custom-time-display');
+    if (!timeDisplay || !videoDuration) return;
+    const currentTime = videoPlayer.currentTime || 0;
+    timeDisplay.textContent = `${formatTime(currentTime)} / ${formatTime(videoDuration)}`;
+}
+
+// Hide custom time display
+function hideCustomTimeDisplay() {
+    const timeDisplay = document.getElementById('custom-time-display');
+    if (timeDisplay) {
+        timeDisplay.style.display = 'none';
+    }
+    videoDuration = null;
 }
