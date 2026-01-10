@@ -1,6 +1,6 @@
 version: '3.8'
 
-# Nedflix - NFS Video Browser
+# Nedflix - Personal Video Streaming Platform
 # Docker Compose configuration
 
 services:

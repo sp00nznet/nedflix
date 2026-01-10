@@ -1,4 +1,4 @@
-# Nedflix - NFS Video Browser
+# Nedflix - Personal Video Streaming Platform
 # Dockerfile for containerized deployment
 
 FROM node:20-alpine
@@ -8,7 +8,7 @@ RUN apk add --no-cache openssl
 
 # Labels
 LABEL org.opencontainers.image.title="Nedflix"
-LABEL org.opencontainers.image.description="NFS Video Browser with OAuth and HTTPS"
+LABEL org.opencontainers.image.description="Personal video streaming platform with OAuth and HTTPS"
 LABEL org.opencontainers.image.version="2.0.0"
 
 # Create non-root user

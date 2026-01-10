@@ -1,7 +1,7 @@
 {
-  "name": "nfs-video-browser",
+  "name": "nedflix",
   "version": "2.0.0",
-  "description": "NFS video browser with HTTPS, OAuth, and user profiles",
+  "description": "Personal video streaming platform for NFS-mounted media libraries",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
