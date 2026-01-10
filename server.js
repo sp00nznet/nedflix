@@ -1164,30 +1164,47 @@ app.get('/api/browse', ensureAuthenticated, async (req, res) => {
     }
 
     try {
-        const items = fs.readdirSync(normalizedPath, { withFileTypes: true });
+        // Try to use database index first for better performance
+        let fileList = [];
+        const hasIndexedData = await mediaService.hasIndexedChildren(normalizedPath);
 
-        const fileList = items.map(item => {
-            const fullPath = path.join(normalizedPath, item.name);
-            let stats;
-            try {
-                stats = fs.statSync(fullPath);
-            } catch {
-                return null;
-            }
+        if (hasIndexedData) {
+            // Use database index (fast, no disk access)
+            fileList = await mediaService.browse(normalizedPath);
+        } else {
+            // Fall back to filesystem scan if path not indexed
+            const items = fs.readdirSync(normalizedPath, { withFileTypes: true });
 
-            const isDir = item.isDirectory();
-            const isVideo = !isDir && /\.(mp4|webm|ogg|avi|mkv|mov|m4v)$/i.test(item.name);
-            const isAudio = !isDir && /\.(mp3|m4a|flac|wav|aac|ogg|wma|opus|aiff)$/i.test(item.name);
+            fileList = items.map(item => {
+                const fullPath = path.join(normalizedPath, item.name);
+                let stats;
+                try {
+                    stats = fs.statSync(fullPath);
+                } catch {
+                    return null;
+                }
 
-            return {
-                name: item.name,
-                path: fullPath,
-                isDirectory: isDir,
-                isVideo: isVideo,
-                isAudio: isAudio,
-                size: stats.size
-            };
-        }).filter(Boolean);
+                const isDir = item.isDirectory();
+                const isVideo = !isDir && /\.(mp4|webm|ogg|avi|mkv|mov|m4v)$/i.test(item.name);
+                const isAudio = !isDir && /\.(mp3|m4a|flac|wav|aac|ogg|wma|opus|aiff)$/i.test(item.name);
+
+                return {
+                    name: item.name,
+                    path: fullPath,
+                    isDirectory: isDir,
+                    isVideo: isVideo,
+                    isAudio: isAudio,
+                    size: stats.size
+                };
+            }).filter(Boolean);
+
+            // Sort filesystem results
+            fileList.sort((a, b) => {
+                if (a.isDirectory && !b.isDirectory) return -1;
+                if (!a.isDirectory && b.isDirectory) return 1;
+                return a.name.localeCompare(b.name);
+            });
+        }
 
         // Get cached metadata for all media files
         const mediaPaths = fileList.filter(f => f.isVideo || f.isAudio).map(f => f.path);
@@ -1219,12 +1236,6 @@ app.get('/api/browse', ensureAuthenticated, async (req, res) => {
                 item.hasMetadata = false;
             }
         }
-
-        fileList.sort((a, b) => {
-            if (a.isDirectory && !b.isDirectory) return -1;
-            if (!a.isDirectory && b.isDirectory) return 1;
-            return a.name.localeCompare(b.name);
-        });
 
         // Calculate parent path (but don't go above mount point)
         let parentPath = path.dirname(normalizedPath);

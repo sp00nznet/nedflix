@@ -397,6 +397,43 @@ async function hasIndex() {
     return parseInt(count.count) > 0;
 }
 
+/**
+ * Browse files from the database index
+ * Returns files and folders in the specified directory path
+ */
+async function browse(directoryPath) {
+    // Get all items where parent_path matches the directory
+    const items = await db.all(`
+        SELECT path, name, parent_path, file_type, extension, size, modified_at, library
+        FROM file_index
+        WHERE parent_path = ?
+        ORDER BY
+            CASE WHEN file_type = 'folder' THEN 0 ELSE 1 END,
+            name ASC
+    `, [directoryPath]);
+
+    return items.map(item => ({
+        name: item.name,
+        path: item.path,
+        isDirectory: item.file_type === 'folder',
+        isVideo: item.file_type === 'video',
+        isAudio: item.file_type === 'audio',
+        size: item.size || 0,
+        library: item.library
+    }));
+}
+
+/**
+ * Check if a specific path has indexed children
+ */
+async function hasIndexedChildren(directoryPath) {
+    const count = await db.get(
+        'SELECT COUNT(*) as count FROM file_index WHERE parent_path = ?',
+        [directoryPath]
+    );
+    return parseInt(count.count) > 0;
+}
+
 module.exports = {
     init,
     startScan,
@@ -405,6 +442,8 @@ module.exports = {
     search,
     getIndexStats,
     hasIndex,
+    browse,
+    hasIndexedChildren,
     VIDEO_EXTENSIONS,
     AUDIO_EXTENSIONS
 };
