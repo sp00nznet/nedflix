@@ -4,6 +4,7 @@ let parentPath = '';
 let canGoUp = false;
 let currentUser = null;
 let userSettings = null;
+const DEFAULT_VOLUME = 0.8; // Default 80% volume
 let availableAvatars = [];
 let selectedAvatar = 'cat';
 let currentVideoPath = null;
@@ -227,7 +228,7 @@ function applySettings() {
     subtitleLanguageSelect.value = s.subtitleLanguage || 'en';
 
     // Apply to video player
-    videoPlayer.volume = (s.volume || 80) / 100;
+    videoPlayer.volume = s.volume ? s.volume / 100 : DEFAULT_VOLUME;
     videoPlayer.playbackRate = s.playbackSpeed || 1;
 }
 
@@ -574,11 +575,11 @@ async function playVideo(path, name) {
     // Load the video
     videoPlayer.src = videoUrl;
 
-    // Apply user settings
-    if (userSettings?.streaming) {
-        videoPlayer.volume = userSettings.streaming.volume / 100;
-        videoPlayer.playbackRate = userSettings.streaming.playbackSpeed;
-    }
+    // Apply user settings with fallback defaults
+    videoPlayer.volume = userSettings?.streaming?.volume
+        ? userSettings.streaming.volume / 100
+        : DEFAULT_VOLUME;
+    videoPlayer.playbackRate = userSettings?.streaming?.playbackSpeed || 1;
 
     videoPlayer.play().catch(e => console.log('Autoplay prevented:', e));
 
@@ -621,11 +622,12 @@ function playAudio(path, name) {
     videoPlaceholder.classList.add('hidden');
     videoPlayer.classList.add('active');
 
-    // Apply user settings
-    if (userSettings?.streaming) {
-        videoPlayer.volume = userSettings.streaming.volume / 100;
-        videoPlayer.playbackRate = userSettings.streaming.playbackSpeed;
-    }
+    // Apply user settings with fallback defaults
+    const targetVolume = userSettings?.streaming?.volume
+        ? userSettings.streaming.volume / 100
+        : DEFAULT_VOLUME;
+    videoPlayer.volume = targetVolume;
+    videoPlayer.playbackRate = userSettings?.streaming?.playbackSpeed || 1;
 
     // Initialize and start visualizer for audio playback
     if (initVisualizer()) {
@@ -633,6 +635,8 @@ function playAudio(path, name) {
         videoPlayer.addEventListener('canplay', function onCanPlay() {
             videoPlayer.removeEventListener('canplay', onCanPlay);
             connectAudioSource();
+            // Re-apply volume after Web Audio API connection
+            videoPlayer.volume = targetVolume;
             startVisualizer();
         }, { once: true });
     }
@@ -1435,8 +1439,8 @@ function drawBars(dataArray) {
     const barCount = 64;
     const barWidth = visualizerCanvas.width / barCount;
     const barGap = 2;
-    const bottomPadding = 60; // Space for video controls
-    const maxBarHeight = (visualizerCanvas.height - bottomPadding) * 0.85;
+    const topPadding = 20; // Small gap from top
+    const maxBarHeight = visualizerCanvas.height * 0.6; // Bars hang from top, use 60% of height
     const step = Math.floor(dataArray.length / barCount);
 
     for (let i = 0; i < barCount; i++) {
@@ -1448,9 +1452,10 @@ function drawBars(dataArray) {
         const barHeight = (average / 255) * maxBarHeight;
 
         const x = i * barWidth + barGap / 2;
-        const y = visualizerCanvas.height - bottomPadding - barHeight;
+        const y = topPadding; // Bars start from top
 
-        const gradient = visualizerCtx.createLinearGradient(x, y, x, visualizerCanvas.height - bottomPadding);
+        // Gradient from top to bottom of bar
+        const gradient = visualizerCtx.createLinearGradient(x, y, x, y + barHeight);
         gradient.addColorStop(0, 'rgba(124, 92, 255, 0.9)');
         gradient.addColorStop(0.5, 'rgba(0, 212, 170, 0.7)');
         gradient.addColorStop(1, 'rgba(0, 212, 170, 0.3)');
