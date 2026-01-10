@@ -1056,22 +1056,6 @@ body {
     display: none;
 }
 
-/* Custom time display - positioned on the left */
-.custom-time-display {
-    position: absolute;
-    bottom: 70px;
-    left: 16px;
-    background: rgba(0, 0, 0, 0.85);
-    color: white;
-    padding: 6px 12px;
-    border-radius: var(--radius-sm);
-    font-size: 13px;
-    font-family: var(--font-mono);
-    font-weight: 500;
-    z-index: 10;
-    pointer-events: none;
-}
-
 /* Scrollbar */
 ::-webkit-scrollbar {
     width: 8px;

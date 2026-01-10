@@ -760,7 +760,7 @@ function getDefaultSettings() {
             volume: 80,
             playbackSpeed: 1.0,
             subtitles: false,
-            audioLanguage: '',
+            audioLanguage: 'eng',
             subtitleLanguage: 'en'
         },
         profilePicture: 'cat'
