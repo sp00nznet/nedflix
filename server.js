@@ -1065,11 +1065,16 @@ app.get('/api/browse', ensureAuthenticated, (req, res) => {
                 return null;
             }
             
+            const isDir = item.isDirectory();
+            const isVideo = !isDir && /\.(mp4|webm|ogg|avi|mkv|mov|m4v)$/i.test(item.name);
+            const isAudio = !isDir && /\.(mp3|m4a|flac|wav|aac|ogg|wma|opus|aiff)$/i.test(item.name);
+
             return {
                 name: item.name,
                 path: fullPath,
-                isDirectory: item.isDirectory(),
-                isVideo: !item.isDirectory() && /\.(mp4|webm|ogg|avi|mkv|mov|m4v)$/i.test(item.name),
+                isDirectory: isDir,
+                isVideo: isVideo,
+                isAudio: isAudio,
                 size: stats.size
             };
         }).filter(Boolean);
@@ -1154,6 +1159,70 @@ app.get('/api/video', ensureAuthenticated, (req, res) => {
                 'Content-Type': contentType,
             };
             
+            res.writeHead(200, head);
+            fs.createReadStream(normalizedPath).pipe(res);
+        }
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Stream audio (protected)
+app.get('/api/audio', ensureAuthenticated, (req, res) => {
+    const audioPath = req.query.path;
+
+    if (!audioPath) {
+        return res.status(400).send('Audio path is required');
+    }
+
+    // Security: Ensure path is within NFS mount
+    const normalizedPath = path.normalize(audioPath);
+    if (!normalizedPath.startsWith(NFS_MOUNT_PATH)) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+
+    try {
+        const stat = fs.statSync(normalizedPath);
+        const fileSize = stat.size;
+        const range = req.headers.range;
+
+        // Determine content type
+        const ext = path.extname(normalizedPath).toLowerCase();
+        const contentTypes = {
+            '.mp3': 'audio/mpeg',
+            '.m4a': 'audio/mp4',
+            '.flac': 'audio/flac',
+            '.wav': 'audio/wav',
+            '.aac': 'audio/aac',
+            '.ogg': 'audio/ogg',
+            '.wma': 'audio/x-ms-wma',
+            '.opus': 'audio/opus',
+            '.aiff': 'audio/aiff'
+        };
+        const contentType = contentTypes[ext] || 'audio/mpeg';
+
+        if (range) {
+            const parts = range.replace(/bytes=/, "").split("-");
+            const start = parseInt(parts[0], 10);
+            const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+            const chunksize = (end - start) + 1;
+            const file = fs.createReadStream(normalizedPath, { start, end });
+
+            const head = {
+                'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+                'Accept-Ranges': 'bytes',
+                'Content-Length': chunksize,
+                'Content-Type': contentType,
+            };
+
+            res.writeHead(206, head);
+            file.pipe(res);
+        } else {
+            const head = {
+                'Content-Length': fileSize,
+                'Content-Type': contentType,
+            };
+
             res.writeHead(200, head);
             fs.createReadStream(normalizedPath).pipe(res);
         }

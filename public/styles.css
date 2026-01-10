@@ -815,8 +815,14 @@ body {
 
 .library-cards {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 24px;
+}
+
+@media (max-width: 1024px) {
+    .library-cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 
 .library-card {
@@ -1030,6 +1036,11 @@ body {
 .file-item.video .file-icon {
     background: rgba(0, 212, 170, 0.15);
     color: var(--color-accent);
+}
+
+.file-item.audio .file-icon {
+    background: rgba(255, 184, 77, 0.15);
+    color: var(--color-warning);
 }
 
 .file-item.other .file-icon {

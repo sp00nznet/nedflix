@@ -417,6 +417,22 @@ function renderFileList(items) {
                 </div>
             `;
             div.addEventListener('click', () => playVideo(item.path, item.name));
+        } else if (item.isAudio) {
+            div.classList.add('audio');
+            div.innerHTML = `
+                <div class="file-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 18V5l12-2v13"></path>
+                        <circle cx="6" cy="18" r="3"></circle>
+                        <circle cx="18" cy="16" r="3"></circle>
+                    </svg>
+                </div>
+                <div class="file-info">
+                    <div class="file-name">${escapeHtml(item.name)}</div>
+                    <div class="file-meta">${formatFileSize(item.size)}</div>
+                </div>
+            `;
+            div.addEventListener('click', () => playAudio(item.path, item.name));
         } else {
             div.classList.add('other');
             div.innerHTML = `
@@ -522,6 +538,50 @@ async function playVideo(path, name) {
 
     // Load embedded subtitles
     await loadEmbeddedSubtitles(path);
+}
+
+// Play audio file
+function playAudio(path, name) {
+    const audioUrl = `/api/audio?path=${encodeURIComponent(path)}`;
+
+    // Reset video-related state
+    currentVideoPath = null;
+    currentVideoName = null;
+    selectedAudioTrack = 0;
+    currentAudioTracks = [];
+    currentEmbeddedSubtitles = [];
+    selectedEmbeddedSubtitle = -1;
+
+    // Remove any existing subtitle tracks
+    removeSubtitleTracks();
+
+    // Hide audio and subtitle selectors (not relevant for audio files)
+    hideAudioTrackSelector();
+    hideEmbeddedSubtitleSelector();
+
+    // Use the video player element for audio (it handles audio files fine)
+    videoPlayer.src = audioUrl;
+    videoName.textContent = name;
+
+    videoPlaceholder.classList.add('hidden');
+    videoPlayer.classList.add('active');
+
+    // Apply user settings
+    if (userSettings?.streaming) {
+        videoPlayer.volume = userSettings.streaming.volume / 100;
+        videoPlayer.playbackRate = userSettings.streaming.playbackSpeed;
+    }
+
+    videoPlayer.play().catch(e => console.log('Autoplay prevented:', e));
+
+    // Mark active item
+    document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+
+    // Scroll to player on mobile
+    if (window.innerWidth <= 1200) {
+        document.getElementById('player-section').scrollIntoView({ behavior: 'smooth' });
+    }
 }
 
 // Fetch audio track info from server (without switching)
