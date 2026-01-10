@@ -1270,6 +1270,8 @@ let visualizerCtx = null;
 let animationFrameId = null;
 let isVisualizerActive = false;
 let audioSourceConnected = false;
+let visualizerType = 'bars';
+let particles = [];
 
 // Initialize the audio visualizer
 function initVisualizer() {
@@ -1286,8 +1288,21 @@ function initVisualizer() {
     // Create analyser node
     if (!analyser) {
         analyser = audioContext.createAnalyser();
-        analyser.fftSize = 256;
+        analyser.fftSize = 512;
         analyser.smoothingTimeConstant = 0.8;
+    }
+
+    // Set up visualizer type selector
+    const visualizerSelect = document.getElementById('visualizer-select');
+    if (visualizerSelect) {
+        visualizerSelect.addEventListener('change', (e) => {
+            visualizerType = e.target.value;
+            if (visualizerType === 'none') {
+                visualizerCanvas.classList.remove('active');
+            } else if (isVisualizerActive) {
+                visualizerCanvas.classList.add('active');
+            }
+        });
     }
 
     return true;
@@ -1295,13 +1310,10 @@ function initVisualizer() {
 
 // Connect the video player to the analyser (only once per session)
 function connectAudioSource() {
-    // MediaElementSource can only be created once per element
-    // So we check if we've already connected
     if (audioSourceConnected && audioSource) {
         return true;
     }
 
-    // Create new source from video player
     try {
         audioSource = audioContext.createMediaElementSource(videoPlayer);
         audioSource.connect(analyser);
@@ -1309,9 +1321,7 @@ function connectAudioSource() {
         audioSourceConnected = true;
         return true;
     } catch (e) {
-        // Source might already be connected from a previous session
         if (e.name === 'InvalidStateError') {
-            // Already connected, that's fine
             audioSourceConnected = true;
             return true;
         }
@@ -1320,17 +1330,39 @@ function connectAudioSource() {
     }
 }
 
+// Show visualizer controls
+function showVisualizerControls() {
+    const controls = document.getElementById('visualizer-controls');
+    if (controls) {
+        controls.classList.add('active');
+    }
+}
+
+// Hide visualizer controls
+function hideVisualizerControls() {
+    const controls = document.getElementById('visualizer-controls');
+    if (controls) {
+        controls.classList.remove('active');
+    }
+}
+
 // Start the visualizer animation
 function startVisualizer() {
     if (!visualizerCanvas || !analyser) return;
 
     isVisualizerActive = true;
-    visualizerCanvas.classList.add('active');
+    showVisualizerControls();
 
-    // Resume audio context if suspended
+    if (visualizerType !== 'none') {
+        visualizerCanvas.classList.add('active');
+    }
+
     if (audioContext && audioContext.state === 'suspended') {
         audioContext.resume();
     }
+
+    // Initialize particles for particle mode
+    particles = [];
 
     drawVisualizer();
 }
@@ -1338,6 +1370,7 @@ function startVisualizer() {
 // Stop the visualizer animation
 function stopVisualizer() {
     isVisualizerActive = false;
+    hideVisualizerControls();
 
     if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
@@ -1346,14 +1379,13 @@ function stopVisualizer() {
 
     if (visualizerCanvas) {
         visualizerCanvas.classList.remove('active');
-        // Clear the canvas
         if (visualizerCtx) {
             visualizerCtx.clearRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
         }
     }
 }
 
-// Draw the visualizer bars
+// Main draw function - dispatches to the selected visualizer
 function drawVisualizer() {
     if (!isVisualizerActive || !analyser || !visualizerCanvas || !visualizerCtx) {
         return;
@@ -1361,62 +1393,238 @@ function drawVisualizer() {
 
     animationFrameId = requestAnimationFrame(drawVisualizer);
 
-    // Update canvas size to match container
+    // Update canvas size
     const container = visualizerCanvas.parentElement;
     if (container) {
         visualizerCanvas.width = container.clientWidth;
-        visualizerCanvas.height = container.clientHeight;
+        visualizerCanvas.height = container.clientHeight - 50; // Leave space for controls
     }
 
+    // Get frequency data
     const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-    analyser.getByteFrequencyData(dataArray);
+    const frequencyData = new Uint8Array(bufferLength);
+    const waveformData = new Uint8Array(bufferLength);
+    analyser.getByteFrequencyData(frequencyData);
+    analyser.getByteTimeDomainData(waveformData);
 
-    // Clear canvas with transparent background
+    // Clear canvas
     visualizerCtx.clearRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
 
-    // Calculate bar dimensions
+    // Draw based on selected type
+    switch (visualizerType) {
+        case 'bars':
+            drawBars(frequencyData);
+            break;
+        case 'wave':
+            drawWaveform(waveformData);
+            break;
+        case 'circular':
+            drawCircular(frequencyData);
+            break;
+        case 'particles':
+            drawParticles(frequencyData);
+            break;
+        case 'none':
+        default:
+            break;
+    }
+}
+
+// Bar visualizer
+function drawBars(dataArray) {
     const barCount = 64;
     const barWidth = visualizerCanvas.width / barCount;
     const barGap = 2;
-    const maxBarHeight = visualizerCanvas.height * 0.8;
-
-    // Sample the frequency data
-    const step = Math.floor(bufferLength / barCount);
+    const maxBarHeight = visualizerCanvas.height * 0.85;
+    const step = Math.floor(dataArray.length / barCount);
 
     for (let i = 0; i < barCount; i++) {
-        // Average a few frequency bins for smoother visualization
         let sum = 0;
         for (let j = 0; j < step; j++) {
             sum += dataArray[i * step + j];
         }
         const average = sum / step;
-
-        // Calculate bar height (0-255 range from analyser)
         const barHeight = (average / 255) * maxBarHeight;
 
-        // Calculate position (centered at bottom)
         const x = i * barWidth + barGap / 2;
         const y = visualizerCanvas.height - barHeight;
 
-        // Create gradient for bars
         const gradient = visualizerCtx.createLinearGradient(x, y, x, visualizerCanvas.height);
-        gradient.addColorStop(0, 'rgba(124, 92, 255, 0.9)');  // Primary color
-        gradient.addColorStop(0.5, 'rgba(0, 212, 170, 0.7)'); // Accent color
+        gradient.addColorStop(0, 'rgba(124, 92, 255, 0.9)');
+        gradient.addColorStop(0.5, 'rgba(0, 212, 170, 0.7)');
         gradient.addColorStop(1, 'rgba(0, 212, 170, 0.3)');
 
         visualizerCtx.fillStyle = gradient;
         visualizerCtx.fillRect(x, y, barWidth - barGap, barHeight);
+    }
+}
 
-        // Add glow effect for higher bars
-        if (barHeight > maxBarHeight * 0.5) {
-            visualizerCtx.shadowColor = 'rgba(124, 92, 255, 0.5)';
-            visualizerCtx.shadowBlur = 10;
+// Waveform visualizer
+function drawWaveform(dataArray) {
+    const width = visualizerCanvas.width;
+    const height = visualizerCanvas.height;
+    const centerY = height / 2;
+
+    visualizerCtx.lineWidth = 3;
+    visualizerCtx.lineCap = 'round';
+    visualizerCtx.lineJoin = 'round';
+
+    // Create gradient stroke
+    const gradient = visualizerCtx.createLinearGradient(0, 0, width, 0);
+    gradient.addColorStop(0, 'rgba(124, 92, 255, 0.9)');
+    gradient.addColorStop(0.5, 'rgba(0, 212, 170, 0.9)');
+    gradient.addColorStop(1, 'rgba(124, 92, 255, 0.9)');
+    visualizerCtx.strokeStyle = gradient;
+
+    visualizerCtx.beginPath();
+
+    const sliceWidth = width / dataArray.length;
+    let x = 0;
+
+    for (let i = 0; i < dataArray.length; i++) {
+        const v = dataArray[i] / 128.0;
+        const y = (v * height) / 2;
+
+        if (i === 0) {
+            visualizerCtx.moveTo(x, y);
         } else {
-            visualizerCtx.shadowBlur = 0;
+            visualizerCtx.lineTo(x, y);
+        }
+        x += sliceWidth;
+    }
+
+    visualizerCtx.stroke();
+
+    // Draw mirrored wave
+    visualizerCtx.globalAlpha = 0.3;
+    visualizerCtx.beginPath();
+    x = 0;
+
+    for (let i = 0; i < dataArray.length; i++) {
+        const v = dataArray[i] / 128.0;
+        const y = height - (v * height) / 2;
+
+        if (i === 0) {
+            visualizerCtx.moveTo(x, y);
+        } else {
+            visualizerCtx.lineTo(x, y);
+        }
+        x += sliceWidth;
+    }
+
+    visualizerCtx.stroke();
+    visualizerCtx.globalAlpha = 1;
+}
+
+// Circular visualizer
+function drawCircular(dataArray) {
+    const centerX = visualizerCanvas.width / 2;
+    const centerY = visualizerCanvas.height / 2;
+    const radius = Math.min(centerX, centerY) * 0.4;
+    const bars = 180;
+    const step = Math.floor(dataArray.length / bars);
+
+    for (let i = 0; i < bars; i++) {
+        let sum = 0;
+        for (let j = 0; j < step; j++) {
+            sum += dataArray[i * step + j];
+        }
+        const average = sum / step;
+        const barHeight = (average / 255) * radius * 1.5;
+
+        const angle = (i / bars) * Math.PI * 2 - Math.PI / 2;
+        const x1 = centerX + Math.cos(angle) * radius;
+        const y1 = centerY + Math.sin(angle) * radius;
+        const x2 = centerX + Math.cos(angle) * (radius + barHeight);
+        const y2 = centerY + Math.sin(angle) * (radius + barHeight);
+
+        const hue = (i / bars) * 60 + 250; // Purple to teal
+        visualizerCtx.strokeStyle = `hsla(${hue}, 70%, 60%, 0.8)`;
+        visualizerCtx.lineWidth = 3;
+        visualizerCtx.lineCap = 'round';
+
+        visualizerCtx.beginPath();
+        visualizerCtx.moveTo(x1, y1);
+        visualizerCtx.lineTo(x2, y2);
+        visualizerCtx.stroke();
+    }
+
+    // Draw center circle
+    visualizerCtx.beginPath();
+    visualizerCtx.arc(centerX, centerY, radius * 0.3, 0, Math.PI * 2);
+    visualizerCtx.fillStyle = 'rgba(124, 92, 255, 0.3)';
+    visualizerCtx.fill();
+}
+
+// Particle visualizer
+function drawParticles(dataArray) {
+    const width = visualizerCanvas.width;
+    const height = visualizerCanvas.height;
+
+    // Calculate average frequency
+    let sum = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+        sum += dataArray[i];
+    }
+    const average = sum / dataArray.length;
+    const intensity = average / 255;
+
+    // Spawn new particles based on intensity
+    if (intensity > 0.3 && particles.length < 150) {
+        const count = Math.floor(intensity * 5);
+        for (let i = 0; i < count; i++) {
+            particles.push({
+                x: width / 2 + (Math.random() - 0.5) * 100,
+                y: height / 2 + (Math.random() - 0.5) * 100,
+                vx: (Math.random() - 0.5) * intensity * 10,
+                vy: (Math.random() - 0.5) * intensity * 10,
+                size: Math.random() * 4 + 2,
+                life: 1,
+                hue: Math.random() * 60 + 250
+            });
         }
     }
 
-    // Reset shadow
+    // Update and draw particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+
+        // Update position
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 0.015;
+
+        // Remove dead particles
+        if (p.life <= 0) {
+            particles.splice(i, 1);
+            continue;
+        }
+
+        // Draw particle
+        visualizerCtx.beginPath();
+        visualizerCtx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+        visualizerCtx.fillStyle = `hsla(${p.hue}, 70%, 60%, ${p.life * 0.8})`;
+        visualizerCtx.fill();
+
+        // Add glow
+        visualizerCtx.shadowColor = `hsla(${p.hue}, 70%, 60%, 0.5)`;
+        visualizerCtx.shadowBlur = 10;
+    }
+
     visualizerCtx.shadowBlur = 0;
+
+    // Draw center glow based on intensity
+    const glowRadius = 50 + intensity * 100;
+    const gradient = visualizerCtx.createRadialGradient(
+        width / 2, height / 2, 0,
+        width / 2, height / 2, glowRadius
+    );
+    gradient.addColorStop(0, `rgba(124, 92, 255, ${intensity * 0.5})`);
+    gradient.addColorStop(0.5, `rgba(0, 212, 170, ${intensity * 0.3})`);
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+    visualizerCtx.beginPath();
+    visualizerCtx.arc(width / 2, height / 2, glowRadius, 0, Math.PI * 2);
+    visualizerCtx.fillStyle = gradient;
+    visualizerCtx.fill();
 }

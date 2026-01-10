@@ -278,6 +278,25 @@
             <div class="player-section" id="player-section">
                 <div class="video-header">
                     <h2 id="video-name">Select a video to play</h2>
+                    <div class="visualizer-controls" id="visualizer-controls">
+                        <div class="visualizer-selector">
+                            <label for="visualizer-select">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="4" y="4" width="4" height="16"></rect>
+                                    <rect x="10" y="8" width="4" height="12"></rect>
+                                    <rect x="16" y="2" width="4" height="18"></rect>
+                                </svg>
+                                Visualizer
+                            </label>
+                            <select id="visualizer-select">
+                                <option value="bars">Bars</option>
+                                <option value="wave">Waveform</option>
+                                <option value="circular">Circular</option>
+                                <option value="particles">Particles</option>
+                                <option value="none">None</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
                 <div class="video-container">
                     <video id="video-player" controls disablepictureinpicture controlslist="nodownload noplaybackrate">
