@@ -782,6 +782,117 @@ body {
     height: 16px;
 }
 
+/* Library Selector */
+.library-selector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 70px);
+    padding: 40px 24px;
+}
+
+.library-selector-content {
+    text-align: center;
+    max-width: 900px;
+    width: 100%;
+}
+
+.library-selector-content h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, var(--color-text) 0%, var(--color-primary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.library-selector-content p {
+    color: var(--color-text-muted);
+    font-size: 1.1rem;
+    margin-bottom: 48px;
+}
+
+.library-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+}
+
+.library-card {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 48px 32px;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.library-card:hover {
+    background: var(--color-bg-hover);
+    border-color: var(--color-primary);
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-glow);
+}
+
+.library-card:active {
+    transform: translateY(-2px);
+}
+
+.library-icon {
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+    border-radius: var(--radius-md);
+    padding: 18px;
+}
+
+.library-icon svg {
+    width: 100%;
+    height: 100%;
+    stroke: white;
+}
+
+.library-name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+@media (max-width: 768px) {
+    .library-cards {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .library-card {
+        padding: 32px 24px;
+        flex-direction: row;
+        justify-content: flex-start;
+    }
+
+    .library-icon {
+        width: 60px;
+        height: 60px;
+        padding: 14px;
+    }
+
+    .library-selector-content h1 {
+        font-size: 1.75rem;
+    }
+
+    .library-selector-content p {
+        margin-bottom: 32px;
+    }
+}
+
 /* Main Content */
 .main-content {
     display: grid;

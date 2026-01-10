@@ -14,8 +14,11 @@ let currentAudioTracks = [];
 let selectedAudioTrack = 0;
 let currentEmbeddedSubtitles = [];
 let selectedEmbeddedSubtitle = -1; // -1 means off
+let currentLibraryRoot = null; // Track which library we're in
 
 // DOM Elements
+const librarySelector = document.getElementById('library-selector');
+const mainContent = document.getElementById('main-content');
 const fileList = document.getElementById('file-list');
 const currentPathDisplay = document.getElementById('current-path');
 const parentBtn = document.getElementById('parent-btn');
@@ -35,6 +38,7 @@ const panelEmail = document.getElementById('panel-email');
 const panelProvider = document.getElementById('panel-provider');
 const avatarGrid = document.getElementById('avatar-grid');
 const saveSettingsBtn = document.getElementById('save-settings');
+const logoElement = document.querySelector('.logo');
 
 // Settings elements
 const qualitySelect = document.getElementById('quality-select');
@@ -69,7 +73,9 @@ async function checkAuth() {
 
         updateUserDisplay();
         applySettings();
-        loadDirectory(currentPath);
+
+        // Show library selector instead of loading directory
+        showLibrarySelector();
 
         // Check subtitle configuration
         checkSubtitleStatus();
@@ -80,6 +86,34 @@ async function checkAuth() {
         console.error('Auth check failed:', error);
         window.location.href = '/login.html';
     }
+}
+
+// Show the library selector screen
+function showLibrarySelector() {
+    librarySelector.style.display = 'flex';
+    mainContent.style.display = 'none';
+    currentLibraryRoot = null;
+
+    // Reset video player
+    videoPlayer.src = '';
+    videoPlayer.classList.remove('active');
+    videoPlaceholder.classList.remove('hidden');
+    videoName.textContent = 'Select a video to play';
+}
+
+// Show the main content (browser + player)
+function showMainContent(libraryPath) {
+    librarySelector.style.display = 'none';
+    mainContent.style.display = 'grid';
+    currentLibraryRoot = libraryPath;
+    currentPath = libraryPath;
+    loadDirectory(libraryPath);
+}
+
+// Handle library card selection
+function selectLibrary(path) {
+    console.log(`Selected library: ${path}`);
+    showMainContent(path);
 }
 
 // Check if subtitle search is configured
@@ -196,38 +230,59 @@ function applySettings() {
 
 // Setup event listeners
 function setupEventListeners() {
+    // Library card selection
+    document.querySelectorAll('.library-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const path = card.dataset.path;
+            if (path) {
+                selectLibrary(path);
+            }
+        });
+    });
+
+    // Logo click to return to library selector
+    if (logoElement) {
+        logoElement.style.cursor = 'pointer';
+        logoElement.addEventListener('click', () => {
+            showLibrarySelector();
+        });
+    }
+
     // Navigation
     parentBtn.addEventListener('click', () => {
-        if (canGoUp && parentPath) {
+        // If we're at the library root, go back to library selector
+        if (currentPath === currentLibraryRoot || !canGoUp) {
+            showLibrarySelector();
+        } else if (parentPath) {
             loadDirectory(parentPath);
         }
     });
-    
+
     refreshBtn.addEventListener('click', () => {
         loadDirectory(currentPath);
     });
-    
+
     // User panel
     userMenuToggle.addEventListener('click', () => {
         userPanelOverlay.classList.add('active');
         userMenuToggle.classList.add('active');
     });
-    
+
     closePanel.addEventListener('click', closeUserPanel);
-    
+
     userPanelOverlay.addEventListener('click', (e) => {
         if (e.target === userPanelOverlay) {
             closeUserPanel();
         }
     });
-    
+
     // Settings
     volumeSlider.addEventListener('input', () => {
         volumeValue.textContent = `${volumeSlider.value}%`;
     });
-    
+
     saveSettingsBtn.addEventListener('click', saveSettings);
-    
+
     // Keyboard
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
@@ -301,8 +356,9 @@ async function loadDirectory(path) {
             parentPath = data.parentPath;
             canGoUp = data.canGoUp;
             currentPathDisplay.textContent = currentPath;
-            
-            parentBtn.disabled = !canGoUp;
+
+            // Always enable back button when in a library (to return to selector)
+            parentBtn.disabled = !currentLibraryRoot;
             renderFileList(data.items);
         } else {
             throw new Error(data.error || 'Failed to load directory');
