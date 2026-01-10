@@ -646,6 +646,9 @@ async function playVideo(path, name, clickedElement) {
     // Reset transcoding state for new video
     usingTranscodedStream = false;
 
+    // Hide any previous error overlay
+    hidePlaybackError();
+
     // Store current video path for subtitle and audio operations
     currentVideoPath = path;
     currentVideoName = name;
@@ -722,6 +725,10 @@ async function playVideo(path, name, clickedElement) {
             videoPlayer.src = transcodeUrl;
             videoPlayer.load();
             videoPlayer.play().catch(e => console.log('Autoplay prevented:', e));
+        } else if (usingTranscodedStream) {
+            // Transcoding also failed - show error to user
+            console.error('Transcoding fallback also failed');
+            showPlaybackError('This video format is not supported. The file may be corrupted or use an unsupported codec.');
         }
     };
 
@@ -986,6 +993,42 @@ async function handleAudioTrackChange(event) {
 }
 
 // Show audio track status message
+// Show playback error message to user
+function showPlaybackError(message) {
+    let errorOverlay = document.getElementById('playback-error-overlay');
+
+    if (!errorOverlay) {
+        errorOverlay = document.createElement('div');
+        errorOverlay.id = 'playback-error-overlay';
+        errorOverlay.className = 'playback-error-overlay';
+        document.querySelector('.video-container').appendChild(errorOverlay);
+    }
+
+    errorOverlay.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <p>${message}</p>
+    `;
+    errorOverlay.style.display = 'flex';
+
+    // Hide transcoding indicator if visible
+    const transcodeIndicator = document.getElementById('transcode-indicator');
+    if (transcodeIndicator) {
+        transcodeIndicator.style.display = 'none';
+    }
+}
+
+// Hide playback error overlay
+function hidePlaybackError() {
+    const errorOverlay = document.getElementById('playback-error-overlay');
+    if (errorOverlay) {
+        errorOverlay.style.display = 'none';
+    }
+}
+
 // Show transcoding indicator when falling back to transcoded stream
 function showTranscodingIndicator() {
     let indicator = document.getElementById('transcode-indicator');
