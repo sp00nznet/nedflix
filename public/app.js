@@ -443,16 +443,17 @@ async function loadAudioTracks(videoPath) {
             showAudioTrackSelector(data.tracks);
             console.log(`Found ${data.tracks.length} audio tracks`);
 
-            // Auto-switch to preferred language track if it's not the default
+            // Auto-switch to preferred language track if it's not already the first track
+            // The direct video stream always uses the first audio track (index 0)
             const preferredLang = userSettings?.streaming?.audioLanguage || '';
             if (preferredLang && audioTrackStatus.canSwitch) {
                 const preferredIndex = data.tracks.findIndex(t =>
                     t.language && t.language.toLowerCase().startsWith(preferredLang.toLowerCase())
                 );
-                const defaultIndex = data.tracks.findIndex(t => t.default);
 
-                // If preferred track exists and is different from default, switch to it
-                if (preferredIndex >= 0 && preferredIndex !== defaultIndex) {
+                // Only switch if preferred track exists and is NOT the first track
+                // (first track is already playing via direct stream)
+                if (preferredIndex > 0) {
                     console.log(`Auto-switching to preferred audio track: ${data.tracks[preferredIndex].label}`);
                     await switchToAudioTrack(preferredIndex);
                 }
