@@ -590,7 +590,7 @@ function renderFileList(items) {
             `;
 
             const itemDisplayName = subtitle ? `${displayName} - ${subtitle}` : displayName;
-            div.addEventListener('click', () => playVideo(item.path, itemDisplayName));
+            div.addEventListener('click', (e) => playVideo(item.path, itemDisplayName, e.currentTarget));
         } else if (item.isAudio) {
             div.classList.add('audio');
             if (item.hasMetadata) div.classList.add('has-metadata');
@@ -614,7 +614,7 @@ function renderFileList(items) {
                 </div>
             `;
 
-            div.addEventListener('click', () => playAudio(item.path, displayName));
+            div.addEventListener('click', (e) => playAudio(item.path, displayName, e.currentTarget));
         } else {
             div.classList.add('other');
             div.innerHTML = `
@@ -636,7 +636,7 @@ function renderFileList(items) {
 }
 
 // Play video
-async function playVideo(path, name) {
+async function playVideo(path, name, clickedElement) {
     const videoUrl = `/api/video?path=${encodeURIComponent(path)}`;
 
     // Stop visualizer if it was playing
@@ -714,7 +714,7 @@ async function playVideo(path, name) {
 
     // Mark active item
     document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
-    event.currentTarget.classList.add('active');
+    if (clickedElement) clickedElement.classList.add('active');
 
     // Scroll to player on mobile
     if (window.innerWidth <= 1200) {
@@ -726,7 +726,7 @@ async function playVideo(path, name) {
 }
 
 // Play audio file
-function playAudio(path, name) {
+function playAudio(path, name, clickedElement) {
     const audioUrl = `/api/audio?path=${encodeURIComponent(path)}`;
 
     // Reset video-related state
@@ -774,7 +774,7 @@ function playAudio(path, name) {
 
     // Mark active item
     document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
-    event.currentTarget.classList.add('active');
+    if (clickedElement) clickedElement.classList.add('active');
 
     // Scroll to player on mobile
     if (window.innerWidth <= 1200) {
