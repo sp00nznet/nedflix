@@ -1287,6 +1287,72 @@ app.get('/api/video', ensureAuthenticated, (req, res) => {
     }
 });
 
+// API: Stream video with transcoding fallback (for incompatible formats)
+app.get('/api/video-transcode', ensureAuthenticated, (req, res) => {
+    const videoPath = req.query.path;
+    const startTime = req.query.start || 0;
+
+    if (!videoPath) {
+        return res.status(400).send('Video path is required');
+    }
+
+    // Security: Ensure path is within NFS mount
+    const normalizedPath = path.normalize(videoPath);
+    if (!normalizedPath.startsWith(NFS_MOUNT_PATH)) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Check file exists
+    if (!fs.existsSync(normalizedPath)) {
+        return res.status(404).json({ error: 'File not found' });
+    }
+
+    // Set headers for streaming
+    res.setHeader('Content-Type', 'video/mp4');
+    res.setHeader('Transfer-Encoding', 'chunked');
+
+    // Build FFmpeg arguments for transcoding to browser-compatible format
+    const ffmpegArgs = [
+        '-i', normalizedPath,
+        '-ss', String(startTime),      // Seek to start time
+        '-c:v', 'libx264',             // H.264 video codec (universal browser support)
+        '-preset', 'veryfast',         // Fast encoding for real-time streaming
+        '-crf', '23',                  // Quality level (lower = better, 23 is default)
+        '-c:a', 'aac',                 // AAC audio codec (universal browser support)
+        '-b:a', '192k',                // Audio bitrate
+        '-ac', '2',                    // Stereo audio
+        '-f', 'mp4',                   // MP4 container
+        '-movflags', 'frag_keyframe+empty_moov+faststart',  // Enable streaming
+        '-'                            // Output to stdout
+    ];
+
+    const ffmpeg = spawn('ffmpeg', ffmpegArgs);
+
+    // Pipe FFmpeg output to response
+    ffmpeg.stdout.pipe(res);
+
+    // Log errors but don't crash
+    ffmpeg.stderr.on('data', (data) => {
+        // FFmpeg outputs progress info to stderr, only log actual errors
+        const msg = data.toString();
+        if (msg.includes('Error') || msg.includes('error')) {
+            console.error('FFmpeg transcode error:', msg);
+        }
+    });
+
+    ffmpeg.on('error', (err) => {
+        console.error('FFmpeg spawn error:', err);
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Transcoding failed' });
+        }
+    });
+
+    // Clean up on client disconnect
+    req.on('close', () => {
+        ffmpeg.kill('SIGTERM');
+    });
+});
+
 // API: Stream audio (protected)
 app.get('/api/audio', ensureAuthenticated, (req, res) => {
     const audioPath = req.query.path;

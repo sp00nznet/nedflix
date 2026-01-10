@@ -1639,6 +1639,31 @@ body {
     border: 1px solid rgba(255, 92, 92, 0.3);
 }
 
+/* Transcoding indicator */
+.transcode-indicator {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    background: rgba(255, 170, 0, 0.15);
+    color: #ffaa00;
+    border: 1px solid rgba(255, 170, 0, 0.3);
+    transition: opacity 0.5s ease;
+}
+
+.transcode-indicator svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+.transcode-indicator svg.spin {
+    animation: spin 1s linear infinite;
+}
+
 /* Video header flex layout for controls */
 .video-header {
     display: flex;
