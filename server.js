@@ -1239,9 +1239,10 @@ app.get('/api/video', ensureAuthenticated, (req, res) => {
         const stat = fs.statSync(normalizedPath);
         const fileSize = stat.size;
         const range = req.headers.range;
-        
+
         // Get user's quality settings
-        const settings = userSettings.get(req.user.id) || getDefaultSettings();
+        const userData = userService.getUser(req.user.id);
+        const settings = userData?.settings || getDefaultSettings();
         
         // Determine content type
         const ext = path.extname(normalizedPath).toLowerCase();
