@@ -1032,11 +1032,13 @@ app.get('/api/user', (req, res) => {
     if (req.isAuthenticated()) {
         const userData = userService.getUser(req.user.id);
         const settings = userData?.settings || getDefaultSettings();
+        const libraryAccess = userData?.user?.libraryAccess || ['movies', 'tv', 'music', 'audiobooks'];
         res.json({
             authenticated: true,
             user: {
                 ...req.user,
-                profilePicture: settings.profilePicture
+                profilePicture: settings.profilePicture,
+                libraryAccess: libraryAccess
             },
             settings: settings
         });
@@ -1078,6 +1080,29 @@ app.get('/api/browse', ensureAuthenticated, (req, res) => {
     const normalizedPath = path.normalize(requestedPath);
     if (!normalizedPath.startsWith(NFS_MOUNT_PATH)) {
         return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Check library access permissions
+    const userData = userService.getUser(req.user.id);
+    const libraryAccess = userData?.user?.libraryAccess || ['movies', 'tv', 'music', 'audiobooks'];
+
+    // Map library paths to access keys
+    const libraryPaths = {
+        'Movies': 'movies',
+        'TV Shows': 'tv',
+        'Music': 'music',
+        'Audiobooks': 'audiobooks'
+    };
+
+    // Check if accessing a restricted library
+    const relativePath = normalizedPath.replace(NFS_MOUNT_PATH, '').replace(/^\//, '');
+    const topLevelDir = relativePath.split('/')[0];
+
+    if (topLevelDir && libraryPaths[topLevelDir]) {
+        const requiredAccess = libraryPaths[topLevelDir];
+        if (!libraryAccess.includes(requiredAccess)) {
+            return res.status(403).json({ error: 'Access to this library is restricted' });
+        }
     }
 
     try {
@@ -1734,10 +1759,10 @@ app.post('/api/admin/users', ensureAdmin, (req, res) => {
 // API: Update a user (admin only)
 app.put('/api/admin/users/:id', ensureAdmin, (req, res) => {
     const { id } = req.params;
-    const { displayName, password, isAdmin, isAllowed } = req.body;
+    const { displayName, password, isAdmin, isAllowed, libraryAccess } = req.body;
 
     try {
-        const result = userService.updateUser(id, { displayName, password, isAdmin, isAllowed });
+        const result = userService.updateUser(id, { displayName, password, isAdmin, isAllowed, libraryAccess });
         // Update session cache if user is currently logged in
         if (result?.user) {
             sessionUsers.set(id, result.user);

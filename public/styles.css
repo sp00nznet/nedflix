@@ -1958,3 +1958,156 @@ body {
     color: var(--color-text-muted);
     font-size: 14px;
 }
+
+/* Expandable User Item */
+.user-item {
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+}
+
+.user-item-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    cursor: pointer;
+    width: 100%;
+    transition: background 0.2s;
+}
+
+.user-item-header:hover {
+    background: var(--color-bg-hover);
+}
+
+.user-expand-icon {
+    color: var(--color-text-dim);
+    transition: transform 0.2s;
+}
+
+.user-expand-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+.user-item.expanded .user-expand-icon {
+    transform: rotate(180deg);
+}
+
+.user-item-details {
+    display: none;
+    padding: 0 16px;
+    border-top: 1px solid var(--color-border);
+    background: var(--color-bg-card);
+}
+
+.user-item-details.expanded {
+    display: block;
+    padding: 16px;
+}
+
+.user-detail-section {
+    margin-bottom: 16px;
+}
+
+.user-detail-section:last-child {
+    margin-bottom: 0;
+}
+
+.user-detail-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+}
+
+/* Library Access Toggles */
+.library-toggles {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+
+.library-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 13px;
+    color: var(--color-text-muted);
+}
+
+.library-toggle:hover {
+    border-color: var(--color-border-light);
+}
+
+.library-toggle input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--color-primary);
+    cursor: pointer;
+}
+
+.library-toggle input[type="checkbox"]:checked + span {
+    color: var(--color-text);
+}
+
+/* Password Reset Form */
+.password-reset-form {
+    display: flex;
+    gap: 8px;
+}
+
+.password-reset-form .password-input {
+    flex: 1;
+    padding: 8px 12px;
+    min-width: 0;
+}
+
+.user-action-btn.reset-password {
+    background: var(--color-bg-card);
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border);
+    white-space: nowrap;
+}
+
+.user-action-btn.reset-password:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+/* User Actions Row */
+.user-actions-row {
+    display: flex;
+    gap: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--color-border);
+    margin-top: 8px;
+}
+
+.user-actions-row .user-action-btn {
+    flex: 1;
+    text-align: center;
+}
+
+@media (max-width: 480px) {
+    .library-toggles {
+        grid-template-columns: 1fr;
+    }
+
+    .password-reset-form {
+        flex-direction: column;
+    }
+
+    .user-actions-row {
+        flex-direction: column;
+    }
+}
