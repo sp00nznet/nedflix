@@ -68,14 +68,21 @@
                         </div>
 
                         <div class="change-password-section" id="change-password-section">
-                            <label>Change Password</label>
-                            <div class="change-password-form">
-                                <input type="password" id="current-password" placeholder="Current password" class="password-field">
-                                <input type="password" id="new-password" placeholder="New password" class="password-field">
-                                <input type="password" id="confirm-password" placeholder="Confirm new password" class="password-field">
-                                <button class="change-password-btn" id="change-password-btn">Change Password</button>
+                            <button class="collapsible-header" id="change-password-toggle">
+                                <span>Change Password</span>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </button>
+                            <div class="collapsible-content" id="change-password-content">
+                                <div class="change-password-form">
+                                    <input type="password" id="current-password" placeholder="Current password" class="password-field">
+                                    <input type="password" id="new-password" placeholder="New password" class="password-field">
+                                    <input type="password" id="confirm-password" placeholder="Confirm new password" class="password-field">
+                                    <button class="change-password-btn" id="change-password-btn">Change Password</button>
+                                </div>
+                                <p class="password-message" id="password-message"></p>
                             </div>
-                            <p class="password-message" id="password-message"></p>
                         </div>
                     </section>
                     

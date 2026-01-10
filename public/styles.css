@@ -437,6 +437,7 @@ body {
     width: 100%;
     max-width: 420px;
     height: 100vh;
+    height: 100dvh;
     background: var(--color-bg-elevated);
     border-left: 1px solid var(--color-border);
     box-shadow: var(--shadow-lg);
@@ -732,9 +733,11 @@ body {
 
 .panel-footer {
     padding: 20px 24px;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid var(--color-border);
     display: flex;
     gap: 12px;
+    flex-shrink: 0;
 }
 
 .save-settings-btn {
@@ -2119,12 +2122,46 @@ body {
     border-top: 1px solid var(--color-border);
 }
 
-.change-password-section > label {
-    display: block;
+.collapsible-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+    font-family: var(--font-display);
     font-size: 14px;
     font-weight: 500;
-    margin-bottom: 12px;
-    color: var(--color-text-muted);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.collapsible-header:hover {
+    background: var(--color-bg-hover);
+    border-color: var(--color-border-light);
+    color: var(--color-text);
+}
+
+.collapsible-header svg {
+    width: 16px;
+    height: 16px;
+    transition: transform 0.2s;
+}
+
+.collapsible-header.expanded svg {
+    transform: rotate(180deg);
+}
+
+.collapsible-content {
+    display: none;
+    padding-top: 12px;
+}
+
+.collapsible-content.expanded {
+    display: block;
 }
 
 .change-password-form {
