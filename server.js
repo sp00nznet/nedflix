@@ -1287,6 +1287,127 @@ app.get('/api/video', ensureAuthenticated, (req, res) => {
     }
 });
 
+// API: Stream video with transcoding fallback (for incompatible formats)
+app.get('/api/video-transcode', ensureAuthenticated, async (req, res) => {
+    const videoPath = req.query.path;
+    const startTime = req.query.start || 0;
+
+    if (!videoPath) {
+        return res.status(400).send('Video path is required');
+    }
+
+    // Security: Ensure path is within NFS mount
+    const normalizedPath = path.normalize(videoPath);
+    if (!normalizedPath.startsWith(NFS_MOUNT_PATH)) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Check file exists
+    if (!fs.existsSync(normalizedPath)) {
+        return res.status(404).json({ error: 'File not found' });
+    }
+
+    // First, probe the file to determine the best transcoding strategy
+    let videoCodec = null;
+    let audioCodec = null;
+    try {
+        const probeResult = await new Promise((resolve, reject) => {
+            const probe = spawn('ffprobe', [
+                '-v', 'quiet',
+                '-print_format', 'json',
+                '-show_streams',
+                normalizedPath
+            ]);
+            let output = '';
+            probe.stdout.on('data', data => output += data);
+            probe.on('close', code => {
+                if (code === 0) {
+                    try {
+                        resolve(JSON.parse(output));
+                    } catch (e) {
+                        reject(e);
+                    }
+                } else {
+                    reject(new Error('ffprobe failed'));
+                }
+            });
+        });
+
+        const videoStream = probeResult.streams?.find(s => s.codec_type === 'video');
+        const audioStream = probeResult.streams?.find(s => s.codec_type === 'audio');
+        videoCodec = videoStream?.codec_name;
+        audioCodec = audioStream?.codec_name;
+        console.log(`Transcoding: video=${videoCodec}, audio=${audioCodec}`);
+    } catch (e) {
+        console.log('Could not probe file, will attempt full transcode');
+    }
+
+    // Set headers for streaming
+    res.setHeader('Content-Type', 'video/mp4');
+    res.setHeader('Transfer-Encoding', 'chunked');
+
+    // Build FFmpeg arguments based on what needs transcoding
+    // If video is already H.264, just copy it (much faster)
+    const videoArgs = (videoCodec === 'h264')
+        ? ['-c:v', 'copy']
+        : ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23'];
+
+    // If audio is already AAC, just copy it
+    const audioArgs = (audioCodec === 'aac')
+        ? ['-c:a', 'copy']
+        : ['-c:a', 'aac', '-b:a', '192k', '-ac', '2'];
+
+    const ffmpegArgs = [
+        '-hide_banner',
+        '-loglevel', 'error',
+        '-ss', String(startTime),      // Input seeking (faster)
+        '-i', normalizedPath,
+        ...videoArgs,
+        ...audioArgs,
+        '-f', 'mp4',                   // MP4 container
+        '-movflags', 'frag_keyframe+empty_moov+faststart',  // Enable streaming
+        'pipe:1'                       // Output to stdout
+    ];
+
+    console.log('FFmpeg transcode args:', ffmpegArgs.join(' '));
+
+    const ffmpeg = spawn('ffmpeg', ffmpegArgs);
+    let hasData = false;
+
+    // Pipe FFmpeg output to response
+    ffmpeg.stdout.on('data', (chunk) => {
+        hasData = true;
+        res.write(chunk);
+    });
+
+    // Log errors
+    ffmpeg.stderr.on('data', (data) => {
+        console.error('FFmpeg stderr:', data.toString());
+    });
+
+    ffmpeg.on('error', (err) => {
+        console.error('FFmpeg spawn error:', err);
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Transcoding failed' });
+        }
+    });
+
+    ffmpeg.on('close', (code) => {
+        if (code !== 0) {
+            console.error(`FFmpeg exited with code ${code}`);
+            if (!hasData && !res.headersSent) {
+                res.status(500).json({ error: 'Transcoding failed' });
+            }
+        }
+        res.end();
+    });
+
+    // Clean up on client disconnect
+    req.on('close', () => {
+        ffmpeg.kill('SIGTERM');
+    });
+});
+
 // API: Stream audio (protected)
 app.get('/api/audio', ensureAuthenticated, (req, res) => {
     const audioPath = req.query.path;

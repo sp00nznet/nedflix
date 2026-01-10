@@ -16,6 +16,7 @@ let selectedAudioTrack = 0;
 let currentEmbeddedSubtitles = [];
 let selectedEmbeddedSubtitle = -1; // -1 means off
 let currentLibraryRoot = null; // Track which library we're in
+let usingTranscodedStream = false; // Track if we're using transcoded playback
 
 // DOM Elements
 const librarySelector = document.getElementById('library-selector');
@@ -642,6 +643,12 @@ async function playVideo(path, name, clickedElement) {
     // Stop visualizer if it was playing
     stopVisualizer();
 
+    // Reset transcoding state for new video
+    usingTranscodedStream = false;
+
+    // Hide any previous error overlay
+    hidePlaybackError();
+
     // Store current video path for subtitle and audio operations
     currentVideoPath = path;
     currentVideoName = name;
@@ -701,9 +708,28 @@ async function playVideo(path, name, clickedElement) {
 
     videoPlayer.addEventListener('loadedmetadata', onMetadataLoaded);
 
-    // Add error handler
+    // Add error handler with transcoding fallback
     videoPlayer.onerror = (e) => {
         console.error('Video error:', videoPlayer.error);
+
+        // If native playback fails and we haven't tried transcoding yet, fall back to transcoded stream
+        if (!usingTranscodedStream && currentVideoPath) {
+            console.log('Native playback failed, falling back to transcoded stream...');
+            usingTranscodedStream = true;
+
+            // Show transcoding indicator
+            showTranscodingIndicator();
+
+            // Switch to transcoded stream
+            const transcodeUrl = `/api/video-transcode?path=${encodeURIComponent(currentVideoPath)}`;
+            videoPlayer.src = transcodeUrl;
+            videoPlayer.load();
+            videoPlayer.play().catch(e => console.log('Autoplay prevented:', e));
+        } else if (usingTranscodedStream) {
+            // Transcoding also failed - show error to user
+            console.error('Transcoding fallback also failed');
+            showPlaybackError('This video format is not supported. The file may be corrupted or use an unsupported codec.');
+        }
     };
 
     // Load the video
@@ -967,6 +993,84 @@ async function handleAudioTrackChange(event) {
 }
 
 // Show audio track status message
+// Show playback error message to user
+function showPlaybackError(message) {
+    let errorOverlay = document.getElementById('playback-error-overlay');
+
+    if (!errorOverlay) {
+        errorOverlay = document.createElement('div');
+        errorOverlay.id = 'playback-error-overlay';
+        errorOverlay.className = 'playback-error-overlay';
+        document.querySelector('.video-container').appendChild(errorOverlay);
+    }
+
+    errorOverlay.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <p>${message}</p>
+    `;
+    errorOverlay.style.display = 'flex';
+
+    // Hide transcoding indicator if visible
+    const transcodeIndicator = document.getElementById('transcode-indicator');
+    if (transcodeIndicator) {
+        transcodeIndicator.style.display = 'none';
+    }
+}
+
+// Hide playback error overlay
+function hidePlaybackError() {
+    const errorOverlay = document.getElementById('playback-error-overlay');
+    if (errorOverlay) {
+        errorOverlay.style.display = 'none';
+    }
+}
+
+// Show transcoding indicator when falling back to transcoded stream
+function showTranscodingIndicator() {
+    let indicator = document.getElementById('transcode-indicator');
+
+    if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'transcode-indicator';
+        indicator.className = 'transcode-indicator';
+        document.querySelector('.video-header').appendChild(indicator);
+    }
+
+    indicator.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 6v6l4 2"></path>
+        </svg>
+        <span>Transcoding...</span>
+    `;
+    indicator.style.display = 'flex';
+
+    // Hide indicator when video starts playing
+    const onPlaying = () => {
+        indicator.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+            <span>Transcoded</span>
+        `;
+        // Fade out after 3 seconds
+        setTimeout(() => {
+            indicator.style.opacity = '0';
+            setTimeout(() => {
+                indicator.style.display = 'none';
+                indicator.style.opacity = '1';
+            }, 500);
+        }, 3000);
+        videoPlayer.removeEventListener('playing', onPlaying);
+    };
+    videoPlayer.addEventListener('playing', onPlaying);
+}
+
 function showAudioTrackMessage(message, type) {
     let indicator = document.getElementById('audio-track-indicator');
 

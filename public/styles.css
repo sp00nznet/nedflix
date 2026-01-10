@@ -1639,6 +1639,62 @@ body {
     border: 1px solid rgba(255, 92, 92, 0.3);
 }
 
+/* Transcoding indicator */
+.transcode-indicator {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    background: rgba(255, 170, 0, 0.15);
+    color: #ffaa00;
+    border: 1px solid rgba(255, 170, 0, 0.3);
+    transition: opacity 0.5s ease;
+}
+
+.transcode-indicator svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+.transcode-indicator svg.spin {
+    animation: spin 1s linear infinite;
+}
+
+/* Playback error overlay */
+.playback-error-overlay {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    color: var(--color-danger);
+    z-index: 10;
+    padding: 20px;
+    text-align: center;
+}
+
+.playback-error-overlay svg {
+    width: 48px;
+    height: 48px;
+}
+
+.playback-error-overlay p {
+    color: var(--text-secondary);
+    font-size: 14px;
+    max-width: 300px;
+    line-height: 1.5;
+}
+
 /* Video header flex layout for controls */
 .video-header {
     display: flex;
