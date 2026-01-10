@@ -664,6 +664,10 @@ const PORT = process.env.PORT || 3000;
 const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 const NFS_MOUNT_PATH = process.env.NFS_MOUNT_PATH || '/mnt/nfs';
 
+// Local admin credentials
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || '';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+
 // Default profile pictures
 const DEFAULT_AVATARS = ['cat', 'dog', 'cow', 'fox', 'owl', 'bear', 'rabbit', 'penguin'];
 
@@ -799,6 +803,46 @@ app.get('/auth/logout', (req, res) => {
         }
         res.redirect('/login.html');
     });
+});
+
+// Local admin authentication
+app.post('/auth/local', express.urlencoded({ extended: true }), (req, res) => {
+    const { username, password } = req.body;
+
+    // Check if local admin is configured
+    if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
+        return res.status(401).json({ error: 'Local admin not configured' });
+    }
+
+    // Validate credentials
+    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+        // Create admin user if not exists
+        const adminId = 'local-admin';
+        let adminUser = users.get(adminId);
+
+        if (!adminUser) {
+            adminUser = {
+                id: adminId,
+                provider: 'local',
+                displayName: 'Admin',
+                email: null,
+                avatar: 'bear',
+                isAdmin: true
+            };
+            users.set(adminId, adminUser);
+            userSettings.set(adminId, getDefaultSettings());
+        }
+
+        // Log in the user
+        req.login(adminUser, (err) => {
+            if (err) {
+                return res.status(500).json({ error: 'Login failed' });
+            }
+            res.redirect('/');
+        });
+    } else {
+        res.redirect('/login.html?error=invalid');
+    }
 });
 
 // API: Get current user
@@ -1292,11 +1336,12 @@ function streamVideoFile(req, res, filePath) {
     }
 }
 
-// Check for available OAuth providers
+// Check for available auth providers
 app.get('/api/auth-providers', (req, res) => {
     const providers = [];
     if (process.env.GOOGLE_CLIENT_ID) providers.push('google');
     if (process.env.GITHUB_CLIENT_ID) providers.push('github');
+    if (ADMIN_USERNAME && ADMIN_PASSWORD) providers.push('local');
     res.json(providers);
 });
 

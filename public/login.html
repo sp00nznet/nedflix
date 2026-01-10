@@ -39,6 +39,20 @@
     </div>
     
     <script>
+        // Check for error in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('error') === 'invalid') {
+            setTimeout(() => {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'login-error';
+                errorDiv.textContent = 'Invalid username or password';
+                const form = document.querySelector('.admin-login-form');
+                if (form) {
+                    form.insertBefore(errorDiv, form.firstChild);
+                }
+            }, 100);
+        }
+
         // Check if already authenticated
         fetch('/api/user')
             .then(res => res.json())
@@ -47,25 +61,25 @@
                     window.location.href = '/';
                 }
             });
-        
+
         // Load available auth providers
         fetch('/api/auth-providers')
             .then(res => res.json())
             .then(providers => {
                 const container = document.getElementById('login-buttons');
-                
+
                 if (providers.length === 0) {
                     container.innerHTML = `
                         <div class="no-providers">
                             <p>No authentication providers configured.</p>
-                            <p class="hint">Please configure OAuth in .env file</p>
+                            <p class="hint">Please configure OAuth or admin credentials in .env file</p>
                         </div>
                     `;
                     return;
                 }
-                
+
                 container.innerHTML = '';
-                
+
                 if (providers.includes('google')) {
                     const googleBtn = document.createElement('a');
                     googleBtn.href = '/auth/google';
@@ -81,7 +95,7 @@
                     `;
                     container.appendChild(googleBtn);
                 }
-                
+
                 if (providers.includes('github')) {
                     const githubBtn = document.createElement('a');
                     githubBtn.href = '/auth/github';
@@ -93,6 +107,38 @@
                         Continue with GitHub
                     `;
                     container.appendChild(githubBtn);
+                }
+
+                // Add local admin login form if configured
+                if (providers.includes('local')) {
+                    // Add divider if there are OAuth providers
+                    if (providers.includes('google') || providers.includes('github')) {
+                        const divider = document.createElement('div');
+                        divider.className = 'auth-divider';
+                        divider.innerHTML = '<span>or</span>';
+                        container.appendChild(divider);
+                    }
+
+                    const form = document.createElement('form');
+                    form.action = '/auth/local';
+                    form.method = 'POST';
+                    form.className = 'admin-login-form';
+                    form.innerHTML = `
+                        <div class="form-group">
+                            <input type="text" name="username" placeholder="Username" required autocomplete="username">
+                        </div>
+                        <div class="form-group">
+                            <input type="password" name="password" placeholder="Password" required autocomplete="current-password">
+                        </div>
+                        <button type="submit" class="auth-btn local-btn">
+                            <svg viewBox="0 0 24 24" class="provider-icon" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                            Sign in as Admin
+                        </button>
+                    `;
+                    container.appendChild(form);
                 }
             })
             .catch(err => {

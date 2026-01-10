@@ -123,6 +123,29 @@ npm start
 
 ---
 
+## Authentication
+
+Nedflix supports multiple authentication methods. You can use OAuth providers (Google/GitHub), a local admin account, or both.
+
+### Local Admin Account
+
+The simplest way to get started without setting up OAuth. Add these to your `.env` file:
+
+```env
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=your-secure-password
+```
+
+**Important security notes:**
+- Use a strong, unique password
+- Change the default password immediately
+- The admin account has full access to browse and stream all videos
+- Credentials are checked against environment variables (not stored in a database)
+
+When configured, a username/password login form will appear on the login page.
+
+---
+
 ## OAuth Configuration
 
 ### Google OAuth
@@ -156,11 +179,13 @@ npm start
 | `GOOGLE_CLIENT_SECRET` | No* | - | Google OAuth client secret |
 | `GITHUB_CLIENT_ID` | No* | - | GitHub OAuth client ID |
 | `GITHUB_CLIENT_SECRET` | No* | - | GitHub OAuth client secret |
-| `CALLBACK_BASE_URL` | Yes | - | Base URL for OAuth callbacks |
+| `CALLBACK_BASE_URL` | No* | - | Base URL for OAuth callbacks |
 | `NFS_MOUNT_PATH` | No | `/mnt/nfs` | Path to video files |
 | `OPENSUBTITLES_API_KEY` | No | - | API key for automatic subtitles |
+| `ADMIN_USERNAME` | No* | - | Local admin username |
+| `ADMIN_PASSWORD` | No* | - | Local admin password |
 
-*At least one OAuth provider is required.
+*At least one authentication method is required: either OAuth provider(s) or local admin credentials.
 
 ---
 
