@@ -400,11 +400,52 @@ async function playVideo(path, name) {
     hideAudioTrackSelector();
     hideEmbeddedSubtitleSelector();
 
-    videoPlayer.src = videoUrl;
-    videoName.textContent = name;
+    // Pre-fetch audio track info to find preferred language
+    let preferredAudioIndex = 0;
+    if (audioTrackStatus.canDetect) {
+        const trackInfo = await fetchAudioTrackInfo(path);
+        if (trackInfo && trackInfo.tracks && trackInfo.tracks.length > 1) {
+            currentAudioTracks = trackInfo.tracks;
+            showAudioTrackSelector(trackInfo.tracks);
 
+            // Find preferred language track
+            const preferredLang = userSettings?.streaming?.audioLanguage || 'eng';
+            const foundIndex = trackInfo.tracks.findIndex(t =>
+                t.language && t.language.toLowerCase().startsWith(preferredLang.toLowerCase())
+            );
+            if (foundIndex >= 0) {
+                preferredAudioIndex = foundIndex;
+                console.log(`Will switch to preferred audio: ${trackInfo.tracks[foundIndex].label}`);
+            }
+        }
+    }
+
+    videoName.textContent = name;
     videoPlaceholder.classList.add('hidden');
     videoPlayer.classList.add('active');
+
+    // Set up native audio track switching when metadata loads
+    const onMetadataLoaded = () => {
+        videoPlayer.removeEventListener('loadedmetadata', onMetadataLoaded);
+
+        // Try native switching to preferred track
+        if (preferredAudioIndex > 0 && videoPlayer.audioTracks && videoPlayer.audioTracks.length > 0) {
+            console.log(`Native audioTracks available: ${videoPlayer.audioTracks.length}`);
+            for (let i = 0; i < videoPlayer.audioTracks.length; i++) {
+                videoPlayer.audioTracks[i].enabled = (i === preferredAudioIndex);
+            }
+            selectedAudioTrack = preferredAudioIndex;
+            // Update the dropdown to show selected track
+            const select = document.getElementById('audio-track-select');
+            if (select) select.value = preferredAudioIndex;
+            showAudioTrackMessage(`Audio: ${currentAudioTracks[preferredAudioIndex]?.label || 'Track ' + (preferredAudioIndex + 1)}`, 'success');
+        }
+    };
+
+    videoPlayer.addEventListener('loadedmetadata', onMetadataLoaded);
+
+    // Load the video
+    videoPlayer.src = videoUrl;
 
     // Apply user settings
     if (userSettings?.streaming) {
@@ -423,35 +464,18 @@ async function playVideo(path, name) {
         document.getElementById('player-section').scrollIntoView({ behavior: 'smooth' });
     }
 
-    // Load audio tracks if available
-    if (audioTrackStatus.canDetect) {
-        await loadAudioTracks(path);
-    }
-
     // Load embedded subtitles
     await loadEmbeddedSubtitles(path);
 }
 
-// Load audio tracks for the current video
-async function loadAudioTracks(videoPath) {
+// Fetch audio track info from server (without switching)
+async function fetchAudioTrackInfo(videoPath) {
     try {
         const response = await fetch(`/api/audio-tracks?path=${encodeURIComponent(videoPath)}`);
-        const data = await response.json();
-
-        if (data.tracks && data.tracks.length > 1) {
-            currentAudioTracks = data.tracks;
-            showAudioTrackSelector(data.tracks);
-            console.log(`Found ${data.tracks.length} audio tracks`);
-
-            // Note: We don't auto-switch audio tracks because FFmpeg streaming
-            // loses seek functionality. Users can manually switch if needed.
-        } else {
-            hideAudioTrackSelector();
-            currentAudioTracks = data.tracks || [];
-        }
+        return await response.json();
     } catch (error) {
-        console.error('Failed to load audio tracks:', error);
-        hideAudioTrackSelector();
+        console.error('Failed to fetch audio track info:', error);
+        return null;
     }
 }
 
