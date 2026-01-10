@@ -1510,7 +1510,28 @@ function initVisualizer() {
         });
     }
 
+    // Set up fullscreen button
+    const fullscreenBtn = document.getElementById('visualizer-fullscreen-btn');
+    if (fullscreenBtn && !fullscreenBtn.hasAttribute('data-listener')) {
+        fullscreenBtn.setAttribute('data-listener', 'true');
+        fullscreenBtn.addEventListener('click', toggleVisualizerFullscreen);
+    }
+
     return true;
+}
+
+// Toggle visualizer fullscreen
+function toggleVisualizerFullscreen() {
+    const videoContainer = document.querySelector('.video-container');
+    if (!videoContainer) return;
+
+    if (document.fullscreenElement) {
+        document.exitFullscreen();
+    } else {
+        videoContainer.requestFullscreen().catch(err => {
+            console.log('Fullscreen error:', err);
+        });
+    }
 }
 
 // Connect the video player to the analyser (only once per session)
