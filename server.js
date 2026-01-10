@@ -10,6 +10,7 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const GitHubStrategy = require('passport-github2').Strategy;
 const { spawn, execSync } = require('child_process');
+const db = require('./db');
 const metadataService = require('./metadata-service');
 const userService = require('./user-service');
 const mediaService = require('./media-service');
@@ -32,11 +33,8 @@ const OMDB_API_KEY = process.env.OMDB_API_KEY || '';
 // Initialize metadata service
 metadataService.init(OMDB_API_KEY);
 
-// Initialize user service
-userService.init();
-
-// Initialize media service (shares database with user service)
-mediaService.init(userService.getDatabase());
+// Services will be initialized after database connection
+// See startServer() function
 
 // ============================================
 // SUBTITLE UTILITY FUNCTIONS
@@ -836,6 +834,14 @@ const PORT = process.env.PORT || 3000;
 const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 const NFS_MOUNT_PATH = process.env.NFS_MOUNT_PATH || '/mnt/nfs';
 
+// Library paths for media indexing
+const libraries = [
+    { name: 'Movies', path: `${NFS_MOUNT_PATH}/Movies` },
+    { name: 'TV Shows', path: `${NFS_MOUNT_PATH}/TV Shows` },
+    { name: 'Music', path: `${NFS_MOUNT_PATH}/Music` },
+    { name: 'Audiobooks', path: `${NFS_MOUNT_PATH}/Audiobooks` }
+];
+
 // Local admin credentials
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || '';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
@@ -871,14 +877,18 @@ passport.serializeUser((user, done) => {
     done(null, user.id);
 });
 
-passport.deserializeUser((id, done) => {
+passport.deserializeUser(async (id, done) => {
     // Try session cache first, then database
     let user = sessionUsers.get(id);
     if (!user) {
-        const userData = userService.getUser(id);
-        if (userData) {
-            user = userData.user;
-            sessionUsers.set(id, user);
+        try {
+            const userData = await userService.getUser(id);
+            if (userData) {
+                user = userData.user;
+                sessionUsers.set(id, user);
+            }
+        } catch (err) {
+            return done(err, null);
         }
     }
     done(null, user || null);
@@ -890,13 +900,17 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         clientID: process.env.GOOGLE_CLIENT_ID,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
         callbackURL: `${process.env.CALLBACK_BASE_URL || 'https://localhost:' + HTTPS_PORT}/auth/google/callback`
-    }, (accessToken, refreshToken, profile, done) => {
-        const user = userService.upsertOAuthUser(profile, 'google');
-        if (!user.isAllowed) {
-            return done(null, false, { message: 'User not authorized' });
+    }, async (accessToken, refreshToken, profile, done) => {
+        try {
+            const user = await userService.upsertOAuthUser(profile, 'google');
+            if (!user.isAllowed) {
+                return done(null, false, { message: 'User not authorized' });
+            }
+            sessionUsers.set(user.id, user);
+            return done(null, user);
+        } catch (err) {
+            return done(err, null);
         }
-        sessionUsers.set(user.id, user);
-        return done(null, user);
     }));
 }
 
@@ -906,13 +920,17 @@ if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
         clientID: process.env.GITHUB_CLIENT_ID,
         clientSecret: process.env.GITHUB_CLIENT_SECRET,
         callbackURL: `${process.env.CALLBACK_BASE_URL || 'https://localhost:' + HTTPS_PORT}/auth/github/callback`
-    }, (accessToken, refreshToken, profile, done) => {
-        const user = userService.upsertOAuthUser(profile, 'github');
-        if (!user.isAllowed) {
-            return done(null, false, { message: 'User not authorized' });
+    }, async (accessToken, refreshToken, profile, done) => {
+        try {
+            const user = await userService.upsertOAuthUser(profile, 'github');
+            if (!user.isAllowed) {
+                return done(null, false, { message: 'User not authorized' });
+            }
+            sessionUsers.set(user.id, user);
+            return done(null, user);
+        } catch (err) {
+            return done(err, null);
         }
-        sessionUsers.set(user.id, user);
-        return done(null, user);
     }));
 }
 
@@ -981,7 +999,7 @@ app.get('/auth/logout', (req, res) => {
 });
 
 // Local user authentication (admin and regular users)
-app.post('/auth/local', express.urlencoded({ extended: true }), (req, res) => {
+app.post('/auth/local', express.urlencoded({ extended: true }), async (req, res) => {
     const { username, password } = req.body;
 
     if (!username || !password) {
@@ -990,7 +1008,7 @@ app.post('/auth/local', express.urlencoded({ extended: true }), (req, res) => {
 
     // First check if this is the env-configured admin
     if (ADMIN_USERNAME && ADMIN_PASSWORD && username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-        const userData = userService.getUser('local-admin');
+        const userData = await userService.getUser('local-admin');
         const adminUser = userData?.user || {
             id: 'local-admin',
             provider: 'local',
@@ -1011,7 +1029,7 @@ app.post('/auth/local', express.urlencoded({ extended: true }), (req, res) => {
     }
 
     // Try to authenticate from database
-    const user = userService.authenticateUser(username, password);
+    const user = await userService.authenticateUser(username, password);
 
     if (!user) {
         return res.redirect('/login.html?error=invalid');
@@ -1032,9 +1050,9 @@ app.post('/auth/local', express.urlencoded({ extended: true }), (req, res) => {
 });
 
 // API: Get current user
-app.get('/api/user', (req, res) => {
+app.get('/api/user', async (req, res) => {
     if (req.isAuthenticated()) {
-        const userData = userService.getUser(req.user.id);
+        const userData = await userService.getUser(req.user.id);
         const settings = userData?.settings || getDefaultSettings();
         const libraryAccess = userData?.user?.libraryAccess || ['movies', 'tv', 'music', 'audiobooks'];
         res.json({
@@ -1057,7 +1075,7 @@ app.get('/api/avatars', (req, res) => {
 });
 
 // API: Update user settings
-app.post('/api/settings', ensureAuthenticated, (req, res) => {
+app.post('/api/settings', ensureAuthenticated, async (req, res) => {
     const { streaming, profilePicture } = req.body;
 
     try {
@@ -1069,7 +1087,7 @@ app.post('/api/settings', ensureAuthenticated, (req, res) => {
             updates.profilePicture = profilePicture;
         }
 
-        const settings = userService.updateSettings(req.user.id, updates);
+        const settings = await userService.updateSettings(req.user.id, updates);
         res.json({ success: true, settings });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -1077,7 +1095,7 @@ app.post('/api/settings', ensureAuthenticated, (req, res) => {
 });
 
 // API: Change own password (any authenticated user)
-app.post('/api/user/change-password', ensureAuthenticated, (req, res) => {
+app.post('/api/user/change-password', ensureAuthenticated, async (req, res) => {
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
@@ -1100,7 +1118,7 @@ app.post('/api/user/change-password', ensureAuthenticated, (req, res) => {
         }
 
         // For database users, verify and update password
-        const result = userService.changePassword(req.user.id, currentPassword, newPassword);
+        const result = await userService.changePassword(req.user.id, currentPassword, newPassword);
 
         if (!result.success) {
             return res.status(401).json({ error: result.error || 'Failed to change password' });
@@ -1113,7 +1131,7 @@ app.post('/api/user/change-password', ensureAuthenticated, (req, res) => {
 });
 
 // API: Browse directories (protected)
-app.get('/api/browse', ensureAuthenticated, (req, res) => {
+app.get('/api/browse', ensureAuthenticated, async (req, res) => {
     const requestedPath = req.query.path || NFS_MOUNT_PATH;
 
     // Security: Ensure path is within NFS mount
@@ -1123,7 +1141,7 @@ app.get('/api/browse', ensureAuthenticated, (req, res) => {
     }
 
     // Check library access permissions
-    const userData = userService.getUser(req.user.id);
+    const userData = await userService.getUser(req.user.id);
     const libraryAccess = userData?.user?.libraryAccess || ['movies', 'tv', 'music', 'audiobooks'];
 
     // Map library paths to access keys
@@ -1226,26 +1244,26 @@ app.get('/api/browse', ensureAuthenticated, (req, res) => {
 });
 
 // API: Stream video (protected)
-app.get('/api/video', ensureAuthenticated, (req, res) => {
+app.get('/api/video', ensureAuthenticated, async (req, res) => {
     const videoPath = req.query.path;
-    
+
     if (!videoPath) {
         return res.status(400).send('Video path is required');
     }
-    
+
     // Security: Ensure path is within NFS mount
     const normalizedPath = path.normalize(videoPath);
     if (!normalizedPath.startsWith(NFS_MOUNT_PATH)) {
         return res.status(403).json({ error: 'Access denied' });
     }
-    
+
     try {
         const stat = fs.statSync(normalizedPath);
         const fileSize = stat.size;
         const range = req.headers.range;
 
         // Get user's quality settings
-        const userData = userService.getUser(req.user.id);
+        const userData = await userService.getUser(req.user.id);
         const settings = userData?.settings || getDefaultSettings();
         
         // Determine content type
@@ -1890,9 +1908,9 @@ function streamVideoFile(req, res, filePath) {
 // ============================================
 
 // API: Get all users (admin only)
-app.get('/api/admin/users', ensureAdmin, (req, res) => {
+app.get('/api/admin/users', ensureAdmin, async (req, res) => {
     try {
-        const users = userService.getAllUsers();
+        const users = await userService.getAllUsers();
         res.json({ users });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -1900,7 +1918,7 @@ app.get('/api/admin/users', ensureAdmin, (req, res) => {
 });
 
 // API: Add a new user (admin only)
-app.post('/api/admin/users', ensureAdmin, (req, res) => {
+app.post('/api/admin/users', ensureAdmin, async (req, res) => {
     const { username, password, displayName, isAdmin } = req.body;
 
     if (!username) {
@@ -1911,7 +1929,7 @@ app.post('/api/admin/users', ensureAdmin, (req, res) => {
     }
 
     try {
-        const user = userService.addUser(username, password, displayName, isAdmin);
+        const user = await userService.addUser(username, password, displayName, isAdmin);
         res.json({ success: true, user });
     } catch (error) {
         res.status(400).json({ error: error.message });
@@ -1919,12 +1937,12 @@ app.post('/api/admin/users', ensureAdmin, (req, res) => {
 });
 
 // API: Update a user (admin only)
-app.put('/api/admin/users/:id', ensureAdmin, (req, res) => {
+app.put('/api/admin/users/:id', ensureAdmin, async (req, res) => {
     const { id } = req.params;
     const { displayName, password, isAdmin, isAllowed, libraryAccess } = req.body;
 
     try {
-        const result = userService.updateUser(id, { displayName, password, isAdmin, isAllowed, libraryAccess });
+        const result = await userService.updateUser(id, { displayName, password, isAdmin, isAllowed, libraryAccess });
         // Update session cache if user is currently logged in
         if (result?.user) {
             sessionUsers.set(id, result.user);
@@ -1936,11 +1954,11 @@ app.put('/api/admin/users/:id', ensureAdmin, (req, res) => {
 });
 
 // API: Delete a user (admin only)
-app.delete('/api/admin/users/:id', ensureAdmin, (req, res) => {
+app.delete('/api/admin/users/:id', ensureAdmin, async (req, res) => {
     const { id } = req.params;
 
     try {
-        userService.deleteUser(id);
+        await userService.deleteUser(id);
         sessionUsers.delete(id);
         res.json({ success: true });
     } catch (error) {
@@ -1953,7 +1971,7 @@ app.delete('/api/admin/users/:id', ensureAdmin, (req, res) => {
 // ============================================
 
 // API: Search files (authenticated users)
-app.get('/api/search', ensureAuthenticated, (req, res) => {
+app.get('/api/search', ensureAuthenticated, async (req, res) => {
     const { q, type, library, limit } = req.query;
 
     if (!q || q.length < 2) {
@@ -1962,11 +1980,11 @@ app.get('/api/search', ensureAuthenticated, (req, res) => {
 
     try {
         // Get user's library access
-        const user = userService.getUser(req.user.id);
-        const userLibraryAccess = user?.libraryAccess || ['movies', 'tv', 'music', 'audiobooks'];
+        const userData = await userService.getUser(req.user.id);
+        const userLibraryAccess = userData?.user?.libraryAccess || ['movies', 'tv', 'music', 'audiobooks'];
 
         // Search in index
-        let results = mediaService.search(q, {
+        let results = await mediaService.search(q, {
             fileType: type,
             library: library,
             limit: parseInt(limit) || 100
@@ -1991,9 +2009,9 @@ app.get('/api/search', ensureAuthenticated, (req, res) => {
 });
 
 // API: Get media index stats
-app.get('/api/search/stats', ensureAuthenticated, (req, res) => {
+app.get('/api/search/stats', ensureAuthenticated, async (req, res) => {
     try {
-        const stats = mediaService.getIndexStats();
+        const stats = await mediaService.getIndexStats();
         res.json(stats);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -2015,9 +2033,9 @@ app.post('/api/admin/scan', ensureAdmin, async (req, res) => {
 });
 
 // API: Get scan status
-app.get('/api/admin/scan/status', ensureAdmin, (req, res) => {
+app.get('/api/admin/scan/status', ensureAdmin, async (req, res) => {
     try {
-        const status = mediaService.getScanStatus();
+        const status = await mediaService.getScanStatus();
         res.json(status || { status: 'no_scans' });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -2025,10 +2043,10 @@ app.get('/api/admin/scan/status', ensureAdmin, (req, res) => {
 });
 
 // API: Get scan logs (admin only)
-app.get('/api/admin/scan/logs', ensureAdmin, (req, res) => {
+app.get('/api/admin/scan/logs', ensureAdmin, async (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || 50;
-        const logs = mediaService.getScanLogs(limit);
+        const logs = await mediaService.getScanLogs(limit);
         res.json(logs);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -2036,9 +2054,9 @@ app.get('/api/admin/scan/logs', ensureAdmin, (req, res) => {
 });
 
 // API: Download scan logs as CSV (admin only)
-app.get('/api/admin/scan/logs/download', ensureAdmin, (req, res) => {
+app.get('/api/admin/scan/logs/download', ensureAdmin, async (req, res) => {
     try {
-        const logs = mediaService.getScanLogs(1000);
+        const logs = await mediaService.getScanLogs(1000);
 
         // Build CSV
         const headers = ['ID', 'Started At', 'Completed At', 'Status', 'Files Found', 'Files Indexed', 'Errors', 'Scan Path', 'Triggered By'];
@@ -2190,23 +2208,36 @@ app.get('/', (req, res, next) => {
 });
 
 // Start servers
-function startServer() {
+async function startServer() {
+    // Initialize database first
+    try {
+        await db.init();
+        console.log('✅ Database initialized');
+    } catch (error) {
+        console.error('❌ Database initialization failed:', error.message);
+        process.exit(1);
+    }
+
+    // Initialize services after database is ready
+    await userService.init();
+    await mediaService.init();
+
     const certsPath = path.join(__dirname, 'certs');
     const keyPath = path.join(certsPath, 'server.key');
     const certPath = path.join(certsPath, 'server.cert');
-    
+
     // Check for SSL certificates
     if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
         const httpsOptions = {
             key: fs.readFileSync(keyPath),
             cert: fs.readFileSync(certPath)
         };
-        
+
         // HTTPS server
         https.createServer(httpsOptions, app).listen(HTTPS_PORT, () => {
             console.log(`🔒 HTTPS server running at https://localhost:${HTTPS_PORT}`);
         });
-        
+
         // HTTP redirect server
         const redirectApp = express();
         redirectApp.all('*', (req, res) => {
@@ -2218,20 +2249,27 @@ function startServer() {
     } else {
         console.log('⚠️  SSL certificates not found. Running HTTP only (not recommended).');
         console.log('   Run "npm run generate-certs" to create self-signed certificates.');
-        
+
         // HTTP only (not secure)
         app.listen(PORT, () => {
             console.log(`⚠️  HTTP server running at http://localhost:${PORT}`);
         });
     }
-    
+
     console.log(`\n📁 NFS mount path: ${NFS_MOUNT_PATH}`);
-    
+
+    // Show database mode
+    if (db.isUsingPostgres()) {
+        console.log('🐘 Database: PostgreSQL (Docker)');
+    } else {
+        console.log('📦 Database: SQLite (local)');
+    }
+
     // Check OAuth configuration
     const providers = [];
     if (process.env.GOOGLE_CLIENT_ID) providers.push('Google');
     if (process.env.GITHUB_CLIENT_ID) providers.push('GitHub');
-    
+
     if (providers.length > 0) {
         console.log(`🔐 OAuth providers enabled: ${providers.join(', ')}`);
     } else {

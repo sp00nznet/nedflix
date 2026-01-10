@@ -1,13 +1,12 @@
 /**
  * Media Service for Nedflix
  * Handles file indexing, scanning, and search functionality
+ * Uses the database abstraction layer for SQLite/PostgreSQL support
  */
 
 const path = require('path');
 const fs = require('fs');
-
-// Database reference (shared with user-service)
-let db = null;
+const db = require('./db');
 
 // Scan state
 let currentScan = null;
@@ -17,47 +16,10 @@ const VIDEO_EXTENSIONS = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.webm', '.m4v
 const AUDIO_EXTENSIONS = ['.mp3', '.flac', '.wav', '.m4a', '.aac', '.ogg', '.wma', '.opus', '.aiff'];
 
 /**
- * Initialize media service with database connection
+ * Initialize media service (db.js handles table creation)
  */
-function init(database) {
-    db = database;
-
-    // Create tables for file indexing and scan logs
-    db.exec(`
-        CREATE TABLE IF NOT EXISTS file_index (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            path TEXT UNIQUE NOT NULL,
-            name TEXT NOT NULL,
-            parent_path TEXT,
-            file_type TEXT NOT NULL,
-            extension TEXT,
-            size INTEGER DEFAULT 0,
-            modified_at INTEGER,
-            library TEXT,
-            indexed_at INTEGER DEFAULT (strftime('%s', 'now'))
-        );
-
-        CREATE TABLE IF NOT EXISTS scan_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            started_at INTEGER NOT NULL,
-            completed_at INTEGER,
-            status TEXT DEFAULT 'running',
-            files_found INTEGER DEFAULT 0,
-            files_indexed INTEGER DEFAULT 0,
-            errors INTEGER DEFAULT 0,
-            error_details TEXT,
-            scan_path TEXT,
-            triggered_by TEXT
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_file_name ON file_index(name);
-        CREATE INDEX IF NOT EXISTS idx_file_type ON file_index(file_type);
-        CREATE INDEX IF NOT EXISTS idx_file_library ON file_index(library);
-        CREATE INDEX IF NOT EXISTS idx_file_parent ON file_index(parent_path);
-        CREATE INDEX IF NOT EXISTS idx_scan_status ON scan_logs(status);
-    `);
-
-    console.log('📁 Media index database initialized');
+async function init() {
+    console.log('📁 Media index service initialized');
     return true;
 }
 
@@ -146,12 +108,21 @@ async function startScan(scanPath, libraries, triggeredBy = 'system') {
     }
 
     // Create scan log entry
-    const result = db.prepare(`
-        INSERT INTO scan_logs (started_at, status, scan_path, triggered_by)
-        VALUES (strftime('%s', 'now'), 'running', ?, ?)
-    `).run(scanPath, triggeredBy);
-
-    const scanId = result.lastInsertRowid;
+    let scanId;
+    if (db.isUsingPostgres()) {
+        const result = await db.get(`
+            INSERT INTO scan_logs (started_at, status, scan_path, triggered_by)
+            VALUES (CURRENT_TIMESTAMP, 'running', ?, ?)
+            RETURNING id
+        `, [scanPath, triggeredBy]);
+        scanId = result.id;
+    } else {
+        const result = await db.run(`
+            INSERT INTO scan_logs (started_at, status, scan_path, triggered_by)
+            VALUES (strftime('%s', 'now'), 'running', ?, ?)
+        `, [scanPath, triggeredBy]);
+        scanId = result.lastInsertRowid;
+    }
 
     currentScan = {
         id: scanId,
@@ -172,19 +143,47 @@ async function startScan(scanPath, libraries, triggeredBy = 'system') {
             currentScan.errors = errors.length;
 
             // Clear existing index for this path
-            db.prepare('DELETE FROM file_index WHERE path LIKE ?').run(scanPath + '%');
+            await db.run('DELETE FROM file_index WHERE path LIKE ?', [scanPath + '%']);
 
-            // Insert files in batches
-            const insertStmt = db.prepare(`
-                INSERT OR REPLACE INTO file_index
-                (path, name, parent_path, file_type, extension, size, modified_at, library, indexed_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
-            `);
-
-            const insertMany = db.transaction((files) => {
+            // Insert files using transaction for PostgreSQL or batch for SQLite
+            if (db.isUsingPostgres()) {
+                await db.transaction(async (tx) => {
+                    for (const file of files) {
+                        const library = getLibraryFromPath(file.path, libraries);
+                        await tx.run(`
+                            INSERT INTO file_index (path, name, parent_path, file_type, extension, size, modified_at, library, indexed_at)
+                            VALUES (?, ?, ?, ?, ?, ?, to_timestamp(?), ?, CURRENT_TIMESTAMP)
+                            ON CONFLICT (path) DO UPDATE SET
+                                name = EXCLUDED.name,
+                                parent_path = EXCLUDED.parent_path,
+                                file_type = EXCLUDED.file_type,
+                                extension = EXCLUDED.extension,
+                                size = EXCLUDED.size,
+                                modified_at = EXCLUDED.modified_at,
+                                library = EXCLUDED.library,
+                                indexed_at = CURRENT_TIMESTAMP
+                        `, [
+                            file.path,
+                            file.name,
+                            file.parentPath,
+                            file.fileType,
+                            file.extension,
+                            file.size,
+                            file.modifiedAt,
+                            library
+                        ]);
+                        currentScan.filesIndexed++;
+                    }
+                });
+            } else {
+                // SQLite batch insert
                 for (const file of files) {
                     const library = getLibraryFromPath(file.path, libraries);
-                    insertStmt.run(
+                    await db.run(`
+                        INSERT OR REPLACE INTO file_index
+                        (path, name, parent_path, file_type, extension, size, modified_at, library, indexed_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
+                    `, [
                         file.path,
                         file.name,
                         file.parentPath,
@@ -193,30 +192,47 @@ async function startScan(scanPath, libraries, triggeredBy = 'system') {
                         file.size,
                         file.modifiedAt,
                         library
-                    );
+                    ]);
                     currentScan.filesIndexed++;
                 }
-            });
-
-            insertMany(files);
+            }
 
             // Update scan log
-            db.prepare(`
-                UPDATE scan_logs
-                SET completed_at = strftime('%s', 'now'),
-                    status = 'completed',
-                    files_found = ?,
-                    files_indexed = ?,
-                    errors = ?,
-                    error_details = ?
-                WHERE id = ?
-            `).run(
-                currentScan.filesFound,
-                currentScan.filesIndexed,
-                currentScan.errors,
-                errors.length > 0 ? JSON.stringify(errors.slice(0, 100)) : null, // Limit error details
-                scanId
-            );
+            if (db.isUsingPostgres()) {
+                await db.run(`
+                    UPDATE scan_logs
+                    SET completed_at = CURRENT_TIMESTAMP,
+                        status = 'completed',
+                        files_found = ?,
+                        files_indexed = ?,
+                        errors = ?,
+                        error_details = ?
+                    WHERE id = ?
+                `, [
+                    currentScan.filesFound,
+                    currentScan.filesIndexed,
+                    currentScan.errors,
+                    errors.length > 0 ? JSON.stringify(errors.slice(0, 100)) : null,
+                    scanId
+                ]);
+            } else {
+                await db.run(`
+                    UPDATE scan_logs
+                    SET completed_at = strftime('%s', 'now'),
+                        status = 'completed',
+                        files_found = ?,
+                        files_indexed = ?,
+                        errors = ?,
+                        error_details = ?
+                    WHERE id = ?
+                `, [
+                    currentScan.filesFound,
+                    currentScan.filesIndexed,
+                    currentScan.errors,
+                    errors.length > 0 ? JSON.stringify(errors.slice(0, 100)) : null,
+                    scanId
+                ]);
+            }
 
             currentScan.status = 'completed';
             console.log(`✅ Media scan complete: ${currentScan.filesIndexed} files indexed`);
@@ -224,13 +240,23 @@ async function startScan(scanPath, libraries, triggeredBy = 'system') {
         } catch (err) {
             console.error('Scan error:', err);
 
-            db.prepare(`
-                UPDATE scan_logs
-                SET completed_at = strftime('%s', 'now'),
-                    status = 'failed',
-                    error_details = ?
-                WHERE id = ?
-            `).run(JSON.stringify({ fatal: err.message }), scanId);
+            if (db.isUsingPostgres()) {
+                await db.run(`
+                    UPDATE scan_logs
+                    SET completed_at = CURRENT_TIMESTAMP,
+                        status = 'failed',
+                        error_details = ?
+                    WHERE id = ?
+                `, [JSON.stringify({ fatal: err.message }), scanId]);
+            } else {
+                await db.run(`
+                    UPDATE scan_logs
+                    SET completed_at = strftime('%s', 'now'),
+                        status = 'failed',
+                        error_details = ?
+                    WHERE id = ?
+                `, [JSON.stringify({ fatal: err.message }), scanId]);
+            }
 
             currentScan.status = 'failed';
         }
@@ -242,19 +268,27 @@ async function startScan(scanPath, libraries, triggeredBy = 'system') {
 /**
  * Get current scan status
  */
-function getScanStatus() {
+async function getScanStatus() {
     if (!currentScan) {
         // Check for most recent scan
-        const lastScan = db.prepare(`
+        const lastScan = await db.get(`
             SELECT * FROM scan_logs ORDER BY started_at DESC LIMIT 1
-        `).get();
+        `);
 
         if (lastScan) {
+            // Handle timestamp conversion for PostgreSQL
+            const startedAt = lastScan.started_at instanceof Date
+                ? Math.floor(lastScan.started_at.getTime() / 1000)
+                : lastScan.started_at;
+            const completedAt = lastScan.completed_at instanceof Date
+                ? Math.floor(lastScan.completed_at.getTime() / 1000)
+                : lastScan.completed_at;
+
             return {
                 id: lastScan.id,
                 status: lastScan.status,
-                startedAt: lastScan.started_at,
-                completedAt: lastScan.completed_at,
+                startedAt,
+                completedAt,
                 filesFound: lastScan.files_found,
                 filesIndexed: lastScan.files_indexed,
                 errors: lastScan.errors
@@ -275,16 +309,27 @@ function getScanStatus() {
 /**
  * Get scan logs
  */
-function getScanLogs(limit = 50) {
-    return db.prepare(`
+async function getScanLogs(limit = 50) {
+    const logs = await db.all(`
         SELECT * FROM scan_logs ORDER BY started_at DESC LIMIT ?
-    `).all(limit);
+    `, [limit]);
+
+    // Convert timestamps for PostgreSQL
+    return logs.map(log => ({
+        ...log,
+        started_at: log.started_at instanceof Date
+            ? Math.floor(log.started_at.getTime() / 1000)
+            : log.started_at,
+        completed_at: log.completed_at instanceof Date
+            ? Math.floor(log.completed_at.getTime() / 1000)
+            : log.completed_at
+    }));
 }
 
 /**
  * Search files in index
  */
-function search(query, options = {}) {
+async function search(query, options = {}) {
     const { fileType, library, limit = 100 } = options;
 
     let sql = `
@@ -306,42 +351,50 @@ function search(query, options = {}) {
     sql += ' ORDER BY name ASC LIMIT ?';
     params.push(limit);
 
-    return db.prepare(sql).all(...params);
+    return await db.all(sql, params);
 }
 
 /**
  * Get index statistics
  */
-function getIndexStats() {
-    const stats = db.prepare(`
+async function getIndexStats() {
+    const stats = await db.all(`
         SELECT
             file_type,
             COUNT(*) as count,
             SUM(size) as total_size
         FROM file_index
         GROUP BY file_type
-    `).all();
+    `);
 
-    const lastScan = db.prepare(`
+    const lastScan = await db.get(`
         SELECT * FROM scan_logs WHERE status = 'completed' ORDER BY completed_at DESC LIMIT 1
-    `).get();
+    `);
+
+    let lastScanInfo = null;
+    if (lastScan) {
+        const completedAt = lastScan.completed_at instanceof Date
+            ? Math.floor(lastScan.completed_at.getTime() / 1000)
+            : lastScan.completed_at;
+        lastScanInfo = {
+            completedAt,
+            filesIndexed: lastScan.files_indexed
+        };
+    }
 
     return {
         byType: stats,
-        lastScan: lastScan ? {
-            completedAt: lastScan.completed_at,
-            filesIndexed: lastScan.files_indexed
-        } : null,
-        totalFiles: stats.reduce((sum, s) => sum + s.count, 0)
+        lastScan: lastScanInfo,
+        totalFiles: stats.reduce((sum, s) => sum + parseInt(s.count), 0)
     };
 }
 
 /**
  * Check if index exists and has data
  */
-function hasIndex() {
-    const count = db.prepare('SELECT COUNT(*) as count FROM file_index').get();
-    return count.count > 0;
+async function hasIndex() {
+    const count = await db.get('SELECT COUNT(*) as count FROM file_index');
+    return parseInt(count.count) > 0;
 }
 
 module.exports = {
