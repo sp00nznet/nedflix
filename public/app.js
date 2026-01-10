@@ -1435,7 +1435,8 @@ function drawBars(dataArray) {
     const barCount = 64;
     const barWidth = visualizerCanvas.width / barCount;
     const barGap = 2;
-    const maxBarHeight = visualizerCanvas.height * 0.85;
+    const bottomPadding = 60; // Space for video controls
+    const maxBarHeight = (visualizerCanvas.height - bottomPadding) * 0.85;
     const step = Math.floor(dataArray.length / barCount);
 
     for (let i = 0; i < barCount; i++) {
@@ -1447,9 +1448,9 @@ function drawBars(dataArray) {
         const barHeight = (average / 255) * maxBarHeight;
 
         const x = i * barWidth + barGap / 2;
-        const y = visualizerCanvas.height - barHeight;
+        const y = visualizerCanvas.height - bottomPadding - barHeight;
 
-        const gradient = visualizerCtx.createLinearGradient(x, y, x, visualizerCanvas.height);
+        const gradient = visualizerCtx.createLinearGradient(x, y, x, visualizerCanvas.height - bottomPadding);
         gradient.addColorStop(0, 'rgba(124, 92, 255, 0.9)');
         gradient.addColorStop(0.5, 'rgba(0, 212, 170, 0.7)');
         gradient.addColorStop(1, 'rgba(0, 212, 170, 0.3)');
