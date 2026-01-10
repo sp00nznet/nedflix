@@ -976,24 +976,21 @@ app.get('/auth/logout', (req, res) => {
     });
 });
 
-// Local admin authentication
+// Local user authentication (admin and regular users)
 app.post('/auth/local', express.urlencoded({ extended: true }), (req, res) => {
     const { username, password } = req.body;
 
-    // Check if local admin is configured
-    if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
-        return res.status(401).json({ error: 'Local admin not configured' });
+    if (!username || !password) {
+        return res.redirect('/login.html?error=invalid');
     }
 
-    // Validate credentials
-    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-        // Get admin user from database
+    // First check if this is the env-configured admin
+    if (ADMIN_USERNAME && ADMIN_PASSWORD && username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
         const userData = userService.getUser('local-admin');
         const adminUser = userData?.user || {
             id: 'local-admin',
             provider: 'local',
             displayName: 'Admin',
-            email: null,
             avatar: 'bear',
             isAdmin: true,
             isAllowed: true
@@ -1001,16 +998,33 @@ app.post('/auth/local', express.urlencoded({ extended: true }), (req, res) => {
 
         sessionUsers.set(adminUser.id, adminUser);
 
-        // Log in the user
-        req.login(adminUser, (err) => {
+        return req.login(adminUser, (err) => {
             if (err) {
                 return res.status(500).json({ error: 'Login failed' });
             }
             res.redirect('/');
         });
-    } else {
-        res.redirect('/login.html?error=invalid');
     }
+
+    // Try to authenticate from database
+    const user = userService.authenticateUser(username, password);
+
+    if (!user) {
+        return res.redirect('/login.html?error=invalid');
+    }
+
+    if (!user.isAllowed) {
+        return res.redirect('/login.html?error=disabled');
+    }
+
+    sessionUsers.set(user.id, user);
+
+    req.login(user, (err) => {
+        if (err) {
+            return res.status(500).json({ error: 'Login failed' });
+        }
+        res.redirect('/');
+    });
 });
 
 // API: Get current user
@@ -1700,14 +1714,17 @@ app.get('/api/admin/users', ensureAdmin, (req, res) => {
 
 // API: Add a new user (admin only)
 app.post('/api/admin/users', ensureAdmin, (req, res) => {
-    const { email, displayName, isAdmin } = req.body;
+    const { username, password, displayName, isAdmin } = req.body;
 
-    if (!email) {
-        return res.status(400).json({ error: 'Email is required' });
+    if (!username) {
+        return res.status(400).json({ error: 'Username is required' });
+    }
+    if (!password) {
+        return res.status(400).json({ error: 'Password is required' });
     }
 
     try {
-        const user = userService.addUser(email, displayName, isAdmin);
+        const user = userService.addUser(username, password, displayName, isAdmin);
         res.json({ success: true, user });
     } catch (error) {
         res.status(400).json({ error: error.message });
@@ -1717,10 +1734,10 @@ app.post('/api/admin/users', ensureAdmin, (req, res) => {
 // API: Update a user (admin only)
 app.put('/api/admin/users/:id', ensureAdmin, (req, res) => {
     const { id } = req.params;
-    const { displayName, email, isAdmin, isAllowed } = req.body;
+    const { displayName, password, isAdmin, isAllowed } = req.body;
 
     try {
-        const result = userService.updateUser(id, { displayName, email, isAdmin, isAllowed });
+        const result = userService.updateUser(id, { displayName, password, isAdmin, isAllowed });
         // Update session cache if user is currently logged in
         if (result?.user) {
             sessionUsers.set(id, result.user);
