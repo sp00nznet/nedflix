@@ -443,21 +443,8 @@ async function loadAudioTracks(videoPath) {
             showAudioTrackSelector(data.tracks);
             console.log(`Found ${data.tracks.length} audio tracks`);
 
-            // Auto-switch to preferred language track if it's not already the first track
-            // The direct video stream always uses the first audio track (index 0)
-            const preferredLang = userSettings?.streaming?.audioLanguage || '';
-            if (preferredLang && audioTrackStatus.canSwitch) {
-                const preferredIndex = data.tracks.findIndex(t =>
-                    t.language && t.language.toLowerCase().startsWith(preferredLang.toLowerCase())
-                );
-
-                // Only switch if preferred track exists and is NOT the first track
-                // (first track is already playing via direct stream)
-                if (preferredIndex > 0) {
-                    console.log(`Auto-switching to preferred audio track: ${data.tracks[preferredIndex].label}`);
-                    await switchToAudioTrack(preferredIndex);
-                }
-            }
+            // Note: We don't auto-switch audio tracks because FFmpeg streaming
+            // loses seek functionality. Users can manually switch if needed.
         } else {
             hideAudioTrackSelector();
             currentAudioTracks = data.tracks || [];
@@ -479,15 +466,8 @@ function showAudioTrackSelector(tracks) {
         document.querySelector('.video-header').appendChild(container);
     }
 
-    // Find preferred track based on user's language setting
-    const preferredLang = userSettings?.streaming?.audioLanguage || '';
-    let preferredIndex = -1;
-    if (preferredLang) {
-        preferredIndex = tracks.findIndex(t =>
-            t.language && t.language.toLowerCase().startsWith(preferredLang.toLowerCase())
-        );
-    }
-
+    // The direct stream always uses the first audio track (index 0)
+    // so we show that as selected by default
     container.innerHTML = `
         <div class="audio-track-selector">
             <label for="audio-track-select">
@@ -501,7 +481,7 @@ function showAudioTrackSelector(tracks) {
             </label>
             <select id="audio-track-select">
                 ${tracks.map((track, index) => `
-                    <option value="${index}" ${preferredIndex >= 0 ? (index === preferredIndex ? 'selected' : '') : (track.default ? 'selected' : '')}>
+                    <option value="${index}" ${index === 0 ? 'selected' : ''}>
                         ${escapeHtml(track.label)}
                     </option>
                 `).join('')}
@@ -515,17 +495,7 @@ function showAudioTrackSelector(tracks) {
     const select = document.getElementById('audio-track-select');
     select.addEventListener('change', handleAudioTrackChange);
 
-    // Set initial selection based on preferred language or default track
-    if (preferredIndex >= 0) {
-        selectedAudioTrack = preferredIndex;
-        select.value = preferredIndex;
-    } else {
-        const defaultTrack = tracks.findIndex(t => t.default);
-        if (defaultTrack >= 0) {
-            selectedAudioTrack = defaultTrack;
-            select.value = defaultTrack;
-        }
-    }
+    // selectedAudioTrack is already 0 from playVideo initialization
 }
 
 // Hide the audio track selector
