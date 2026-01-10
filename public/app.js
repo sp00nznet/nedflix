@@ -701,8 +701,14 @@ async function playVideo(path, name, clickedElement) {
 
     videoPlayer.addEventListener('loadedmetadata', onMetadataLoaded);
 
+    // Add error handler
+    videoPlayer.onerror = (e) => {
+        console.error('Video error:', videoPlayer.error);
+    };
+
     // Load the video
     videoPlayer.src = videoUrl;
+    videoPlayer.load();
 
     // Apply user settings with fallback defaults
     videoPlayer.volume = userSettings?.streaming?.volume
