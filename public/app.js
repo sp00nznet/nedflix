@@ -711,11 +711,14 @@ async function playVideo(path, name, clickedElement) {
     videoPlayer.load();
 
     // Apply user settings with fallback defaults
-    // Use setAudioVolume to also update gainNode if Web Audio API was connected
+    // Set both HTML5 volume and gainNode (if Web Audio API was connected)
     const volume = userSettings?.streaming?.volume
         ? userSettings.streaming.volume / 100
         : DEFAULT_VOLUME;
-    setAudioVolume(volume);
+    videoPlayer.volume = volume;
+    if (typeof gainNode !== 'undefined' && gainNode) {
+        gainNode.gain.value = volume;
+    }
     videoPlayer.playbackRate = userSettings?.streaming?.playbackSpeed || 1;
 
     videoPlayer.play().catch(e => console.log('Autoplay prevented:', e));
@@ -763,7 +766,7 @@ function playAudio(path, name, clickedElement) {
     const targetVolume = userSettings?.streaming?.volume
         ? userSettings.streaming.volume / 100
         : DEFAULT_VOLUME;
-    setAudioVolume(targetVolume);
+    videoPlayer.volume = targetVolume;
     videoPlayer.playbackRate = userSettings?.streaming?.playbackSpeed || 1;
 
     // Initialize and start visualizer for audio playback
@@ -772,8 +775,8 @@ function playAudio(path, name, clickedElement) {
         videoPlayer.addEventListener('canplay', function onCanPlay() {
             videoPlayer.removeEventListener('canplay', onCanPlay);
             connectAudioSource();
-            // Apply volume through Web Audio API gain node
-            setAudioVolume(targetVolume);
+            // Apply volume through Web Audio API gain node (gainNode exists after connectAudioSource)
+            if (gainNode) gainNode.gain.value = targetVolume;
             startVisualizer();
         }, { once: true });
     }
@@ -914,8 +917,11 @@ async function switchToAudioTrack(trackIndex) {
         // Load new stream
         videoPlayer.src = videoUrl;
 
-        // Restore settings (use setAudioVolume for Web Audio API support)
-        setAudioVolume(volume);
+        // Restore settings
+        videoPlayer.volume = volume;
+        if (typeof gainNode !== 'undefined' && gainNode) {
+            gainNode.gain.value = volume;
+        }
         videoPlayer.playbackRate = playbackRate;
 
         // Wait for video to be ready
