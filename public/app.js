@@ -42,6 +42,8 @@ const volumeValue = document.getElementById('volume-value');
 const speedSelect = document.getElementById('speed-select');
 const autoplayToggle = document.getElementById('autoplay-toggle');
 const subtitlesToggle = document.getElementById('subtitles-toggle');
+const audioLanguageSelect = document.getElementById('audio-language-select');
+const subtitleLanguageSelect = document.getElementById('subtitle-language-select');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
@@ -174,16 +176,18 @@ function selectAvatar(avatar) {
 // Apply settings to UI
 function applySettings() {
     if (!userSettings?.streaming) return;
-    
+
     const s = userSettings.streaming;
-    
+
     qualitySelect.value = s.quality || 'auto';
     volumeSlider.value = s.volume || 80;
     volumeValue.textContent = `${s.volume || 80}%`;
     speedSelect.value = s.playbackSpeed || 1;
     autoplayToggle.checked = s.autoplay || false;
     subtitlesToggle.checked = s.subtitles || false;
-    
+    audioLanguageSelect.value = s.audioLanguage || '';
+    subtitleLanguageSelect.value = s.subtitleLanguage || 'en';
+
     // Apply to video player
     videoPlayer.volume = (s.volume || 80) / 100;
     videoPlayer.playbackRate = s.playbackSpeed || 1;
@@ -245,7 +249,9 @@ async function saveSettings() {
             volume: parseInt(volumeSlider.value),
             playbackSpeed: parseFloat(speedSelect.value),
             autoplay: autoplayToggle.checked,
-            subtitles: subtitlesToggle.checked
+            subtitles: subtitlesToggle.checked,
+            audioLanguage: audioLanguageSelect.value,
+            subtitleLanguage: subtitleLanguageSelect.value
         },
         profilePicture: selectedAvatar
     };
@@ -465,6 +471,15 @@ function showAudioTrackSelector(tracks) {
         document.querySelector('.video-header').appendChild(container);
     }
 
+    // Find preferred track based on user's language setting
+    const preferredLang = userSettings?.streaming?.audioLanguage || '';
+    let preferredIndex = -1;
+    if (preferredLang) {
+        preferredIndex = tracks.findIndex(t =>
+            t.language && t.language.toLowerCase().startsWith(preferredLang.toLowerCase())
+        );
+    }
+
     container.innerHTML = `
         <div class="audio-track-selector">
             <label for="audio-track-select">
@@ -478,7 +493,7 @@ function showAudioTrackSelector(tracks) {
             </label>
             <select id="audio-track-select">
                 ${tracks.map((track, index) => `
-                    <option value="${index}" ${track.default ? 'selected' : ''}>
+                    <option value="${index}" ${preferredIndex >= 0 ? (index === preferredIndex ? 'selected' : '') : (track.default ? 'selected' : '')}>
                         ${escapeHtml(track.label)}
                     </option>
                 `).join('')}
@@ -492,11 +507,16 @@ function showAudioTrackSelector(tracks) {
     const select = document.getElementById('audio-track-select');
     select.addEventListener('change', handleAudioTrackChange);
 
-    // Set initial selection to default track
-    const defaultTrack = tracks.findIndex(t => t.default);
-    if (defaultTrack >= 0) {
-        selectedAudioTrack = defaultTrack;
-        select.value = defaultTrack;
+    // Set initial selection based on preferred language or default track
+    if (preferredIndex >= 0) {
+        selectedAudioTrack = preferredIndex;
+        select.value = preferredIndex;
+    } else {
+        const defaultTrack = tracks.findIndex(t => t.default);
+        if (defaultTrack >= 0) {
+            selectedAudioTrack = defaultTrack;
+            select.value = defaultTrack;
+        }
     }
 }
 
@@ -631,8 +651,10 @@ function removeSubtitleTracks() {
 async function loadSubtitles(videoPath) {
     updateSubtitleIndicator('searching');
 
+    const subtitleLang = userSettings?.streaming?.subtitleLanguage || 'en';
+
     try {
-        const response = await fetch(`/api/subtitles/search?path=${encodeURIComponent(videoPath)}`);
+        const response = await fetch(`/api/subtitles/search?path=${encodeURIComponent(videoPath)}&language=${subtitleLang}`);
         const data = await response.json();
 
         if (data.found && data.subtitleUrl) {
