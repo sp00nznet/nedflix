@@ -3,8 +3,8 @@
 
 FROM node:20-alpine
 
-# Install OpenSSL for certificate generation
-RUN apk add --no-cache openssl
+# Install OpenSSL for certificate generation and FFmpeg for audio track support
+RUN apk add --no-cache openssl ffmpeg
 
 # Labels
 LABEL org.opencontainers.image.title="Nedflix"
