@@ -439,6 +439,21 @@ async function loadAudioTracks(videoPath) {
             currentAudioTracks = data.tracks;
             showAudioTrackSelector(data.tracks);
             console.log(`Found ${data.tracks.length} audio tracks`);
+
+            // Auto-switch to preferred language track if it's not the default
+            const preferredLang = userSettings?.streaming?.audioLanguage || '';
+            if (preferredLang && audioTrackStatus.canSwitch) {
+                const preferredIndex = data.tracks.findIndex(t =>
+                    t.language && t.language.toLowerCase().startsWith(preferredLang.toLowerCase())
+                );
+                const defaultIndex = data.tracks.findIndex(t => t.default);
+
+                // If preferred track exists and is different from default, switch to it
+                if (preferredIndex >= 0 && preferredIndex !== defaultIndex) {
+                    console.log(`Auto-switching to preferred audio track: ${data.tracks[preferredIndex].label}`);
+                    await switchToAudioTrack(preferredIndex);
+                }
+            }
         } else {
             hideAudioTrackSelector();
             currentAudioTracks = data.tracks || [];
@@ -517,7 +532,69 @@ function hideAudioTrackSelector() {
     }
 }
 
-// Handle audio track change
+// Switch to a specific audio track
+async function switchToAudioTrack(trackIndex) {
+    return new Promise((resolve, reject) => {
+        // Store current playback state
+        const currentTime = videoPlayer.currentTime;
+        const wasPlaying = !videoPlayer.paused;
+        const volume = videoPlayer.volume;
+        const playbackRate = videoPlayer.playbackRate;
+
+        // Show loading indicator
+        showAudioTrackMessage('Switching audio track...', 'loading');
+
+        // Update selected track
+        selectedAudioTrack = trackIndex;
+
+        // Update the dropdown if it exists
+        const select = document.getElementById('audio-track-select');
+        if (select) {
+            select.value = trackIndex;
+        }
+
+        // Create new video URL with selected audio track
+        const videoUrl = `/api/video-stream?path=${encodeURIComponent(currentVideoPath)}&audio=${trackIndex}&start=${currentTime}`;
+
+        // Remove subtitle tracks (they'll need to be re-added)
+        removeSubtitleTracks();
+
+        // Load new stream
+        videoPlayer.src = videoUrl;
+
+        // Restore settings
+        videoPlayer.volume = volume;
+        videoPlayer.playbackRate = playbackRate;
+
+        // Wait for video to be ready
+        videoPlayer.onloadeddata = async () => {
+            showAudioTrackMessage(`Audio: ${currentAudioTracks[trackIndex]?.label || 'Track ' + (trackIndex + 1)}`, 'success');
+
+            if (wasPlaying) {
+                videoPlayer.play().catch(e => console.log('Autoplay prevented:', e));
+            }
+
+            // Reload subtitles if enabled
+            if (userSettings?.streaming?.subtitles && subtitleStatus.configured) {
+                await loadSubtitles(currentVideoPath);
+            }
+            resolve();
+        };
+
+        videoPlayer.onerror = () => {
+            showAudioTrackMessage('Failed to switch audio track', 'error');
+            // Revert to original stream
+            selectedAudioTrack = 0;
+            if (select) {
+                select.value = 0;
+            }
+            videoPlayer.src = `/api/video?path=${encodeURIComponent(currentVideoPath)}`;
+            reject(new Error('Failed to switch audio track'));
+        };
+    });
+}
+
+// Handle audio track change from UI
 async function handleAudioTrackChange(event) {
     const newTrack = parseInt(event.target.value, 10);
 
@@ -532,52 +609,11 @@ async function handleAudioTrackChange(event) {
         return;
     }
 
-    // Store current playback state
-    const currentTime = videoPlayer.currentTime;
-    const wasPlaying = !videoPlayer.paused;
-    const volume = videoPlayer.volume;
-    const playbackRate = videoPlayer.playbackRate;
-
-    // Show loading indicator
-    showAudioTrackMessage('Switching audio track...', 'loading');
-
-    // Update selected track
-    selectedAudioTrack = newTrack;
-
-    // Create new video URL with selected audio track
-    const videoUrl = `/api/video-stream?path=${encodeURIComponent(currentVideoPath)}&audio=${newTrack}&start=${currentTime}`;
-
-    // Remove subtitle tracks (they'll need to be re-added)
-    removeSubtitleTracks();
-
-    // Load new stream
-    videoPlayer.src = videoUrl;
-
-    // Restore settings
-    videoPlayer.volume = volume;
-    videoPlayer.playbackRate = playbackRate;
-
-    // Wait for video to be ready
-    videoPlayer.onloadeddata = async () => {
-        showAudioTrackMessage(`Audio: ${currentAudioTracks[newTrack]?.label || 'Track ' + (newTrack + 1)}`, 'success');
-
-        if (wasPlaying) {
-            videoPlayer.play().catch(e => console.log('Autoplay prevented:', e));
-        }
-
-        // Reload subtitles if enabled
-        if (userSettings?.streaming?.subtitles && subtitleStatus.configured) {
-            await loadSubtitles(currentVideoPath);
-        }
-    };
-
-    videoPlayer.onerror = () => {
-        showAudioTrackMessage('Failed to switch audio track', 'error');
-        // Revert to original stream
-        selectedAudioTrack = 0;
-        event.target.value = 0;
-        videoPlayer.src = `/api/video?path=${encodeURIComponent(currentVideoPath)}`;
-    };
+    try {
+        await switchToAudioTrack(newTrack);
+    } catch (error) {
+        console.error('Failed to switch audio track:', error);
+    }
 }
 
 // Show audio track status message
