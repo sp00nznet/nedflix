@@ -363,6 +363,12 @@ body {
     align-items: center;
 }
 
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
 .logo {
     display: flex;
     align-items: center;
