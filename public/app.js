@@ -711,14 +711,9 @@ async function playVideo(path, name, clickedElement) {
     videoPlayer.load();
 
     // Apply user settings with fallback defaults
-    // Set both HTML5 volume and gainNode (if Web Audio API was connected)
-    const volume = userSettings?.streaming?.volume
+    videoPlayer.volume = userSettings?.streaming?.volume
         ? userSettings.streaming.volume / 100
         : DEFAULT_VOLUME;
-    videoPlayer.volume = volume;
-    if (typeof gainNode !== 'undefined' && gainNode) {
-        gainNode.gain.value = volume;
-    }
     videoPlayer.playbackRate = userSettings?.streaming?.playbackSpeed || 1;
 
     videoPlayer.play().catch(e => console.log('Autoplay prevented:', e));
@@ -775,8 +770,8 @@ function playAudio(path, name, clickedElement) {
         videoPlayer.addEventListener('canplay', function onCanPlay() {
             videoPlayer.removeEventListener('canplay', onCanPlay);
             connectAudioSource();
-            // Apply volume through Web Audio API gain node (gainNode exists after connectAudioSource)
-            if (gainNode) gainNode.gain.value = targetVolume;
+            // Apply volume through Web Audio API gain node
+            setAudioVolume(targetVolume);
             startVisualizer();
         }, { once: true });
     }
@@ -919,9 +914,6 @@ async function switchToAudioTrack(trackIndex) {
 
         // Restore settings
         videoPlayer.volume = volume;
-        if (typeof gainNode !== 'undefined' && gainNode) {
-            gainNode.gain.value = volume;
-        }
         videoPlayer.playbackRate = playbackRate;
 
         // Wait for video to be ready
