@@ -153,8 +153,27 @@
                         </div>
                     </section>
 
-                    <section class="settings-section">
-                        <h3>Library</h3>
+                    <!-- Admin Section (only visible to admins) -->
+                    <section class="settings-section admin-only" id="admin-section" style="display: none;">
+                        <h3>Admin Settings</h3>
+                        <div class="setting-item">
+                            <label>User Management</label>
+                            <p class="setting-description">Add and manage users who can access Nedflix</p>
+                            <div class="user-management">
+                                <div class="add-user-form">
+                                    <input type="email" id="new-user-email" placeholder="Email address" class="user-input">
+                                    <input type="text" id="new-user-name" placeholder="Display name (optional)" class="user-input">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="new-user-admin">
+                                        <span>Admin</span>
+                                    </label>
+                                    <button class="add-user-btn" id="add-user-btn">Add User</button>
+                                </div>
+                                <div class="users-list" id="users-list">
+                                    <!-- Users will be populated here -->
+                                </div>
+                            </div>
+                        </div>
                         <div class="setting-item">
                             <label>Metadata Scan</label>
                             <p class="setting-description">Fetch movie and TV show information from online databases</p>

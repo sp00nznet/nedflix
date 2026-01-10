@@ -75,6 +75,11 @@ async function checkAuth() {
         updateUserDisplay();
         applySettings();
 
+        // Show admin section if user is admin
+        if (currentUser.isAdmin) {
+            showAdminSection();
+        }
+
         // Show library selector instead of loading directory
         showLibrarySelector();
 
@@ -1268,6 +1273,174 @@ function resetScanButtons(activeButton) {
         btn.classList.remove('scanning');
     });
     activeButton.textContent = activeButton.id === 'scan-movies-btn' ? 'Scan Movies' : 'Scan TV Shows';
+}
+
+// ========== USER MANAGEMENT (Admin) ==========
+
+// Show admin section and load users
+function showAdminSection() {
+    const adminSection = document.getElementById('admin-section');
+    if (adminSection) {
+        adminSection.style.display = 'block';
+        loadUsers();
+        setupUserManagementListeners();
+    }
+}
+
+// Setup user management event listeners
+function setupUserManagementListeners() {
+    const addUserBtn = document.getElementById('add-user-btn');
+    if (addUserBtn && !addUserBtn.hasAttribute('data-listener')) {
+        addUserBtn.setAttribute('data-listener', 'true');
+        addUserBtn.addEventListener('click', addUser);
+    }
+}
+
+// Load all users from the server
+async function loadUsers() {
+    try {
+        const response = await fetch('/api/admin/users');
+        const data = await response.json();
+
+        if (data.users) {
+            renderUsersList(data.users);
+        }
+    } catch (error) {
+        console.error('Failed to load users:', error);
+    }
+}
+
+// Render the users list
+function renderUsersList(users) {
+    const usersList = document.getElementById('users-list');
+    if (!usersList) return;
+
+    if (users.length === 0) {
+        usersList.innerHTML = '<div class="no-users-message">No users added yet</div>';
+        return;
+    }
+
+    usersList.innerHTML = users.map(user => {
+        const isPending = user.provider === 'pending';
+        const isCurrentUser = user.id === currentUser.id;
+        const avatarUrl = user.avatar?.startsWith('http')
+            ? user.avatar
+            : `/avatars/${user.avatar || 'cat'}.svg`;
+
+        return `
+            <div class="user-item ${isPending ? 'pending' : ''}" data-user-id="${user.id}">
+                <div class="user-avatar">
+                    <img src="${avatarUrl}" alt="${user.displayName}" onerror="this.src='/avatars/cat.svg'">
+                </div>
+                <div class="user-info">
+                    <div class="user-name">
+                        ${user.displayName || user.email || 'User'}
+                        ${user.isAdmin ? '<span class="user-badge admin">Admin</span>' : ''}
+                        ${isPending ? '<span class="user-badge pending">Pending</span>' : ''}
+                    </div>
+                    <div class="user-email">${user.email || user.provider}</div>
+                </div>
+                <div class="user-actions">
+                    ${!isCurrentUser ? `
+                        <button class="user-action-btn toggle-allowed ${!user.isAllowed ? 'disabled' : ''}"
+                                onclick="toggleUserAllowed('${user.id}', ${!user.isAllowed})"
+                                title="${user.isAllowed ? 'Disable access' : 'Enable access'}">
+                            ${user.isAllowed ? 'Enabled' : 'Disabled'}
+                        </button>
+                        <button class="user-action-btn delete"
+                                onclick="deleteUser('${user.id}')"
+                                title="Delete user">
+                            Delete
+                        </button>
+                    ` : '<span style="color: var(--color-text-dim); font-size: 12px;">You</span>'}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Add a new user
+async function addUser() {
+    const emailInput = document.getElementById('new-user-email');
+    const nameInput = document.getElementById('new-user-name');
+    const adminCheckbox = document.getElementById('new-user-admin');
+
+    const email = emailInput.value.trim();
+    const displayName = nameInput.value.trim();
+    const isAdmin = adminCheckbox.checked;
+
+    if (!email) {
+        alert('Please enter an email address');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/admin/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, displayName, isAdmin })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            emailInput.value = '';
+            nameInput.value = '';
+            adminCheckbox.checked = false;
+            loadUsers();
+        } else {
+            alert(data.error || 'Failed to add user');
+        }
+    } catch (error) {
+        console.error('Failed to add user:', error);
+        alert('Failed to add user');
+    }
+}
+
+// Toggle user allowed status
+async function toggleUserAllowed(userId, newStatus) {
+    try {
+        const response = await fetch(`/api/admin/users/${encodeURIComponent(userId)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ isAllowed: newStatus })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            loadUsers();
+        } else {
+            alert(data.error || 'Failed to update user');
+        }
+    } catch (error) {
+        console.error('Failed to update user:', error);
+        alert('Failed to update user');
+    }
+}
+
+// Delete a user
+async function deleteUser(userId) {
+    if (!confirm('Are you sure you want to delete this user?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/admin/users/${encodeURIComponent(userId)}`, {
+            method: 'DELETE'
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            loadUsers();
+        } else {
+            alert(data.error || 'Failed to delete user');
+        }
+    } catch (error) {
+        console.error('Failed to delete user:', error);
+        alert('Failed to delete user');
+    }
 }
 
 // ========== AUDIO VISUALIZER ==========
