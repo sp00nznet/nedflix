@@ -659,6 +659,163 @@ async function getAudioTracksWithCache(videoPath) {
     return tracks;
 }
 
+// Cache for subtitle track info
+const subtitleTrackCache = new Map();
+const SUBTITLE_CACHE_TTL = 3600000; // 1 hour
+
+/**
+ * Get embedded subtitle tracks from a video file
+ */
+function getSubtitleTracks(videoPath) {
+    return new Promise((resolve, reject) => {
+        if (!ffprobeAvailable) {
+            return resolve([]);
+        }
+
+        const args = [
+            '-v', 'quiet',
+            '-print_format', 'json',
+            '-show_streams',
+            '-select_streams', 's',
+            videoPath
+        ];
+
+        const ffprobe = spawn('ffprobe', args);
+        let stdout = '';
+        let stderr = '';
+
+        ffprobe.stdout.on('data', (data) => {
+            stdout += data.toString();
+        });
+
+        ffprobe.stderr.on('data', (data) => {
+            stderr += data.toString();
+        });
+
+        ffprobe.on('close', (code) => {
+            if (code !== 0) {
+                console.error('FFprobe subtitle error:', stderr);
+                return resolve([]);
+            }
+
+            try {
+                const data = JSON.parse(stdout);
+                const streams = data.streams || [];
+
+                const subtitleTracks = streams.map((stream, index) => {
+                    const tags = stream.tags || {};
+                    const language = tags.language || '';
+                    const title = tags.title || '';
+
+                    // Build a descriptive label
+                    let label = getLanguageName(language) || 'Unknown';
+                    if (title && title !== label) {
+                        label += ` (${title})`;
+                    }
+
+                    // Add codec info for context
+                    const codec = stream.codec_name || '';
+                    if (codec === 'hdmv_pgs_subtitle' || codec === 'pgssub') {
+                        label += ' [PGS]';
+                    } else if (codec === 'dvd_subtitle' || codec === 'dvdsub') {
+                        label += ' [DVD]';
+                    } else if (codec === 'ass' || codec === 'ssa') {
+                        label += ' [ASS]';
+                    }
+
+                    // Check if this is a text-based subtitle (extractable)
+                    const textBasedCodecs = ['subrip', 'srt', 'ass', 'ssa', 'webvtt', 'mov_text'];
+                    const isTextBased = textBasedCodecs.includes(codec);
+
+                    return {
+                        index: stream.index,
+                        streamIndex: index,
+                        codec: codec,
+                        language: language,
+                        languageName: getLanguageName(language),
+                        title: title,
+                        label: label,
+                        default: stream.disposition?.default === 1,
+                        forced: stream.disposition?.forced === 1,
+                        isTextBased: isTextBased
+                    };
+                });
+
+                resolve(subtitleTracks);
+            } catch (error) {
+                console.error('FFprobe subtitle parse error:', error);
+                resolve([]);
+            }
+        });
+
+        ffprobe.on('error', (error) => {
+            console.error('FFprobe subtitle spawn error:', error);
+            resolve([]);
+        });
+    });
+}
+
+/**
+ * Get subtitle tracks with caching
+ */
+async function getSubtitleTracksWithCache(videoPath) {
+    const cached = subtitleTrackCache.get(videoPath);
+    if (cached && Date.now() - cached.timestamp < SUBTITLE_CACHE_TTL) {
+        return cached.tracks;
+    }
+
+    const tracks = await getSubtitleTracks(videoPath);
+    subtitleTrackCache.set(videoPath, {
+        tracks,
+        timestamp: Date.now()
+    });
+
+    return tracks;
+}
+
+/**
+ * Extract subtitle track from video and convert to WebVTT
+ */
+function extractSubtitleTrack(videoPath, streamIndex) {
+    return new Promise((resolve, reject) => {
+        if (!ffmpegAvailable) {
+            return reject(new Error('FFmpeg not available'));
+        }
+
+        const args = [
+            '-i', videoPath,
+            '-map', `0:s:${streamIndex}`,
+            '-f', 'webvtt',
+            '-'
+        ];
+
+        const ffmpeg = spawn('ffmpeg', args);
+        let stdout = '';
+        let stderr = '';
+
+        ffmpeg.stdout.on('data', (data) => {
+            stdout += data.toString();
+        });
+
+        ffmpeg.stderr.on('data', (data) => {
+            stderr += data.toString();
+        });
+
+        ffmpeg.on('close', (code) => {
+            if (code !== 0) {
+                console.error('FFmpeg subtitle extraction error:', stderr);
+                return reject(new Error('Failed to extract subtitle'));
+            }
+            resolve(stdout);
+        });
+
+        ffmpeg.on('error', (error) => {
+            console.error('FFmpeg subtitle spawn error:', error);
+            reject(error);
+        });
+    });
+}
+
 // Configuration
 const PORT = process.env.PORT || 3000;
 const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
@@ -1202,6 +1359,78 @@ app.get('/api/audio-tracks/status', ensureAuthenticated, (req, res) => {
                 ? 'Install FFprobe to enable audio track detection'
                 : 'Install FFmpeg to enable audio track switching'
     });
+});
+
+// API: Get embedded subtitle tracks from a video (protected)
+app.get('/api/embedded-subtitles', ensureAuthenticated, async (req, res) => {
+    const videoPath = req.query.path;
+
+    if (!videoPath) {
+        return res.status(400).json({ error: 'Video path is required' });
+    }
+
+    // Security: Ensure path is within NFS mount
+    const normalizedPath = path.normalize(videoPath);
+    if (!normalizedPath.startsWith(NFS_MOUNT_PATH)) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Check if file exists
+    if (!fs.existsSync(normalizedPath)) {
+        return res.status(404).json({ error: 'Video file not found' });
+    }
+
+    try {
+        const tracks = await getSubtitleTracksWithCache(normalizedPath);
+
+        res.json({
+            available: ffprobeAvailable,
+            extractable: ffmpegAvailable,
+            tracks: tracks,
+            message: !ffprobeAvailable
+                ? 'FFprobe not installed - subtitle detection unavailable'
+                : tracks.length > 0
+                    ? `${tracks.length} subtitle track(s) found`
+                    : 'No embedded subtitles found'
+        });
+    } catch (error) {
+        console.error('Subtitle track detection error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Extract and serve embedded subtitle track as WebVTT (protected)
+app.get('/api/embedded-subtitles/extract', ensureAuthenticated, async (req, res) => {
+    const videoPath = req.query.path;
+    const trackIndex = parseInt(req.query.track, 10);
+
+    if (!videoPath) {
+        return res.status(400).json({ error: 'Video path is required' });
+    }
+
+    if (isNaN(trackIndex)) {
+        return res.status(400).json({ error: 'Track index is required' });
+    }
+
+    // Security: Ensure path is within NFS mount
+    const normalizedPath = path.normalize(videoPath);
+    if (!normalizedPath.startsWith(NFS_MOUNT_PATH)) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Check if file exists
+    if (!fs.existsSync(normalizedPath)) {
+        return res.status(404).json({ error: 'Video file not found' });
+    }
+
+    try {
+        const vttContent = await extractSubtitleTrack(normalizedPath, trackIndex);
+        res.set('Content-Type', 'text/vtt');
+        res.send(vttContent);
+    } catch (error) {
+        console.error('Subtitle extraction error:', error);
+        res.status(500).json({ error: 'Failed to extract subtitle' });
+    }
 });
 
 // API: Stream video with specific audio track (protected)
