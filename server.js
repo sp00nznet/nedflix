@@ -12,6 +12,7 @@ const GitHubStrategy = require('passport-github2').Strategy;
 const { spawn, execSync } = require('child_process');
 const metadataService = require('./metadata-service');
 const userService = require('./user-service');
+const mediaService = require('./media-service');
 
 const app = express();
 
@@ -33,6 +34,9 @@ metadataService.init(OMDB_API_KEY);
 
 // Initialize user service
 userService.init();
+
+// Initialize media service (shares database with user service)
+mediaService.init(userService.getDatabase());
 
 // ============================================
 // SUBTITLE UTILITY FUNCTIONS
@@ -1941,6 +1945,125 @@ app.delete('/api/admin/users/:id', ensureAdmin, (req, res) => {
         res.json({ success: true });
     } catch (error) {
         res.status(400).json({ error: error.message });
+    }
+});
+
+// ============================================
+// MEDIA INDEX & SEARCH API ENDPOINTS
+// ============================================
+
+// API: Search files (authenticated users)
+app.get('/api/search', ensureAuthenticated, (req, res) => {
+    const { q, type, library, limit } = req.query;
+
+    if (!q || q.length < 2) {
+        return res.status(400).json({ error: 'Search query must be at least 2 characters' });
+    }
+
+    try {
+        // Get user's library access
+        const user = userService.getUser(req.user.id);
+        const userLibraryAccess = user?.libraryAccess || ['movies', 'tv', 'music', 'audiobooks'];
+
+        // Search in index
+        let results = mediaService.search(q, {
+            fileType: type,
+            library: library,
+            limit: parseInt(limit) || 100
+        });
+
+        // Filter results by user's library access
+        results = results.filter(file => {
+            const fileLibrary = file.library?.toLowerCase();
+            return userLibraryAccess.some(lib =>
+                fileLibrary?.includes(lib.toLowerCase())
+            );
+        });
+
+        res.json({
+            query: q,
+            count: results.length,
+            results: results
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Get media index stats
+app.get('/api/search/stats', ensureAuthenticated, (req, res) => {
+    try {
+        const stats = mediaService.getIndexStats();
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Start media scan (admin only)
+app.post('/api/admin/scan', ensureAdmin, async (req, res) => {
+    try {
+        const result = await mediaService.startScan(
+            NFS_MOUNT_PATH,
+            libraries,
+            req.user.displayName || req.user.id
+        );
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Get scan status
+app.get('/api/admin/scan/status', ensureAdmin, (req, res) => {
+    try {
+        const status = mediaService.getScanStatus();
+        res.json(status || { status: 'no_scans' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Get scan logs (admin only)
+app.get('/api/admin/scan/logs', ensureAdmin, (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit) || 50;
+        const logs = mediaService.getScanLogs(limit);
+        res.json(logs);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Download scan logs as CSV (admin only)
+app.get('/api/admin/scan/logs/download', ensureAdmin, (req, res) => {
+    try {
+        const logs = mediaService.getScanLogs(1000);
+
+        // Build CSV
+        const headers = ['ID', 'Started At', 'Completed At', 'Status', 'Files Found', 'Files Indexed', 'Errors', 'Scan Path', 'Triggered By'];
+        const rows = logs.map(log => [
+            log.id,
+            new Date(log.started_at * 1000).toISOString(),
+            log.completed_at ? new Date(log.completed_at * 1000).toISOString() : '',
+            log.status,
+            log.files_found,
+            log.files_indexed,
+            log.errors,
+            log.scan_path,
+            log.triggered_by
+        ]);
+
+        const csv = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        ].join('\n');
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="scan-logs-${Date.now()}.csv"`);
+        res.send(csv);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 

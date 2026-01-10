@@ -22,6 +22,13 @@
                 </div>
             </div>
             <div class="header-right">
+                <button class="admin-menu-toggle admin-only" id="admin-menu-toggle" title="Admin Panel" style="display: none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    <span>Admin</span>
+                </button>
                 <button class="user-menu-toggle" id="user-menu-toggle" title="User Menu">
                     <img src="" alt="Profile" id="header-avatar" class="header-avatar">
                     <span id="header-username">User</span>
@@ -171,43 +178,6 @@
                         </div>
                     </section>
 
-                    <!-- Admin Section (only visible to admins) -->
-                    <section class="settings-section admin-only" id="admin-section" style="display: none;">
-                        <h3>Admin Settings</h3>
-                        <div class="setting-item">
-                            <label>User Management</label>
-                            <p class="setting-description">Add and manage users who can access Nedflix</p>
-                            <div class="user-management">
-                                <div class="add-user-form">
-                                    <input type="text" id="new-user-username" placeholder="Username" class="user-input" autocomplete="off">
-                                    <input type="password" id="new-user-password" placeholder="Password" class="user-input" autocomplete="new-password">
-                                    <input type="text" id="new-user-name" placeholder="Display name (optional)" class="user-input">
-                                    <label class="checkbox-label">
-                                        <input type="checkbox" id="new-user-admin">
-                                        <span>Admin</span>
-                                    </label>
-                                    <button class="add-user-btn" id="add-user-btn">Add User</button>
-                                </div>
-                                <div class="users-list" id="users-list">
-                                    <!-- Users will be populated here -->
-                                </div>
-                            </div>
-                        </div>
-                        <div class="setting-item">
-                            <label>Metadata Scan</label>
-                            <p class="setting-description">Fetch movie and TV show information from online databases</p>
-                            <div class="scan-controls">
-                                <button class="scan-btn" id="scan-movies-btn" data-path="/mnt/nfs/Movies">Scan Movies</button>
-                                <button class="scan-btn" id="scan-tv-btn" data-path="/mnt/nfs/TV Shows">Scan TV Shows</button>
-                            </div>
-                            <div class="scan-progress" id="scan-progress" style="display: none;">
-                                <div class="scan-progress-bar">
-                                    <div class="scan-progress-fill" id="scan-progress-fill"></div>
-                                </div>
-                                <div class="scan-progress-text" id="scan-progress-text">Scanning...</div>
-                            </div>
-                        </div>
-                    </section>
                 </div>
 
                 <div class="panel-footer">
@@ -220,6 +190,121 @@
                         </svg>
                         Log Out
                     </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Panel Overlay -->
+        <div class="admin-panel-overlay" id="admin-panel-overlay">
+            <div class="admin-panel" id="admin-panel">
+                <div class="panel-header">
+                    <h2>Admin Panel</h2>
+                    <button class="close-panel" id="close-admin-panel" title="Close">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="panel-content">
+                    <!-- User Management Section -->
+                    <section class="settings-section">
+                        <h3>User Management</h3>
+                        <p class="setting-description">Add and manage users who can access Nedflix</p>
+                        <div class="user-management">
+                            <div class="add-user-form">
+                                <input type="text" id="admin-new-user-username" placeholder="Username" class="user-input" autocomplete="off">
+                                <input type="password" id="admin-new-user-password" placeholder="Password" class="user-input" autocomplete="new-password">
+                                <input type="text" id="admin-new-user-name" placeholder="Display name (optional)" class="user-input">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="admin-new-user-admin">
+                                    <span>Admin</span>
+                                </label>
+                                <button class="add-user-btn" id="admin-add-user-btn">Add User</button>
+                            </div>
+                            <div class="users-list" id="admin-users-list">
+                                <!-- Users will be populated here -->
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Media Library Scan Section -->
+                    <section class="settings-section">
+                        <h3>Media Library Index</h3>
+                        <p class="setting-description">Scan and index your media library for fast searching</p>
+
+                        <div class="index-stats" id="index-stats">
+                            <div class="stat-item">
+                                <span class="stat-value" id="stat-total-files">-</span>
+                                <span class="stat-label">Total Files</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-value" id="stat-videos">-</span>
+                                <span class="stat-label">Videos</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-value" id="stat-audio">-</span>
+                                <span class="stat-label">Audio</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-value" id="stat-last-scan">Never</span>
+                                <span class="stat-label">Last Scan</span>
+                            </div>
+                        </div>
+
+                        <div class="scan-controls">
+                            <button class="scan-btn primary" id="start-index-scan-btn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <path d="m21 21-4.35-4.35"></path>
+                                </svg>
+                                Scan Library
+                            </button>
+                        </div>
+
+                        <div class="scan-progress" id="index-scan-progress" style="display: none;">
+                            <div class="scan-progress-bar">
+                                <div class="scan-progress-fill" id="index-scan-progress-fill"></div>
+                            </div>
+                            <div class="scan-progress-text" id="index-scan-progress-text">Scanning...</div>
+                        </div>
+                    </section>
+
+                    <!-- Metadata Scan Section -->
+                    <section class="settings-section">
+                        <h3>Metadata Scan</h3>
+                        <p class="setting-description">Fetch movie and TV show information from online databases</p>
+                        <div class="scan-controls">
+                            <button class="scan-btn" id="admin-scan-movies-btn" data-path="/mnt/nfs/Movies">Scan Movies</button>
+                            <button class="scan-btn" id="admin-scan-tv-btn" data-path="/mnt/nfs/TV Shows">Scan TV Shows</button>
+                        </div>
+                        <div class="scan-progress" id="admin-scan-progress" style="display: none;">
+                            <div class="scan-progress-bar">
+                                <div class="scan-progress-fill" id="admin-scan-progress-fill"></div>
+                            </div>
+                            <div class="scan-progress-text" id="admin-scan-progress-text">Scanning...</div>
+                        </div>
+                    </section>
+
+                    <!-- Scan Logs Section -->
+                    <section class="settings-section">
+                        <h3>Scan Logs</h3>
+                        <p class="setting-description">View and download scan activity logs</p>
+                        <div class="scan-logs-controls">
+                            <button class="scan-btn" id="download-scan-logs-btn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                Download Logs (CSV)
+                            </button>
+                        </div>
+                        <div class="scan-logs-list" id="scan-logs-list">
+                            <!-- Scan logs will be populated here -->
+                        </div>
+                    </section>
                 </div>
             </div>
         </div>
@@ -303,8 +388,26 @@
                         </svg>
                         <span id="current-path">/mnt/nfs</span>
                     </div>
+                    <div class="search-container">
+                        <div class="search-input-wrapper">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="m21 21-4.35-4.35"></path>
+                            </svg>
+                            <input type="text" id="search-input" placeholder="Search files..." autocomplete="off">
+                            <button class="search-clear" id="search-clear" style="display: none;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="search-results" id="search-results" style="display: none;">
+                            <!-- Search results will be populated here -->
+                        </div>
+                    </div>
                 </div>
-                
+
                 <div class="file-list" id="file-list">
                     <div class="loading-state">
                         <div class="spinner"></div>

@@ -448,6 +448,13 @@ function getSettings(userId) {
     return data?.settings || null;
 }
 
+/**
+ * Get database instance for sharing with other services
+ */
+function getDatabase() {
+    return db;
+}
+
 module.exports = {
     init,
     getUser,
@@ -459,5 +466,6 @@ module.exports = {
     changePassword,
     getAllUsers,
     updateSettings,
-    getSettings
+    getSettings,
+    getDatabase
 };
