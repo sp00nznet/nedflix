@@ -1939,7 +1939,18 @@ async function performSearch(query) {
     searchResults.innerHTML = '<div class="search-results-header">Searching...</div>';
 
     try {
-        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=50`);
+        // Build search URL with library filter if we're in a specific library
+        let searchUrl = `/api/search?q=${encodeURIComponent(query)}&limit=50`;
+
+        if (currentLibraryRoot) {
+            // Extract library name from path (e.g., "/mnt/nfs/Movies" -> "Movies")
+            const libraryName = currentLibraryRoot.split('/').pop();
+            if (libraryName) {
+                searchUrl += `&library=${encodeURIComponent(libraryName)}`;
+            }
+        }
+
+        const response = await fetch(searchUrl);
         const data = await response.json();
 
         if (data.error) {
@@ -1971,6 +1982,10 @@ async function performSearch(query) {
 function renderSearchResults(results, query) {
     if (!searchResults) return;
 
+    // Get current library name for display
+    const currentLibrary = currentLibraryRoot ? currentLibraryRoot.split('/').pop() : null;
+    const libraryContext = currentLibrary ? ` in ${currentLibrary}` : '';
+
     if (!results || results.length === 0) {
         searchResults.innerHTML = `
             ${!hasMediaIndex ? `
@@ -1984,7 +1999,7 @@ function renderSearchResults(results, query) {
                     <circle cx="11" cy="11" r="8"></circle>
                     <path d="m21 21-4.35-4.35"></path>
                 </svg>
-                <p>No results found for "${escapeHtml(query)}"</p>
+                <p>No results found for "${escapeHtml(query)}"${libraryContext}</p>
             </div>
         `;
         return;
@@ -2008,7 +2023,7 @@ function renderSearchResults(results, query) {
     };
 
     searchResults.innerHTML = `
-        <div class="search-results-header">${results.length} result${results.length !== 1 ? 's' : ''} for "${escapeHtml(query)}"</div>
+        <div class="search-results-header">${results.length} result${results.length !== 1 ? 's' : ''} for "${escapeHtml(query)}"${libraryContext}</div>
         ${results.map(result => `
             <div class="search-result-item" onclick="navigateToSearchResult('${escapeHtml(result.path)}', '${result.file_type}')">
                 <div class="search-result-icon">${getIcon(result.file_type)}</div>
