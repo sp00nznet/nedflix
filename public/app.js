@@ -94,6 +94,9 @@ function showLibrarySelector() {
     mainContent.style.display = 'none';
     currentLibraryRoot = null;
 
+    // Stop visualizer if playing
+    stopVisualizer();
+
     // Reset video player
     videoPlayer.src = '';
     videoPlayer.classList.remove('active');
@@ -457,6 +460,9 @@ function renderFileList(items) {
 async function playVideo(path, name) {
     const videoUrl = `/api/video?path=${encodeURIComponent(path)}`;
 
+    // Stop visualizer if it was playing
+    stopVisualizer();
+
     // Store current video path for subtitle and audio operations
     currentVideoPath = path;
     currentVideoName = name;
@@ -570,6 +576,16 @@ function playAudio(path, name) {
     if (userSettings?.streaming) {
         videoPlayer.volume = userSettings.streaming.volume / 100;
         videoPlayer.playbackRate = userSettings.streaming.playbackSpeed;
+    }
+
+    // Initialize and start visualizer for audio playback
+    if (initVisualizer()) {
+        // Need to wait for audio to load before connecting
+        videoPlayer.addEventListener('canplay', function onCanPlay() {
+            videoPlayer.removeEventListener('canplay', onCanPlay);
+            connectAudioSource();
+            startVisualizer();
+        }, { once: true });
     }
 
     videoPlayer.play().catch(e => console.log('Autoplay prevented:', e));
@@ -1103,4 +1119,164 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// ========== AUDIO VISUALIZER ==========
+let audioContext = null;
+let analyser = null;
+let audioSource = null;
+let visualizerCanvas = null;
+let visualizerCtx = null;
+let animationFrameId = null;
+let isVisualizerActive = false;
+let audioSourceConnected = false;
+
+// Initialize the audio visualizer
+function initVisualizer() {
+    visualizerCanvas = document.getElementById('audio-visualizer');
+    if (!visualizerCanvas) return false;
+
+    visualizerCtx = visualizerCanvas.getContext('2d');
+
+    // Create audio context if not exists
+    if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    // Create analyser node
+    if (!analyser) {
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.8;
+    }
+
+    return true;
+}
+
+// Connect the video player to the analyser (only once per session)
+function connectAudioSource() {
+    // MediaElementSource can only be created once per element
+    // So we check if we've already connected
+    if (audioSourceConnected && audioSource) {
+        return true;
+    }
+
+    // Create new source from video player
+    try {
+        audioSource = audioContext.createMediaElementSource(videoPlayer);
+        audioSource.connect(analyser);
+        analyser.connect(audioContext.destination);
+        audioSourceConnected = true;
+        return true;
+    } catch (e) {
+        // Source might already be connected from a previous session
+        if (e.name === 'InvalidStateError') {
+            // Already connected, that's fine
+            audioSourceConnected = true;
+            return true;
+        }
+        console.log('Audio source connection error:', e.message);
+        return false;
+    }
+}
+
+// Start the visualizer animation
+function startVisualizer() {
+    if (!visualizerCanvas || !analyser) return;
+
+    isVisualizerActive = true;
+    visualizerCanvas.classList.add('active');
+
+    // Resume audio context if suspended
+    if (audioContext && audioContext.state === 'suspended') {
+        audioContext.resume();
+    }
+
+    drawVisualizer();
+}
+
+// Stop the visualizer animation
+function stopVisualizer() {
+    isVisualizerActive = false;
+
+    if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+    }
+
+    if (visualizerCanvas) {
+        visualizerCanvas.classList.remove('active');
+        // Clear the canvas
+        if (visualizerCtx) {
+            visualizerCtx.clearRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
+        }
+    }
+}
+
+// Draw the visualizer bars
+function drawVisualizer() {
+    if (!isVisualizerActive || !analyser || !visualizerCanvas || !visualizerCtx) {
+        return;
+    }
+
+    animationFrameId = requestAnimationFrame(drawVisualizer);
+
+    // Update canvas size to match container
+    const container = visualizerCanvas.parentElement;
+    if (container) {
+        visualizerCanvas.width = container.clientWidth;
+        visualizerCanvas.height = container.clientHeight;
+    }
+
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    analyser.getByteFrequencyData(dataArray);
+
+    // Clear canvas with transparent background
+    visualizerCtx.clearRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
+
+    // Calculate bar dimensions
+    const barCount = 64;
+    const barWidth = visualizerCanvas.width / barCount;
+    const barGap = 2;
+    const maxBarHeight = visualizerCanvas.height * 0.8;
+
+    // Sample the frequency data
+    const step = Math.floor(bufferLength / barCount);
+
+    for (let i = 0; i < barCount; i++) {
+        // Average a few frequency bins for smoother visualization
+        let sum = 0;
+        for (let j = 0; j < step; j++) {
+            sum += dataArray[i * step + j];
+        }
+        const average = sum / step;
+
+        // Calculate bar height (0-255 range from analyser)
+        const barHeight = (average / 255) * maxBarHeight;
+
+        // Calculate position (centered at bottom)
+        const x = i * barWidth + barGap / 2;
+        const y = visualizerCanvas.height - barHeight;
+
+        // Create gradient for bars
+        const gradient = visualizerCtx.createLinearGradient(x, y, x, visualizerCanvas.height);
+        gradient.addColorStop(0, 'rgba(124, 92, 255, 0.9)');  // Primary color
+        gradient.addColorStop(0.5, 'rgba(0, 212, 170, 0.7)'); // Accent color
+        gradient.addColorStop(1, 'rgba(0, 212, 170, 0.3)');
+
+        visualizerCtx.fillStyle = gradient;
+        visualizerCtx.fillRect(x, y, barWidth - barGap, barHeight);
+
+        // Add glow effect for higher bars
+        if (barHeight > maxBarHeight * 0.5) {
+            visualizerCtx.shadowColor = 'rgba(124, 92, 255, 0.5)';
+            visualizerCtx.shadowBlur = 10;
+        } else {
+            visualizerCtx.shadowBlur = 0;
+        }
+    }
+
+    // Reset shadow
+    visualizerCtx.shadowBlur = 0;
 }
