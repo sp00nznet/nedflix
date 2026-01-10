@@ -1296,14 +1296,21 @@ function setupUserManagementListeners() {
     }
 }
 
+// Track if users have been loaded
+let usersLoaded = false;
+
 // Load all users from the server
-async function loadUsers() {
+async function loadUsers(forceReload = false) {
+    // Skip if already loaded and not forcing reload
+    if (usersLoaded && !forceReload) return;
+
     try {
         const response = await fetch('/api/admin/users');
         const data = await response.json();
 
         if (data.users) {
             renderUsersList(data.users);
+            usersLoaded = true;
         }
     } catch (error) {
         console.error('Failed to load users:', error);
@@ -1396,7 +1403,7 @@ async function addUser() {
             passwordInput.value = '';
             nameInput.value = '';
             adminCheckbox.checked = false;
-            loadUsers();
+            loadUsers(true);
         } else {
             alert(data.error || 'Failed to add user');
         }
@@ -1418,7 +1425,7 @@ async function toggleUserAllowed(userId, newStatus) {
         const data = await response.json();
 
         if (data.success) {
-            loadUsers();
+            loadUsers(true);
         } else {
             alert(data.error || 'Failed to update user');
         }
@@ -1442,7 +1449,7 @@ async function deleteUser(userId) {
         const data = await response.json();
 
         if (data.success) {
-            loadUsers();
+            loadUsers(true);
         } else {
             alert(data.error || 'Failed to delete user');
         }
