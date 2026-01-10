@@ -75,7 +75,8 @@
                         <div class="setting-item">
                             <label for="quality-select">Video Quality</label>
                             <select id="quality-select" class="setting-select">
-                                <option value="auto">Auto</option>
+                                <option value="auto">Auto (Original)</option>
+                                <option value="4k">4K Ultra HD (2160p)</option>
                                 <option value="high">High (1080p)</option>
                                 <option value="medium">Medium (720p)</option>
                                 <option value="low">Low (480p)</option>
@@ -151,8 +152,26 @@
                             </select>
                         </div>
                     </section>
+
+                    <section class="settings-section">
+                        <h3>Library</h3>
+                        <div class="setting-item">
+                            <label>Metadata Scan</label>
+                            <p class="setting-description">Fetch movie and TV show information from online databases</p>
+                            <div class="scan-controls">
+                                <button class="scan-btn" id="scan-movies-btn" data-path="/mnt/nfs/Movies">Scan Movies</button>
+                                <button class="scan-btn" id="scan-tv-btn" data-path="/mnt/nfs/TV Shows">Scan TV Shows</button>
+                            </div>
+                            <div class="scan-progress" id="scan-progress" style="display: none;">
+                                <div class="scan-progress-bar">
+                                    <div class="scan-progress-fill" id="scan-progress-fill"></div>
+                                </div>
+                                <div class="scan-progress-text" id="scan-progress-text">Scanning...</div>
+                            </div>
+                        </div>
+                    </section>
                 </div>
-                
+
                 <div class="panel-footer">
                     <button class="save-settings-btn" id="save-settings">Save Settings</button>
                     <a href="/auth/logout" class="logout-btn">
@@ -264,6 +283,7 @@
                     <video id="video-player" controls disablepictureinpicture controlslist="nodownload noplaybackrate">
                         Your browser does not support the video tag.
                     </video>
+                    <canvas id="audio-visualizer" class="audio-visualizer"></canvas>
                     <div class="video-placeholder" id="video-placeholder">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                             <circle cx="12" cy="12" r="10"></circle>

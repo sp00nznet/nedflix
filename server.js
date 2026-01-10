@@ -10,6 +10,7 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const GitHubStrategy = require('passport-github2').Strategy;
 const { spawn, execSync } = require('child_process');
+const metadataService = require('./metadata-service');
 
 const app = express();
 
@@ -22,6 +23,12 @@ if (!fs.existsSync(SUBTITLE_CACHE_DIR)) {
 // OpenSubtitles API configuration
 const OPENSUBTITLES_API_KEY = process.env.OPENSUBTITLES_API_KEY || '';
 const OPENSUBTITLES_API_URL = 'https://api.opensubtitles.com/api/v1';
+
+// OMDb API configuration (for movie/show metadata)
+const OMDB_API_KEY = process.env.OMDB_API_KEY || '';
+
+// Initialize metadata service
+metadataService.init(OMDB_API_KEY);
 
 // ============================================
 // SUBTITLE UTILITY FUNCTIONS
@@ -1046,16 +1053,16 @@ app.post('/api/settings', ensureAuthenticated, (req, res) => {
 // API: Browse directories (protected)
 app.get('/api/browse', ensureAuthenticated, (req, res) => {
     const requestedPath = req.query.path || NFS_MOUNT_PATH;
-    
+
     // Security: Ensure path is within NFS mount
     const normalizedPath = path.normalize(requestedPath);
     if (!normalizedPath.startsWith(NFS_MOUNT_PATH)) {
         return res.status(403).json({ error: 'Access denied' });
     }
-    
+
     try {
         const items = fs.readdirSync(normalizedPath, { withFileTypes: true });
-        
+
         const fileList = items.map(item => {
             const fullPath = path.join(normalizedPath, item.name);
             let stats;
@@ -1064,7 +1071,7 @@ app.get('/api/browse', ensureAuthenticated, (req, res) => {
             } catch {
                 return null;
             }
-            
+
             const isDir = item.isDirectory();
             const isVideo = !isDir && /\.(mp4|webm|ogg|avi|mkv|mov|m4v)$/i.test(item.name);
             const isAudio = !isDir && /\.(mp3|m4a|flac|wav|aac|ogg|wma|opus|aiff)$/i.test(item.name);
@@ -1078,19 +1085,50 @@ app.get('/api/browse', ensureAuthenticated, (req, res) => {
                 size: stats.size
             };
         }).filter(Boolean);
-        
+
+        // Get cached metadata for all media files
+        const mediaPaths = fileList.filter(f => f.isVideo || f.isAudio).map(f => f.path);
+        const metadataMap = metadataService.getCachedMetadataBulk(mediaPaths);
+
+        // Enrich items with metadata
+        for (const item of fileList) {
+            const meta = metadataMap[item.path];
+            if (meta) {
+                item.cleanTitle = meta.clean_title;
+                item.year = meta.year;
+                item.poster = meta.poster_path;
+                item.rating = meta.rating;
+                item.genre = meta.genre;
+                item.plot = meta.plot;
+                item.episodeTitle = meta.episode_title;
+                item.season = meta.season;
+                item.episode = meta.episode;
+                item.type = meta.type;
+                item.hasMetadata = true;
+            } else {
+                // Extract basic info from filename
+                const extracted = metadataService.extractFromFilename(item.name);
+                item.cleanTitle = extracted.title;
+                item.year = extracted.year;
+                item.season = extracted.season;
+                item.episode = extracted.episode;
+                item.type = extracted.type;
+                item.hasMetadata = false;
+            }
+        }
+
         fileList.sort((a, b) => {
             if (a.isDirectory && !b.isDirectory) return -1;
             if (!a.isDirectory && b.isDirectory) return 1;
             return a.name.localeCompare(b.name);
         });
-        
+
         // Calculate parent path (but don't go above mount point)
         let parentPath = path.dirname(normalizedPath);
         if (!parentPath.startsWith(NFS_MOUNT_PATH)) {
             parentPath = NFS_MOUNT_PATH;
         }
-        
+
         res.json({
             currentPath: normalizedPath,
             parentPath: parentPath,
@@ -1639,6 +1677,111 @@ function streamVideoFile(req, res, filePath) {
         res.status(500).json({ error: error.message });
     }
 }
+
+// ============================================
+// METADATA API ENDPOINTS
+// ============================================
+
+// API: Get metadata status
+app.get('/api/metadata/status', ensureAuthenticated, (req, res) => {
+    res.json({
+        configured: !!OMDB_API_KEY,
+        provider: 'OMDb + TVmaze + Wikidata',
+        message: OMDB_API_KEY
+            ? 'Metadata fetching is enabled'
+            : 'Set OMDB_API_KEY environment variable to enable automatic metadata fetching'
+    });
+});
+
+// API: Start metadata scan for a directory
+app.post('/api/metadata/scan', ensureAuthenticated, async (req, res) => {
+    const { path: dirPath } = req.body;
+
+    if (!dirPath) {
+        return res.status(400).json({ error: 'Directory path is required' });
+    }
+
+    // Security: Ensure path is within NFS mount
+    const normalizedPath = path.normalize(dirPath);
+    if (!normalizedPath.startsWith(NFS_MOUNT_PATH)) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+
+    if (!OMDB_API_KEY) {
+        return res.status(400).json({
+            error: 'OMDb API key not configured',
+            message: 'Set OMDB_API_KEY in your .env file'
+        });
+    }
+
+    const result = await metadataService.startBackgroundScan(normalizedPath, OMDB_API_KEY);
+    res.json(result);
+});
+
+// API: Get scan progress
+app.get('/api/metadata/scan/progress', ensureAuthenticated, (req, res) => {
+    res.json(metadataService.getScanProgress());
+});
+
+// API: Get metadata for a specific file
+app.get('/api/metadata', ensureAuthenticated, async (req, res) => {
+    const filePath = req.query.path;
+
+    if (!filePath) {
+        return res.status(400).json({ error: 'File path is required' });
+    }
+
+    // Security: Ensure path is within NFS mount
+    const normalizedPath = path.normalize(filePath);
+    if (!normalizedPath.startsWith(NFS_MOUNT_PATH)) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Check for cached metadata first
+    let metadata = metadataService.getCachedMetadata(normalizedPath);
+
+    // If not cached and API key available, fetch it
+    if (!metadata && OMDB_API_KEY) {
+        metadata = await metadataService.getMetadata(normalizedPath, OMDB_API_KEY);
+    }
+
+    if (metadata) {
+        res.json({
+            found: true,
+            metadata: {
+                cleanTitle: metadata.clean_title,
+                year: metadata.year,
+                type: metadata.type,
+                poster: metadata.poster_path,
+                plot: metadata.plot,
+                rating: metadata.rating,
+                genre: metadata.genre,
+                director: metadata.director,
+                actors: metadata.actors,
+                runtime: metadata.runtime,
+                imdbId: metadata.imdb_id,
+                season: metadata.season,
+                episode: metadata.episode,
+                episodeTitle: metadata.episode_title,
+                source: metadata.source
+            }
+        });
+    } else {
+        // Return extracted info from filename
+        const extracted = metadataService.extractFromFilename(path.basename(normalizedPath));
+        res.json({
+            found: false,
+            metadata: {
+                cleanTitle: extracted.title,
+                year: extracted.year,
+                type: extracted.type,
+                season: extracted.season,
+                episode: extracted.episode,
+                source: 'filename'
+            }
+        });
+    }
+});
 
 // Check for available auth providers
 app.get('/api/auth-providers', (req, res) => {
