@@ -1072,6 +1072,42 @@ app.post('/api/settings', ensureAuthenticated, (req, res) => {
     }
 });
 
+// API: Change own password (any authenticated user)
+app.post('/api/user/change-password', ensureAuthenticated, (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: 'Current and new passwords are required' });
+    }
+
+    if (newPassword.length < 4) {
+        return res.status(400).json({ error: 'New password must be at least 4 characters' });
+    }
+
+    try {
+        // Check if this is the env-configured admin
+        if (req.user.id === 'local-admin') {
+            // For env admin, verify current password matches env config
+            if (currentPassword !== ADMIN_PASSWORD) {
+                return res.status(401).json({ error: 'Current password is incorrect' });
+            }
+            // Cannot change env admin password through the UI
+            return res.status(400).json({ error: 'Admin password must be changed in environment configuration' });
+        }
+
+        // For database users, verify and update password
+        const result = userService.changePassword(req.user.id, currentPassword, newPassword);
+
+        if (!result.success) {
+            return res.status(401).json({ error: result.error || 'Failed to change password' });
+        }
+
+        res.json({ success: true, message: 'Password changed successfully' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // API: Browse directories (protected)
 app.get('/api/browse', ensureAuthenticated, (req, res) => {
     const requestedPath = req.query.path || NFS_MOUNT_PATH;
