@@ -506,8 +506,46 @@ function hideAudioTrackSelector() {
     }
 }
 
-// Switch to a specific audio track
+// Check if browser supports native audio track switching
+function supportsNativeAudioTracks() {
+    return videoPlayer.audioTracks && videoPlayer.audioTracks.length > 0;
+}
+
+// Try native audio track switching (preserves seek functionality)
+function tryNativeAudioSwitch(trackIndex) {
+    if (!supportsNativeAudioTracks()) {
+        return false;
+    }
+
+    const audioTracks = videoPlayer.audioTracks;
+    if (trackIndex >= audioTracks.length) {
+        return false;
+    }
+
+    // Disable all tracks, then enable the selected one
+    for (let i = 0; i < audioTracks.length; i++) {
+        audioTracks[i].enabled = (i === trackIndex);
+    }
+
+    console.log(`Native audio switch to track ${trackIndex}`);
+    return true;
+}
+
 async function switchToAudioTrack(trackIndex) {
+    // Update the dropdown if it exists
+    const select = document.getElementById('audio-track-select');
+    if (select) {
+        select.value = trackIndex;
+    }
+
+    // Try native switching first (preserves seek/duration)
+    if (tryNativeAudioSwitch(trackIndex)) {
+        selectedAudioTrack = trackIndex;
+        showAudioTrackMessage(`Audio: ${currentAudioTracks[trackIndex]?.label || 'Track ' + (trackIndex + 1)}`, 'success');
+        return Promise.resolve();
+    }
+
+    // Fall back to FFmpeg streaming (loses seek functionality)
     return new Promise((resolve, reject) => {
         // Store current playback state
         const currentTime = videoPlayer.currentTime;
@@ -520,12 +558,6 @@ async function switchToAudioTrack(trackIndex) {
 
         // Update selected track
         selectedAudioTrack = trackIndex;
-
-        // Update the dropdown if it exists
-        const select = document.getElementById('audio-track-select');
-        if (select) {
-            select.value = trackIndex;
-        }
 
         // Create new video URL with selected audio track
         const videoUrl = `/api/video-stream?path=${encodeURIComponent(currentVideoPath)}&audio=${trackIndex}&start=${currentTime}`;
