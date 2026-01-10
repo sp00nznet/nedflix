@@ -1208,7 +1208,7 @@ app.get('/api/browse', ensureAuthenticated, async (req, res) => {
 
         // Get cached metadata for all media files
         const mediaPaths = fileList.filter(f => f.isVideo || f.isAudio).map(f => f.path);
-        const metadataMap = metadataService.getCachedMetadataBulk(mediaPaths);
+        const metadataMap = await metadataService.getCachedMetadataBulkAsync(mediaPaths);
 
         // Enrich items with metadata
         for (const item of fileList) {
