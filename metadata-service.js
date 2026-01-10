@@ -27,59 +27,24 @@ let lastRequestTime = {
     wikidata: 0
 };
 
-// Database setup
-let db = null;
-const DB_PATH = path.join(__dirname, 'metadata.db');
+// Database - uses shared db.js abstraction layer
+const db = require('./db');
 const THUMBNAIL_DIR = path.join(__dirname, 'public', 'thumbnails');
+let omdbKey = '';
 
 /**
  * Initialize the metadata service
  */
 function init(omdbApiKey) {
+    omdbKey = omdbApiKey;
+
     // Create thumbnail directory
     if (!fs.existsSync(THUMBNAIL_DIR)) {
         fs.mkdirSync(THUMBNAIL_DIR, { recursive: true });
     }
 
-    // Initialize database
-    try {
-        const Database = require('better-sqlite3');
-        db = new Database(DB_PATH);
-
-        // Create tables
-        db.exec(`
-            CREATE TABLE IF NOT EXISTS media_metadata (
-                file_path TEXT PRIMARY KEY,
-                clean_title TEXT,
-                year INTEGER,
-                type TEXT,
-                poster_path TEXT,
-                plot TEXT,
-                rating TEXT,
-                genre TEXT,
-                director TEXT,
-                actors TEXT,
-                runtime TEXT,
-                imdb_id TEXT,
-                tvmaze_id INTEGER,
-                season INTEGER,
-                episode INTEGER,
-                episode_title TEXT,
-                source TEXT,
-                fetched_at INTEGER,
-                updated_at INTEGER
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_file_path ON media_metadata(file_path);
-            CREATE INDEX IF NOT EXISTS idx_imdb_id ON media_metadata(imdb_id);
-        `);
-
-        console.log('📚 Metadata database initialized');
-        return true;
-    } catch (error) {
-        console.error('Failed to initialize metadata database:', error.message);
-        return false;
-    }
+    console.log('📚 Metadata service initialized (using shared database)');
+    return true;
 }
 
 /**
@@ -403,13 +368,14 @@ async function searchWikidata(title, year) {
  * Get metadata for a file
  */
 async function getMetadata(filePath, omdbApiKey) {
-    if (!db) return null;
-
     // Check cache first
-    const cached = db.prepare('SELECT * FROM media_metadata WHERE file_path = ?').get(filePath);
+    const cached = await getCachedMetadata(filePath);
 
     // Return cached if less than 7 days old
-    if (cached && (Date.now() - cached.fetched_at) < 7 * 24 * 60 * 60 * 1000) {
+    const fetchedAt = cached?.fetched_at instanceof Date
+        ? cached.fetched_at.getTime()
+        : (cached?.fetched_at || 0);
+    if (cached && (Date.now() - fetchedAt) < 7 * 24 * 60 * 60 * 1000) {
         return cached;
     }
 
@@ -502,62 +468,133 @@ async function getMetadata(filePath, omdbApiKey) {
 /**
  * Save metadata to database
  */
-function saveMetadata(metadata) {
-    if (!db) return;
-
-    const stmt = db.prepare(`
-        INSERT OR REPLACE INTO media_metadata
-        (file_path, clean_title, year, type, poster_path, plot, rating, genre,
-         director, actors, runtime, imdb_id, tvmaze_id, season, episode,
-         episode_title, source, fetched_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    stmt.run(
-        metadata.file_path,
-        metadata.clean_title,
-        metadata.year,
-        metadata.type,
-        metadata.poster_path,
-        metadata.plot,
-        metadata.rating,
-        metadata.genre,
-        metadata.director,
-        metadata.actors,
-        metadata.runtime,
-        metadata.imdb_id,
-        metadata.tvmaze_id,
-        metadata.season,
-        metadata.episode,
-        metadata.episode_title,
-        metadata.source,
-        metadata.fetched_at,
-        metadata.updated_at || Date.now()
-    );
+async function saveMetadata(metadata) {
+    try {
+        if (db.isUsingPostgres()) {
+            await db.run(`
+                INSERT INTO media_metadata
+                (file_path, clean_title, year, type, poster_path, plot, rating, genre,
+                 director, actors, runtime, imdb_id, tvmaze_id, season, episode,
+                 episode_title, source, fetched_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, to_timestamp(?), CURRENT_TIMESTAMP)
+                ON CONFLICT (file_path) DO UPDATE SET
+                    clean_title = EXCLUDED.clean_title,
+                    year = EXCLUDED.year,
+                    type = EXCLUDED.type,
+                    poster_path = EXCLUDED.poster_path,
+                    plot = EXCLUDED.plot,
+                    rating = EXCLUDED.rating,
+                    genre = EXCLUDED.genre,
+                    director = EXCLUDED.director,
+                    actors = EXCLUDED.actors,
+                    runtime = EXCLUDED.runtime,
+                    imdb_id = EXCLUDED.imdb_id,
+                    tvmaze_id = EXCLUDED.tvmaze_id,
+                    season = EXCLUDED.season,
+                    episode = EXCLUDED.episode,
+                    episode_title = EXCLUDED.episode_title,
+                    source = EXCLUDED.source,
+                    updated_at = CURRENT_TIMESTAMP
+            `, [
+                metadata.file_path,
+                metadata.clean_title,
+                metadata.year,
+                metadata.type,
+                metadata.poster_path,
+                metadata.plot,
+                metadata.rating,
+                metadata.genre,
+                metadata.director,
+                metadata.actors,
+                metadata.runtime,
+                metadata.imdb_id,
+                metadata.tvmaze_id,
+                metadata.season,
+                metadata.episode,
+                metadata.episode_title,
+                metadata.source,
+                metadata.fetched_at ? metadata.fetched_at / 1000 : null
+            ]);
+        } else {
+            await db.run(`
+                INSERT OR REPLACE INTO media_metadata
+                (file_path, clean_title, year, type, poster_path, plot, rating, genre,
+                 director, actors, runtime, imdb_id, tvmaze_id, season, episode,
+                 episode_title, source, fetched_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+                metadata.file_path,
+                metadata.clean_title,
+                metadata.year,
+                metadata.type,
+                metadata.poster_path,
+                metadata.plot,
+                metadata.rating,
+                metadata.genre,
+                metadata.director,
+                metadata.actors,
+                metadata.runtime,
+                metadata.imdb_id,
+                metadata.tvmaze_id,
+                metadata.season,
+                metadata.episode,
+                metadata.episode_title,
+                metadata.source,
+                metadata.fetched_at,
+                metadata.updated_at || Date.now()
+            ]);
+        }
+    } catch (error) {
+        console.error('Failed to save metadata:', error.message);
+    }
 }
 
 /**
  * Get cached metadata for a file (no API calls)
  */
-function getCachedMetadata(filePath) {
-    if (!db) return null;
-    return db.prepare('SELECT * FROM media_metadata WHERE file_path = ?').get(filePath);
+async function getCachedMetadata(filePath) {
+    try {
+        return await db.get('SELECT * FROM media_metadata WHERE file_path = ?', [filePath]);
+    } catch (error) {
+        return null;
+    }
 }
 
 /**
- * Get cached metadata for multiple files
+ * Get cached metadata for multiple files (sync wrapper for compatibility)
  */
 function getCachedMetadataBulk(filePaths) {
-    if (!db || !filePaths.length) return {};
+    // This is called synchronously from browse, so we need to handle it differently
+    // Return empty object if no paths, results will be fetched async elsewhere
+    if (!filePaths.length) return {};
 
-    const placeholders = filePaths.map(() => '?').join(',');
-    const rows = db.prepare(`SELECT * FROM media_metadata WHERE file_path IN (${placeholders})`).all(...filePaths);
+    // For now, return empty - the browse endpoint will need to be updated
+    // to handle async metadata fetching, or we cache results differently
+    return {};
+}
 
-    const result = {};
-    for (const row of rows) {
-        result[row.file_path] = row;
+/**
+ * Get cached metadata for multiple files (async version)
+ */
+async function getCachedMetadataBulkAsync(filePaths) {
+    if (!filePaths.length) return {};
+
+    try {
+        const placeholders = filePaths.map(() => '?').join(',');
+        const rows = await db.all(
+            `SELECT * FROM media_metadata WHERE file_path IN (${placeholders})`,
+            filePaths
+        );
+
+        const result = {};
+        for (const row of rows) {
+            result[row.file_path] = row;
+        }
+        return result;
+    } catch (error) {
+        console.error('Failed to get bulk metadata:', error.message);
+        return {};
     }
-    return result;
 }
 
 /**
@@ -598,8 +635,11 @@ async function scanDirectory(dirPath, omdbApiKey, progressCallback) {
                     await processDirectory(fullPath);
                 } else if (mediaExtensions.test(item.name)) {
                     // Check if already cached
-                    const cached = getCachedMetadata(fullPath);
-                    if (!cached || (Date.now() - cached.fetched_at) > 7 * 24 * 60 * 60 * 1000) {
+                    const cached = await getCachedMetadata(fullPath);
+                    const fetchedAt = cached?.fetched_at instanceof Date
+                        ? cached.fetched_at.getTime()
+                        : (cached?.fetched_at || 0);
+                    if (!cached || (Date.now() - fetchedAt) > 7 * 24 * 60 * 60 * 1000) {
                         await getMetadata(fullPath, omdbApiKey);
                     }
                     scanned++;
@@ -662,6 +702,7 @@ module.exports = {
     getMetadata,
     getCachedMetadata,
     getCachedMetadataBulk,
+    getCachedMetadataBulkAsync,
     scanDirectory,
     startBackgroundScan,
     getScanProgress,

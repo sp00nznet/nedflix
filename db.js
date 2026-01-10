@@ -35,11 +35,14 @@ async function init() {
 
         db = new Pool(config);
 
-        // Test connection
+        // Test connection and ensure tables exist
         try {
             const client = await db.connect();
             client.release();
             console.log('🐘 Connected to PostgreSQL database');
+
+            // Ensure tables exist (in case init script didn't run)
+            await initPostgresTables();
         } catch (err) {
             console.error('PostgreSQL connection error:', err.message);
             throw err;
@@ -57,6 +60,113 @@ async function init() {
     }
 
     return db;
+}
+
+/**
+ * Initialize PostgreSQL tables (ensures tables exist even if init script didn't run)
+ */
+async function initPostgresTables() {
+    await db.query(`
+        CREATE TABLE IF NOT EXISTS users (
+            id VARCHAR(255) PRIMARY KEY,
+            username VARCHAR(255) UNIQUE,
+            password_hash TEXT,
+            provider VARCHAR(50) NOT NULL DEFAULT 'local',
+            display_name VARCHAR(255),
+            email VARCHAR(255),
+            avatar VARCHAR(50) DEFAULT 'cat',
+            is_admin BOOLEAN DEFAULT FALSE,
+            is_allowed BOOLEAN DEFAULT TRUE,
+            library_access TEXT DEFAULT '["movies","tv","music","audiobooks"]',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_login TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS user_settings (
+            user_id VARCHAR(255) PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+            quality VARCHAR(20) DEFAULT 'auto',
+            autoplay BOOLEAN DEFAULT FALSE,
+            volume INTEGER DEFAULT 80,
+            playback_speed DECIMAL(3,2) DEFAULT 1.0,
+            subtitles BOOLEAN DEFAULT FALSE,
+            audio_language VARCHAR(10) DEFAULT 'eng',
+            subtitle_language VARCHAR(10) DEFAULT 'en',
+            profile_picture VARCHAR(50) DEFAULT 'cat'
+        );
+
+        CREATE TABLE IF NOT EXISTS file_index (
+            id SERIAL PRIMARY KEY,
+            path TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            parent_path TEXT,
+            file_type VARCHAR(20) NOT NULL,
+            extension VARCHAR(20),
+            size BIGINT DEFAULT 0,
+            modified_at TIMESTAMP,
+            library VARCHAR(50),
+            indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS scan_logs (
+            id SERIAL PRIMARY KEY,
+            started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            completed_at TIMESTAMP,
+            status VARCHAR(20) DEFAULT 'running',
+            files_found INTEGER DEFAULT 0,
+            files_indexed INTEGER DEFAULT 0,
+            errors INTEGER DEFAULT 0,
+            error_details TEXT,
+            scan_path TEXT,
+            triggered_by VARCHAR(255)
+        );
+
+        CREATE TABLE IF NOT EXISTS media_metadata (
+            file_path TEXT PRIMARY KEY,
+            clean_title TEXT,
+            year INTEGER,
+            type VARCHAR(20),
+            poster_path TEXT,
+            plot TEXT,
+            rating VARCHAR(20),
+            genre TEXT,
+            director TEXT,
+            actors TEXT,
+            runtime VARCHAR(50),
+            imdb_id VARCHAR(20),
+            tvmaze_id INTEGER,
+            season INTEGER,
+            episode INTEGER,
+            episode_title TEXT,
+            source VARCHAR(50),
+            fetched_at TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+        CREATE INDEX IF NOT EXISTS idx_users_provider ON users(provider);
+        CREATE INDEX IF NOT EXISTS idx_file_name ON file_index(name);
+        CREATE INDEX IF NOT EXISTS idx_file_type ON file_index(file_type);
+        CREATE INDEX IF NOT EXISTS idx_file_library ON file_index(library);
+        CREATE INDEX IF NOT EXISTS idx_file_parent ON file_index(parent_path);
+        CREATE INDEX IF NOT EXISTS idx_scan_status ON scan_logs(status);
+        CREATE INDEX IF NOT EXISTS idx_metadata_path ON media_metadata(file_path);
+        CREATE INDEX IF NOT EXISTS idx_metadata_imdb ON media_metadata(imdb_id);
+    `);
+
+    // Ensure admin exists
+    await db.query(`
+        INSERT INTO users (id, provider, display_name, avatar, is_admin, is_allowed)
+        VALUES ('local-admin', 'local', 'Admin', 'bear', TRUE, TRUE)
+        ON CONFLICT (id) DO NOTHING
+    `);
+
+    await db.query(`
+        INSERT INTO user_settings (user_id)
+        VALUES ('local-admin')
+        ON CONFLICT (user_id) DO NOTHING
+    `);
+
+    console.log('📋 PostgreSQL tables verified');
 }
 
 /**
@@ -118,6 +228,28 @@ function initSqliteTables() {
             triggered_by TEXT
         );
 
+        CREATE TABLE IF NOT EXISTS media_metadata (
+            file_path TEXT PRIMARY KEY,
+            clean_title TEXT,
+            year INTEGER,
+            type TEXT,
+            poster_path TEXT,
+            plot TEXT,
+            rating TEXT,
+            genre TEXT,
+            director TEXT,
+            actors TEXT,
+            runtime TEXT,
+            imdb_id TEXT,
+            tvmaze_id INTEGER,
+            season INTEGER,
+            episode INTEGER,
+            episode_title TEXT,
+            source TEXT,
+            fetched_at INTEGER,
+            updated_at INTEGER DEFAULT (strftime('%s', 'now'))
+        );
+
         CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
         CREATE INDEX IF NOT EXISTS idx_users_provider ON users(provider);
         CREATE INDEX IF NOT EXISTS idx_file_name ON file_index(name);
@@ -125,6 +257,8 @@ function initSqliteTables() {
         CREATE INDEX IF NOT EXISTS idx_file_library ON file_index(library);
         CREATE INDEX IF NOT EXISTS idx_file_parent ON file_index(parent_path);
         CREATE INDEX IF NOT EXISTS idx_scan_status ON scan_logs(status);
+        CREATE INDEX IF NOT EXISTS idx_metadata_path ON media_metadata(file_path);
+        CREATE INDEX IF NOT EXISTS idx_metadata_imdb ON media_metadata(imdb_id);
     `);
 
     // Migrations for SQLite
