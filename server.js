@@ -759,7 +759,9 @@ function getDefaultSettings() {
             autoplay: false,
             volume: 80,
             playbackSpeed: 1.0,
-            subtitles: false
+            subtitles: false,
+            audioLanguage: '',
+            subtitleLanguage: 'en'
         },
         profilePicture: 'cat'
     };

@@ -12,6 +12,7 @@ let subtitleStatus = { configured: false };
 let audioTrackStatus = { canDetect: false, canSwitch: false };
 let currentAudioTracks = [];
 let selectedAudioTrack = 0;
+let videoDuration = null;
 
 // DOM Elements
 const fileList = document.getElementById('file-list');
@@ -41,6 +42,8 @@ const volumeValue = document.getElementById('volume-value');
 const speedSelect = document.getElementById('speed-select');
 const autoplayToggle = document.getElementById('autoplay-toggle');
 const subtitlesToggle = document.getElementById('subtitles-toggle');
+const audioLanguageSelect = document.getElementById('audio-language-select');
+const subtitleLanguageSelect = document.getElementById('subtitle-language-select');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
@@ -173,16 +176,18 @@ function selectAvatar(avatar) {
 // Apply settings to UI
 function applySettings() {
     if (!userSettings?.streaming) return;
-    
+
     const s = userSettings.streaming;
-    
+
     qualitySelect.value = s.quality || 'auto';
     volumeSlider.value = s.volume || 80;
     volumeValue.textContent = `${s.volume || 80}%`;
     speedSelect.value = s.playbackSpeed || 1;
     autoplayToggle.checked = s.autoplay || false;
     subtitlesToggle.checked = s.subtitles || false;
-    
+    audioLanguageSelect.value = s.audioLanguage || '';
+    subtitleLanguageSelect.value = s.subtitleLanguage || 'en';
+
     // Apply to video player
     videoPlayer.volume = (s.volume || 80) / 100;
     videoPlayer.playbackRate = s.playbackSpeed || 1;
@@ -244,7 +249,9 @@ async function saveSettings() {
             volume: parseInt(volumeSlider.value),
             playbackSpeed: parseFloat(speedSelect.value),
             autoplay: autoplayToggle.checked,
-            subtitles: subtitlesToggle.checked
+            subtitles: subtitlesToggle.checked,
+            audioLanguage: audioLanguageSelect.value,
+            subtitleLanguage: subtitleLanguageSelect.value
         },
         profilePicture: selectedAvatar
     };
@@ -382,9 +389,13 @@ async function playVideo(path, name) {
     currentVideoName = name;
     selectedAudioTrack = 0;
     currentAudioTracks = [];
+    videoDuration = null;
 
     // Remove any existing subtitle tracks
     removeSubtitleTracks();
+
+    // Hide custom time display until duration is loaded
+    hideCustomTimeDisplay();
 
     // Hide audio selector while loading
     hideAudioTrackSelector();
@@ -429,6 +440,12 @@ async function loadAudioTracks(videoPath) {
         const response = await fetch(`/api/audio-tracks?path=${encodeURIComponent(videoPath)}`);
         const data = await response.json();
 
+        // Store video duration for custom time display
+        if (data.duration) {
+            videoDuration = data.duration;
+            setupCustomTimeDisplay();
+        }
+
         if (data.tracks && data.tracks.length > 1) {
             currentAudioTracks = data.tracks;
             showAudioTrackSelector(data.tracks);
@@ -454,6 +471,15 @@ function showAudioTrackSelector(tracks) {
         document.querySelector('.video-header').appendChild(container);
     }
 
+    // Find preferred track based on user's language setting
+    const preferredLang = userSettings?.streaming?.audioLanguage || '';
+    let preferredIndex = -1;
+    if (preferredLang) {
+        preferredIndex = tracks.findIndex(t =>
+            t.language && t.language.toLowerCase().startsWith(preferredLang.toLowerCase())
+        );
+    }
+
     container.innerHTML = `
         <div class="audio-track-selector">
             <label for="audio-track-select">
@@ -467,7 +493,7 @@ function showAudioTrackSelector(tracks) {
             </label>
             <select id="audio-track-select">
                 ${tracks.map((track, index) => `
-                    <option value="${index}" ${track.default ? 'selected' : ''}>
+                    <option value="${index}" ${preferredIndex >= 0 ? (index === preferredIndex ? 'selected' : '') : (track.default ? 'selected' : '')}>
                         ${escapeHtml(track.label)}
                     </option>
                 `).join('')}
@@ -481,11 +507,16 @@ function showAudioTrackSelector(tracks) {
     const select = document.getElementById('audio-track-select');
     select.addEventListener('change', handleAudioTrackChange);
 
-    // Set initial selection to default track
-    const defaultTrack = tracks.findIndex(t => t.default);
-    if (defaultTrack >= 0) {
-        selectedAudioTrack = defaultTrack;
-        select.value = defaultTrack;
+    // Set initial selection based on preferred language or default track
+    if (preferredIndex >= 0) {
+        selectedAudioTrack = preferredIndex;
+        select.value = preferredIndex;
+    } else {
+        const defaultTrack = tracks.findIndex(t => t.default);
+        if (defaultTrack >= 0) {
+            selectedAudioTrack = defaultTrack;
+            select.value = defaultTrack;
+        }
     }
 }
 
@@ -620,8 +651,10 @@ function removeSubtitleTracks() {
 async function loadSubtitles(videoPath) {
     updateSubtitleIndicator('searching');
 
+    const subtitleLang = userSettings?.streaming?.subtitleLanguage || 'en';
+
     try {
-        const response = await fetch(`/api/subtitles/search?path=${encodeURIComponent(videoPath)}`);
+        const response = await fetch(`/api/subtitles/search?path=${encodeURIComponent(videoPath)}&language=${subtitleLang}`);
         const data = await response.json();
 
         if (data.found && data.subtitleUrl) {
@@ -745,4 +778,49 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// Format seconds to HH:MM:SS or MM:SS
+function formatTime(seconds) {
+    if (isNaN(seconds) || seconds < 0) return '0:00';
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    if (hrs > 0) {
+        return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Setup custom time display overlay
+function setupCustomTimeDisplay() {
+    if (!videoDuration) return;
+    let timeDisplay = document.getElementById('custom-time-display');
+    if (!timeDisplay) {
+        timeDisplay = document.createElement('div');
+        timeDisplay.id = 'custom-time-display';
+        timeDisplay.className = 'custom-time-display';
+        document.querySelector('.video-container').appendChild(timeDisplay);
+    }
+    timeDisplay.style.display = 'block';
+    updateTimeDisplay();
+    videoPlayer.removeEventListener('timeupdate', updateTimeDisplay);
+    videoPlayer.addEventListener('timeupdate', updateTimeDisplay);
+}
+
+// Update the custom time display
+function updateTimeDisplay() {
+    const timeDisplay = document.getElementById('custom-time-display');
+    if (!timeDisplay || !videoDuration) return;
+    const currentTime = videoPlayer.currentTime || 0;
+    timeDisplay.textContent = `${formatTime(currentTime)} / ${formatTime(videoDuration)}`;
+}
+
+// Hide custom time display
+function hideCustomTimeDisplay() {
+    const timeDisplay = document.getElementById('custom-time-display');
+    if (timeDisplay) {
+        timeDisplay.style.display = 'none';
+    }
+    videoDuration = null;
 }
