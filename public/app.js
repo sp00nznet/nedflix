@@ -227,8 +227,13 @@ function applySettings() {
     audioLanguageSelect.value = s.audioLanguage || '';
     subtitleLanguageSelect.value = s.subtitleLanguage || 'en';
 
-    // Apply to video player
-    videoPlayer.volume = s.volume ? s.volume / 100 : DEFAULT_VOLUME;
+    // Apply to video player (use setAudioVolume if available for Web Audio API support)
+    const volume = s.volume ? s.volume / 100 : DEFAULT_VOLUME;
+    if (typeof setAudioVolume === 'function') {
+        setAudioVolume(volume);
+    } else {
+        videoPlayer.volume = volume;
+    }
     videoPlayer.playbackRate = s.playbackSpeed || 1;
 }
 
@@ -635,8 +640,8 @@ function playAudio(path, name) {
         videoPlayer.addEventListener('canplay', function onCanPlay() {
             videoPlayer.removeEventListener('canplay', onCanPlay);
             connectAudioSource();
-            // Re-apply volume after Web Audio API connection
-            videoPlayer.volume = targetVolume;
+            // Apply volume through Web Audio API gain node
+            setAudioVolume(targetVolume);
             startVisualizer();
         }, { once: true });
     }
@@ -1269,6 +1274,7 @@ function resetScanButtons(activeButton) {
 let audioContext = null;
 let analyser = null;
 let audioSource = null;
+let gainNode = null;
 let visualizerCanvas = null;
 let visualizerCtx = null;
 let animationFrameId = null;
@@ -1296,6 +1302,12 @@ function initVisualizer() {
         analyser.smoothingTimeConstant = 0.8;
     }
 
+    // Create gain node for volume control
+    if (!gainNode) {
+        gainNode = audioContext.createGain();
+        gainNode.gain.value = DEFAULT_VOLUME;
+    }
+
     // Set up visualizer type selector
     const visualizerSelect = document.getElementById('visualizer-select');
     if (visualizerSelect) {
@@ -1320,8 +1332,10 @@ function connectAudioSource() {
 
     try {
         audioSource = audioContext.createMediaElementSource(videoPlayer);
+        // Route: source -> analyser -> gain -> destination
         audioSource.connect(analyser);
-        analyser.connect(audioContext.destination);
+        analyser.connect(gainNode);
+        gainNode.connect(audioContext.destination);
         audioSourceConnected = true;
         return true;
     } catch (e) {
@@ -1331,6 +1345,16 @@ function connectAudioSource() {
         }
         console.log('Audio source connection error:', e.message);
         return false;
+    }
+}
+
+// Set audio volume (works with Web Audio API)
+function setAudioVolume(volume) {
+    // Set HTML5 element volume (for video playback without visualizer)
+    videoPlayer.volume = volume;
+    // Set Web Audio API gain (for audio playback with visualizer)
+    if (gainNode) {
+        gainNode.gain.value = volume;
     }
 }
 
