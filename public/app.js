@@ -108,6 +108,33 @@ function showLibrarySelector() {
     videoPlayer.classList.remove('active');
     videoPlaceholder.classList.remove('hidden');
     videoName.textContent = 'Select a video to play';
+
+    // Filter library cards based on user access
+    filterLibraryCards();
+}
+
+// Filter library cards based on user's library access
+function filterLibraryCards() {
+    const userLibraries = currentUser?.libraryAccess || ['movies', 'tv', 'music', 'audiobooks'];
+
+    // Map library paths to access keys
+    const pathToAccess = {
+        '/mnt/nfs/Movies': 'movies',
+        '/mnt/nfs/TV Shows': 'tv',
+        '/mnt/nfs/Music': 'music',
+        '/mnt/nfs/Audiobooks': 'audiobooks'
+    };
+
+    document.querySelectorAll('.library-card').forEach(card => {
+        const path = card.dataset.path;
+        const accessKey = pathToAccess[path];
+
+        if (accessKey && !userLibraries.includes(accessKey)) {
+            card.style.display = 'none';
+        } else {
+            card.style.display = '';
+        }
+    });
 }
 
 // Show the main content (browser + player)
@@ -1327,41 +1354,176 @@ function renderUsersList(users) {
         return;
     }
 
+    const allLibraries = ['movies', 'tv', 'music', 'audiobooks'];
+    const libraryLabels = {
+        movies: 'Movies',
+        tv: 'TV Shows',
+        music: 'Music',
+        audiobooks: 'Audiobooks'
+    };
+
     usersList.innerHTML = users.map(user => {
         const isCurrentUser = user.id === currentUser.id;
+        const userLibraries = user.libraryAccess || allLibraries;
 
         return `
             <div class="user-item" data-user-id="${user.id}">
-                <div class="user-avatar">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="12" cy="7" r="4"></circle>
-                    </svg>
-                </div>
-                <div class="user-info">
-                    <div class="user-name">
-                        ${user.displayName || user.username || 'User'}
-                        ${user.isAdmin ? '<span class="user-badge admin">Admin</span>' : ''}
+                <div class="user-item-header" onclick="toggleUserExpanded('${user.id}')">
+                    <div class="user-avatar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
                     </div>
-                    <div class="user-email">${user.username || user.provider}</div>
+                    <div class="user-info">
+                        <div class="user-name">
+                            ${escapeHtml(user.displayName || user.username || 'User')}
+                            ${user.isAdmin ? '<span class="user-badge admin">Admin</span>' : ''}
+                        </div>
+                        <div class="user-email">${escapeHtml(user.username || user.provider)}</div>
+                    </div>
+                    <div class="user-expand-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
                 </div>
-                <div class="user-actions">
+                <div class="user-item-details" id="user-details-${user.id}">
                     ${!isCurrentUser ? `
-                        <button class="user-action-btn toggle-allowed ${!user.isAllowed ? 'disabled' : ''}"
-                                onclick="toggleUserAllowed('${user.id}', ${!user.isAllowed})"
-                                title="${user.isAllowed ? 'Disable access' : 'Enable access'}">
-                            ${user.isAllowed ? 'Enabled' : 'Disabled'}
-                        </button>
-                        <button class="user-action-btn delete"
-                                onclick="deleteUser('${user.id}')"
-                                title="Delete user">
-                            Delete
-                        </button>
-                    ` : '<span style="color: var(--color-text-dim); font-size: 12px;">You</span>'}
+                        <div class="user-detail-section">
+                            <label class="user-detail-label">Library Access</label>
+                            <div class="library-toggles">
+                                ${allLibraries.map(lib => `
+                                    <label class="library-toggle">
+                                        <input type="checkbox"
+                                               ${userLibraries.includes(lib) ? 'checked' : ''}
+                                               onchange="updateUserLibraryAccess('${user.id}', '${lib}', this.checked)">
+                                        <span>${libraryLabels[lib]}</span>
+                                    </label>
+                                `).join('')}
+                            </div>
+                        </div>
+                        <div class="user-detail-section">
+                            <label class="user-detail-label">Reset Password</label>
+                            <div class="password-reset-form">
+                                <input type="password"
+                                       id="reset-password-${user.id}"
+                                       placeholder="New password"
+                                       class="user-input password-input">
+                                <button class="user-action-btn reset-password"
+                                        onclick="resetUserPassword('${user.id}')">
+                                    Reset
+                                </button>
+                            </div>
+                        </div>
+                        <div class="user-detail-section user-actions-row">
+                            <button class="user-action-btn toggle-allowed ${!user.isAllowed ? 'disabled' : ''}"
+                                    onclick="toggleUserAllowed('${user.id}', ${!user.isAllowed})"
+                                    title="${user.isAllowed ? 'Disable access' : 'Enable access'}">
+                                ${user.isAllowed ? 'Enabled' : 'Disabled'}
+                            </button>
+                            <button class="user-action-btn delete"
+                                    onclick="deleteUser('${user.id}')"
+                                    title="Delete user">
+                                Delete
+                            </button>
+                        </div>
+                    ` : '<div class="user-detail-section"><span style="color: var(--color-text-dim);">This is your account</span></div>'}
                 </div>
             </div>
         `;
     }).join('');
+}
+
+// Toggle user details expanded state
+function toggleUserExpanded(userId) {
+    const details = document.getElementById(`user-details-${userId}`);
+    const item = details.closest('.user-item');
+
+    if (details.classList.contains('expanded')) {
+        details.classList.remove('expanded');
+        item.classList.remove('expanded');
+    } else {
+        // Close other expanded items
+        document.querySelectorAll('.user-item-details.expanded').forEach(el => {
+            el.classList.remove('expanded');
+            el.closest('.user-item').classList.remove('expanded');
+        });
+        details.classList.add('expanded');
+        item.classList.add('expanded');
+    }
+}
+
+// Reset user password
+async function resetUserPassword(userId) {
+    const passwordInput = document.getElementById(`reset-password-${userId}`);
+    const newPassword = passwordInput.value;
+
+    if (!newPassword) {
+        alert('Please enter a new password');
+        return;
+    }
+    if (newPassword.length < 4) {
+        alert('Password must be at least 4 characters');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/admin/users/${encodeURIComponent(userId)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: newPassword })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            passwordInput.value = '';
+            alert('Password updated successfully');
+        } else {
+            alert(data.error || 'Failed to reset password');
+        }
+    } catch (error) {
+        console.error('Failed to reset password:', error);
+        alert('Failed to reset password');
+    }
+}
+
+// Update user library access
+async function updateUserLibraryAccess(userId, library, hasAccess) {
+    // Get the current user's libraries from the checkboxes
+    const checkboxes = document.querySelectorAll(`#user-details-${userId} .library-toggle input`);
+    const libraries = [];
+    const libraryNames = ['movies', 'tv', 'music', 'audiobooks'];
+
+    checkboxes.forEach((cb, index) => {
+        if (cb.checked) {
+            libraries.push(libraryNames[index]);
+        }
+    });
+
+    try {
+        const response = await fetch(`/api/admin/users/${encodeURIComponent(userId)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ libraryAccess: libraries })
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+            alert(data.error || 'Failed to update library access');
+            // Revert the checkbox
+            const checkbox = event.target;
+            checkbox.checked = !hasAccess;
+        }
+    } catch (error) {
+        console.error('Failed to update library access:', error);
+        alert('Failed to update library access');
+        // Revert the checkbox
+        const checkbox = event.target;
+        checkbox.checked = !hasAccess;
+    }
 }
 
 // Add a new user

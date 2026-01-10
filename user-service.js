@@ -83,6 +83,14 @@ function init() {
             // Column already exists
         }
 
+        // Migrate: Add library_access column if it doesn't exist
+        // Stores JSON array of allowed libraries: ["movies", "tv", "music", "audiobooks"]
+        try {
+            db.exec("ALTER TABLE users ADD COLUMN library_access TEXT DEFAULT '[\"movies\",\"tv\",\"music\",\"audiobooks\"]'");
+        } catch (e) {
+            // Column already exists
+        }
+
         // Ensure local-admin exists and is admin + allowed
         ensureAdminExists();
 
@@ -152,6 +160,16 @@ function getUser(id) {
 
     if (!row) return null;
 
+    // Parse library access
+    let libraryAccess = ['movies', 'tv', 'music', 'audiobooks'];
+    try {
+        if (row.library_access) {
+            libraryAccess = JSON.parse(row.library_access);
+        }
+    } catch (e) {
+        // Use default if parsing fails
+    }
+
     return {
         user: {
             id: row.id,
@@ -162,6 +180,7 @@ function getUser(id) {
             avatar: row.avatar,
             isAdmin: row.is_admin === 1,
             isAllowed: row.is_allowed === 1,
+            libraryAccess,
             createdAt: row.created_at,
             lastLogin: row.last_login
         },
@@ -269,6 +288,10 @@ function updateUser(id, updates) {
         fields.push('is_allowed = ?');
         values.push(updates.isAllowed ? 1 : 0);
     }
+    if (updates.libraryAccess !== undefined && Array.isArray(updates.libraryAccess)) {
+        fields.push('library_access = ?');
+        values.push(JSON.stringify(updates.libraryAccess));
+    }
 
     if (fields.length > 0) {
         values.push(id);
@@ -300,23 +323,33 @@ function deleteUser(id) {
  */
 function getAllUsers() {
     const rows = db.prepare(`
-        SELECT id, username, provider, display_name, email, avatar, is_admin, is_allowed, created_at, last_login
+        SELECT id, username, provider, display_name, email, avatar, is_admin, is_allowed, library_access, created_at, last_login
         FROM users
         ORDER BY created_at DESC
     `).all();
 
-    return rows.map(row => ({
-        id: row.id,
-        username: row.username,
-        provider: row.provider,
-        displayName: row.display_name,
-        email: row.email,
-        avatar: row.avatar,
-        isAdmin: row.is_admin === 1,
-        isAllowed: row.is_allowed === 1,
-        createdAt: row.created_at,
-        lastLogin: row.last_login
-    }));
+    return rows.map(row => {
+        let libraryAccess = ['movies', 'tv', 'music', 'audiobooks'];
+        try {
+            if (row.library_access) {
+                libraryAccess = JSON.parse(row.library_access);
+            }
+        } catch (e) {}
+
+        return {
+            id: row.id,
+            username: row.username,
+            provider: row.provider,
+            displayName: row.display_name,
+            email: row.email,
+            avatar: row.avatar,
+            isAdmin: row.is_admin === 1,
+            isAllowed: row.is_allowed === 1,
+            libraryAccess,
+            createdAt: row.created_at,
+            lastLogin: row.last_login
+        };
+    });
 }
 
 /**
