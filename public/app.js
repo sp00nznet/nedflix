@@ -34,6 +34,16 @@ const userPanelOverlay = document.getElementById('user-panel-overlay');
 const closePanel = document.getElementById('close-panel');
 const headerAvatar = document.getElementById('header-avatar');
 const headerUsername = document.getElementById('header-username');
+
+// Admin panel elements
+const adminMenuToggle = document.getElementById('admin-menu-toggle');
+const adminPanelOverlay = document.getElementById('admin-panel-overlay');
+const closeAdminPanel = document.getElementById('close-admin-panel');
+
+// Search elements
+const searchInput = document.getElementById('search-input');
+const searchResults = document.getElementById('search-results');
+const searchClear = document.getElementById('search-clear');
 const panelAvatar = document.getElementById('panel-avatar');
 const panelUsername = document.getElementById('panel-username');
 const panelEmail = document.getElementById('panel-email');
@@ -352,15 +362,20 @@ function setupEventListeners() {
         changePasswordBtn.addEventListener('click', changeOwnPassword);
     }
 
-    // Metadata scan buttons
-    document.querySelectorAll('.scan-btn').forEach(btn => {
-        btn.addEventListener('click', () => startMetadataScan(btn.dataset.path, btn));
-    });
+    // Metadata scan buttons (removed - now in admin panel)
+    // document.querySelectorAll('.scan-btn').forEach(btn => {
+    //     btn.addEventListener('click', () => startMetadataScan(btn.dataset.path, btn));
+    // });
+
+    // Setup search
+    setupSearchListeners();
 
     // Keyboard
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             closeUserPanel();
+            closeAdminPanelFunc();
+            hideSearchResults();
         }
     });
 }
@@ -1504,15 +1519,531 @@ function resetScanButtons(activeButton) {
     activeButton.textContent = activeButton.id === 'scan-movies-btn' ? 'Scan Movies' : 'Scan TV Shows';
 }
 
-// ========== USER MANAGEMENT (Admin) ==========
+// ========== ADMIN PANEL & USER MANAGEMENT ==========
 
 // Show admin section and load users
 function showAdminSection() {
-    const adminSection = document.getElementById('admin-section');
-    if (adminSection) {
-        adminSection.style.display = 'block';
-        loadUsers();
-        setupUserManagementListeners();
+    // Show admin button in header
+    if (adminMenuToggle) {
+        adminMenuToggle.style.display = 'flex';
+    }
+
+    // Setup admin panel event listeners
+    setupAdminPanelListeners();
+}
+
+// Setup admin panel event listeners
+function setupAdminPanelListeners() {
+    // Admin panel toggle
+    if (adminMenuToggle && !adminMenuToggle.hasAttribute('data-listener')) {
+        adminMenuToggle.setAttribute('data-listener', 'true');
+        adminMenuToggle.addEventListener('click', openAdminPanel);
+    }
+
+    // Close admin panel
+    if (closeAdminPanel && !closeAdminPanel.hasAttribute('data-listener')) {
+        closeAdminPanel.setAttribute('data-listener', 'true');
+        closeAdminPanel.addEventListener('click', closeAdminPanelFunc);
+    }
+
+    // Click outside to close
+    if (adminPanelOverlay && !adminPanelOverlay.hasAttribute('data-listener')) {
+        adminPanelOverlay.setAttribute('data-listener', 'true');
+        adminPanelOverlay.addEventListener('click', (e) => {
+            if (e.target === adminPanelOverlay) {
+                closeAdminPanelFunc();
+            }
+        });
+    }
+
+    // Admin user management
+    const adminAddUserBtn = document.getElementById('admin-add-user-btn');
+    if (adminAddUserBtn && !adminAddUserBtn.hasAttribute('data-listener')) {
+        adminAddUserBtn.setAttribute('data-listener', 'true');
+        adminAddUserBtn.addEventListener('click', addUserFromAdminPanel);
+    }
+
+    // Index scan button
+    const startIndexScanBtn = document.getElementById('start-index-scan-btn');
+    if (startIndexScanBtn && !startIndexScanBtn.hasAttribute('data-listener')) {
+        startIndexScanBtn.setAttribute('data-listener', 'true');
+        startIndexScanBtn.addEventListener('click', startIndexScan);
+    }
+
+    // Download scan logs button
+    const downloadScanLogsBtn = document.getElementById('download-scan-logs-btn');
+    if (downloadScanLogsBtn && !downloadScanLogsBtn.hasAttribute('data-listener')) {
+        downloadScanLogsBtn.setAttribute('data-listener', 'true');
+        downloadScanLogsBtn.addEventListener('click', downloadScanLogs);
+    }
+
+    // Metadata scan buttons in admin panel
+    const adminScanMoviesBtn = document.getElementById('admin-scan-movies-btn');
+    const adminScanTvBtn = document.getElementById('admin-scan-tv-btn');
+    if (adminScanMoviesBtn && !adminScanMoviesBtn.hasAttribute('data-listener')) {
+        adminScanMoviesBtn.setAttribute('data-listener', 'true');
+        adminScanMoviesBtn.addEventListener('click', () => startMetadataScan(adminScanMoviesBtn.dataset.path, adminScanMoviesBtn, 'admin'));
+    }
+    if (adminScanTvBtn && !adminScanTvBtn.hasAttribute('data-listener')) {
+        adminScanTvBtn.setAttribute('data-listener', 'true');
+        adminScanTvBtn.addEventListener('click', () => startMetadataScan(adminScanTvBtn.dataset.path, adminScanTvBtn, 'admin'));
+    }
+}
+
+// Open admin panel
+function openAdminPanel() {
+    if (adminPanelOverlay) {
+        adminPanelOverlay.classList.add('active');
+        loadUsersInAdminPanel();
+        loadIndexStats();
+        loadScanLogs();
+    }
+}
+
+// Close admin panel
+function closeAdminPanelFunc() {
+    if (adminPanelOverlay) {
+        adminPanelOverlay.classList.remove('active');
+    }
+}
+
+// Load users in admin panel
+async function loadUsersInAdminPanel() {
+    try {
+        const response = await fetch('/api/admin/users');
+        const data = await response.json();
+
+        if (data.users) {
+            renderUsersListInAdminPanel(data.users);
+        }
+    } catch (error) {
+        console.error('Failed to load users:', error);
+    }
+}
+
+// Render users list in admin panel
+function renderUsersListInAdminPanel(users) {
+    const usersList = document.getElementById('admin-users-list');
+    if (!usersList) return;
+
+    if (users.length === 0) {
+        usersList.innerHTML = '<div class="no-users-message">No users added yet</div>';
+        return;
+    }
+
+    const allLibraries = ['movies', 'tv', 'music', 'audiobooks'];
+    const libraryLabels = {
+        movies: 'Movies',
+        tv: 'TV Shows',
+        music: 'Music',
+        audiobooks: 'Audiobooks'
+    };
+
+    usersList.innerHTML = users.map(user => {
+        const isCurrentUser = user.id === currentUser.id;
+        const userLibraries = user.libraryAccess || allLibraries;
+
+        return `
+            <div class="user-item" data-user-id="${user.id}">
+                <div class="user-item-header" onclick="toggleUserExpanded('${user.id}')">
+                    <div class="user-avatar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                    </div>
+                    <div class="user-info">
+                        <div class="user-name">
+                            ${escapeHtml(user.displayName || user.username || 'User')}
+                            ${user.isAdmin ? '<span class="user-badge admin">Admin</span>' : ''}
+                        </div>
+                        <div class="user-email">${escapeHtml(user.username || user.provider)}</div>
+                    </div>
+                    <div class="user-expand-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                </div>
+                <div class="user-item-details" id="user-details-${user.id}">
+                    ${!isCurrentUser ? `
+                        <div class="user-detail-section">
+                            <label class="user-detail-label">Library Access</label>
+                            <div class="library-toggles">
+                                ${allLibraries.map(lib => `
+                                    <label class="library-toggle">
+                                        <input type="checkbox"
+                                               ${userLibraries.includes(lib) ? 'checked' : ''}
+                                               onchange="updateUserLibraryAccess('${user.id}', '${lib}', this.checked)">
+                                        <span>${libraryLabels[lib]}</span>
+                                    </label>
+                                `).join('')}
+                            </div>
+                        </div>
+                        <div class="user-detail-section">
+                            <label class="user-detail-label">Reset Password</label>
+                            <div class="password-reset-form">
+                                <input type="password" id="reset-password-${user.id}" placeholder="New password" class="user-input">
+                                <button class="reset-password-btn" onclick="resetUserPassword('${user.id}')">Reset</button>
+                            </div>
+                        </div>
+                        <div class="user-actions">
+                            <button class="delete-user-btn" onclick="deleteUser('${user.id}')">Delete User</button>
+                        </div>
+                    ` : '<div class="current-user-note">This is your account</div>'}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Add user from admin panel
+async function addUserFromAdminPanel() {
+    const usernameInput = document.getElementById('admin-new-user-username');
+    const passwordInput = document.getElementById('admin-new-user-password');
+    const displayNameInput = document.getElementById('admin-new-user-name');
+    const adminCheckbox = document.getElementById('admin-new-user-admin');
+
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value;
+    const displayName = displayNameInput.value.trim();
+    const isAdmin = adminCheckbox.checked;
+
+    if (!username || !password) {
+        alert('Username and password are required');
+        return;
+    }
+
+    if (password.length < 4) {
+        alert('Password must be at least 4 characters');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/admin/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password, displayName, isAdmin })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            usernameInput.value = '';
+            passwordInput.value = '';
+            displayNameInput.value = '';
+            adminCheckbox.checked = false;
+            loadUsersInAdminPanel();
+        } else {
+            alert(data.error || 'Failed to add user');
+        }
+    } catch (error) {
+        console.error('Error adding user:', error);
+        alert('Failed to add user');
+    }
+}
+
+// Load index statistics
+async function loadIndexStats() {
+    try {
+        const response = await fetch('/api/search/stats');
+        const stats = await response.json();
+
+        document.getElementById('stat-total-files').textContent = stats.totalFiles?.toLocaleString() || '0';
+
+        const videoCount = stats.byType?.find(t => t.file_type === 'video')?.count || 0;
+        const audioCount = stats.byType?.find(t => t.file_type === 'audio')?.count || 0;
+
+        document.getElementById('stat-videos').textContent = videoCount.toLocaleString();
+        document.getElementById('stat-audio').textContent = audioCount.toLocaleString();
+
+        if (stats.lastScan?.completedAt) {
+            const date = new Date(stats.lastScan.completedAt * 1000);
+            document.getElementById('stat-last-scan').textContent = date.toLocaleDateString();
+        } else {
+            document.getElementById('stat-last-scan').textContent = 'Never';
+        }
+    } catch (error) {
+        console.error('Failed to load index stats:', error);
+    }
+}
+
+// Start index scan
+async function startIndexScan() {
+    const btn = document.getElementById('start-index-scan-btn');
+    const progress = document.getElementById('index-scan-progress');
+    const progressText = document.getElementById('index-scan-progress-text');
+    const progressFill = document.getElementById('index-scan-progress-fill');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-small"></span> Scanning...';
+    progress.style.display = 'block';
+    progressText.textContent = 'Starting scan...';
+    progressFill.style.width = '0%';
+
+    try {
+        const response = await fetch('/api/admin/scan', { method: 'POST' });
+        const data = await response.json();
+
+        if (data.success) {
+            // Poll for status
+            const pollStatus = async () => {
+                const statusRes = await fetch('/api/admin/scan/status');
+                const status = await statusRes.json();
+
+                if (status.status === 'running') {
+                    progressText.textContent = `Scanning... ${status.filesIndexed || 0} files indexed`;
+                    progressFill.style.width = '50%';
+                    setTimeout(pollStatus, 1000);
+                } else {
+                    progressText.textContent = `Complete: ${status.filesIndexed || 0} files indexed`;
+                    progressFill.style.width = '100%';
+                    btn.disabled = false;
+                    btn.innerHTML = `
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="m21 21-4.35-4.35"></path>
+                        </svg>
+                        Scan Library
+                    `;
+                    loadIndexStats();
+                    loadScanLogs();
+
+                    setTimeout(() => {
+                        progress.style.display = 'none';
+                    }, 3000);
+                }
+            };
+            setTimeout(pollStatus, 1000);
+        } else {
+            throw new Error(data.error || 'Scan failed');
+        }
+    } catch (error) {
+        console.error('Scan error:', error);
+        progressText.textContent = 'Scan failed: ' + error.message;
+        btn.disabled = false;
+        btn.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <path d="m21 21-4.35-4.35"></path>
+            </svg>
+            Scan Library
+        `;
+    }
+}
+
+// Load scan logs
+async function loadScanLogs() {
+    try {
+        const response = await fetch('/api/admin/scan/logs?limit=10');
+        const logs = await response.json();
+
+        const logsList = document.getElementById('scan-logs-list');
+        if (!logsList) return;
+
+        if (!logs || logs.length === 0) {
+            logsList.innerHTML = '<div class="scan-log-item"><div class="scan-log-info">No scans yet</div></div>';
+            return;
+        }
+
+        logsList.innerHTML = logs.map(log => {
+            const startDate = new Date(log.started_at * 1000);
+            return `
+                <div class="scan-log-item">
+                    <div class="scan-log-info">
+                        <div class="scan-log-date">${startDate.toLocaleString()}</div>
+                        <div class="scan-log-stats">${log.files_indexed} files indexed${log.errors > 0 ? `, ${log.errors} errors` : ''}</div>
+                    </div>
+                    <span class="scan-log-status ${log.status}">${log.status}</span>
+                </div>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Failed to load scan logs:', error);
+    }
+}
+
+// Download scan logs
+function downloadScanLogs() {
+    window.location.href = '/api/admin/scan/logs/download';
+}
+
+// ========== SEARCH FUNCTIONALITY ==========
+
+let searchDebounceTimer = null;
+let hasMediaIndex = false;
+
+// Setup search event listeners
+function setupSearchListeners() {
+    if (!searchInput) return;
+
+    searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.trim();
+
+        // Show/hide clear button
+        if (searchClear) {
+            searchClear.style.display = query.length > 0 ? 'flex' : 'none';
+        }
+
+        // Debounce search
+        clearTimeout(searchDebounceTimer);
+        if (query.length >= 2) {
+            searchDebounceTimer = setTimeout(() => performSearch(query), 300);
+        } else {
+            hideSearchResults();
+        }
+    });
+
+    searchInput.addEventListener('focus', () => {
+        if (searchInput.value.trim().length >= 2) {
+            performSearch(searchInput.value.trim());
+        }
+    });
+
+    // Clear button
+    if (searchClear) {
+        searchClear.addEventListener('click', () => {
+            searchInput.value = '';
+            searchClear.style.display = 'none';
+            hideSearchResults();
+        });
+    }
+
+    // Click outside to close
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.search-container')) {
+            hideSearchResults();
+        }
+    });
+
+    // Check if media index exists
+    checkMediaIndex();
+}
+
+// Check if media index has data
+async function checkMediaIndex() {
+    try {
+        const response = await fetch('/api/search/stats');
+        const stats = await response.json();
+        hasMediaIndex = stats.totalFiles > 0;
+    } catch (error) {
+        hasMediaIndex = false;
+    }
+}
+
+// Perform search
+async function performSearch(query) {
+    if (!searchResults) return;
+
+    searchResults.style.display = 'block';
+    searchResults.innerHTML = '<div class="search-results-header">Searching...</div>';
+
+    try {
+        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=50`);
+        const data = await response.json();
+
+        if (data.error) {
+            throw new Error(data.error);
+        }
+
+        renderSearchResults(data.results, query);
+    } catch (error) {
+        console.error('Search error:', error);
+        searchResults.innerHTML = `
+            ${!hasMediaIndex ? `
+                <div class="search-no-index">
+                    <p>Media library not indexed yet</p>
+                    <button onclick="openAdminPanel()">Open Admin Panel to Scan</button>
+                </div>
+            ` : ''}
+            <div class="search-no-results">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="m21 21-4.35-4.35"></path>
+                </svg>
+                <p>Search failed. Try again.</p>
+            </div>
+        `;
+    }
+}
+
+// Render search results
+function renderSearchResults(results, query) {
+    if (!searchResults) return;
+
+    if (!results || results.length === 0) {
+        searchResults.innerHTML = `
+            ${!hasMediaIndex ? `
+                <div class="search-no-index">
+                    <p>Media library not indexed yet</p>
+                    <button onclick="openAdminPanel()">Open Admin Panel to Scan</button>
+                </div>
+            ` : ''}
+            <div class="search-no-results">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="m21 21-4.35-4.35"></path>
+                </svg>
+                <p>No results found for "${escapeHtml(query)}"</p>
+            </div>
+        `;
+        return;
+    }
+
+    const getIcon = (type) => {
+        if (type === 'video') {
+            return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>`;
+        } else if (type === 'audio') {
+            return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 18V5l12-2v13"></path>
+                <circle cx="6" cy="18" r="3"></circle>
+                <circle cx="18" cy="16" r="3"></circle>
+            </svg>`;
+        }
+        return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+        </svg>`;
+    };
+
+    searchResults.innerHTML = `
+        <div class="search-results-header">${results.length} result${results.length !== 1 ? 's' : ''} for "${escapeHtml(query)}"</div>
+        ${results.map(result => `
+            <div class="search-result-item" onclick="navigateToSearchResult('${escapeHtml(result.path)}', '${result.file_type}')">
+                <div class="search-result-icon">${getIcon(result.file_type)}</div>
+                <div class="search-result-info">
+                    <div class="search-result-name">${escapeHtml(result.name)}</div>
+                    <div class="search-result-path">${escapeHtml(result.parent_path)}</div>
+                </div>
+                <span class="search-result-type">${result.file_type}</span>
+            </div>
+        `).join('')}
+    `;
+}
+
+// Navigate to search result
+function navigateToSearchResult(filePath, fileType) {
+    hideSearchResults();
+    searchInput.value = '';
+    if (searchClear) searchClear.style.display = 'none';
+
+    if (fileType === 'video') {
+        const fileName = filePath.split('/').pop();
+        playVideo(filePath, fileName, null);
+    } else if (fileType === 'audio') {
+        const fileName = filePath.split('/').pop();
+        playAudio(filePath, fileName, null);
+    } else {
+        // Navigate to folder
+        loadDirectory(filePath);
+    }
+}
+
+// Hide search results
+function hideSearchResults() {
+    if (searchResults) {
+        searchResults.style.display = 'none';
     }
 }
 
