@@ -41,7 +41,21 @@
     <script>
         // Check for error in URL
         const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('error') === 'invalid') {
+        const errorType = urlParams.get('error');
+
+        function showError(message) {
+            setTimeout(() => {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'login-error';
+                errorDiv.textContent = message;
+                const loginButtons = document.getElementById('login-buttons');
+                if (loginButtons) {
+                    loginButtons.parentNode.insertBefore(errorDiv, loginButtons);
+                }
+            }, 100);
+        }
+
+        if (errorType === 'invalid') {
             setTimeout(() => {
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'login-error';
@@ -51,6 +65,8 @@
                     form.insertBefore(errorDiv, form.firstChild);
                 }
             }, 100);
+        } else if (errorType === 'unauthorized') {
+            showError('Your account is not authorized to access Nedflix. Please contact an administrator.');
         }
 
         // Check if already authenticated

@@ -11,6 +11,7 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const GitHubStrategy = require('passport-github2').Strategy;
 const { spawn, execSync } = require('child_process');
 const metadataService = require('./metadata-service');
+const userService = require('./user-service');
 
 const app = express();
 
@@ -29,6 +30,9 @@ const OMDB_API_KEY = process.env.OMDB_API_KEY || '';
 
 // Initialize metadata service
 metadataService.init(OMDB_API_KEY);
+
+// Initialize user service
+userService.init();
 
 // ============================================
 // SUBTITLE UTILITY FUNCTIONS
@@ -835,9 +839,8 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 // Default profile pictures
 const DEFAULT_AVATARS = ['cat', 'dog', 'cow', 'fox', 'owl', 'bear', 'rabbit', 'penguin'];
 
-// In-memory user store (use a database in production)
-const users = new Map();
-const userSettings = new Map();
+// In-memory session cache (user data is now stored in database)
+const sessionUsers = new Map();
 
 // Middleware
 app.use(express.json());
@@ -865,7 +868,15 @@ passport.serializeUser((user, done) => {
 });
 
 passport.deserializeUser((id, done) => {
-    const user = users.get(id);
+    // Try session cache first, then database
+    let user = sessionUsers.get(id);
+    if (!user) {
+        const userData = userService.getUser(id);
+        if (userData) {
+            user = userData.user;
+            sessionUsers.set(id, user);
+        }
+    }
     done(null, user || null);
 });
 
@@ -876,18 +887,11 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
         callbackURL: `${process.env.CALLBACK_BASE_URL || 'https://localhost:' + HTTPS_PORT}/auth/google/callback`
     }, (accessToken, refreshToken, profile, done) => {
-        let user = users.get(profile.id);
-        if (!user) {
-            user = {
-                id: profile.id,
-                provider: 'google',
-                displayName: profile.displayName,
-                email: profile.emails?.[0]?.value,
-                avatar: profile.photos?.[0]?.value || 'cat'
-            };
-            users.set(profile.id, user);
-            userSettings.set(profile.id, getDefaultSettings());
+        const user = userService.upsertOAuthUser(profile, 'google');
+        if (!user.isAllowed) {
+            return done(null, false, { message: 'User not authorized' });
         }
+        sessionUsers.set(user.id, user);
         return done(null, user);
     }));
 }
@@ -899,18 +903,11 @@ if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
         clientSecret: process.env.GITHUB_CLIENT_SECRET,
         callbackURL: `${process.env.CALLBACK_BASE_URL || 'https://localhost:' + HTTPS_PORT}/auth/github/callback`
     }, (accessToken, refreshToken, profile, done) => {
-        let user = users.get(profile.id);
-        if (!user) {
-            user = {
-                id: profile.id,
-                provider: 'github',
-                displayName: profile.displayName || profile.username,
-                email: profile.emails?.[0]?.value,
-                avatar: profile.photos?.[0]?.value || 'dog'
-            };
-            users.set(profile.id, user);
-            userSettings.set(profile.id, getDefaultSettings());
+        const user = userService.upsertOAuthUser(profile, 'github');
+        if (!user.isAllowed) {
+            return done(null, false, { message: 'User not authorized' });
         }
+        sessionUsers.set(user.id, user);
         return done(null, user);
     }));
 }
@@ -939,13 +936,21 @@ function ensureAuthenticated(req, res, next) {
     res.status(401).json({ error: 'Not authenticated' });
 }
 
+// Admin middleware
+function ensureAdmin(req, res, next) {
+    if (req.isAuthenticated() && req.user?.isAdmin) {
+        return next();
+    }
+    res.status(403).json({ error: 'Admin access required' });
+}
+
 // Auth routes
 app.get('/auth/google', passport.authenticate('google', {
     scope: ['profile', 'email']
 }));
 
 app.get('/auth/google/callback',
-    passport.authenticate('google', { failureRedirect: '/login.html' }),
+    passport.authenticate('google', { failureRedirect: '/login.html?error=unauthorized' }),
     (req, res) => {
         res.redirect('/');
     }
@@ -956,7 +961,7 @@ app.get('/auth/github', passport.authenticate('github', {
 }));
 
 app.get('/auth/github/callback',
-    passport.authenticate('github', { failureRedirect: '/login.html' }),
+    passport.authenticate('github', { failureRedirect: '/login.html?error=unauthorized' }),
     (req, res) => {
         res.redirect('/');
     }
@@ -982,22 +987,19 @@ app.post('/auth/local', express.urlencoded({ extended: true }), (req, res) => {
 
     // Validate credentials
     if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-        // Create admin user if not exists
-        const adminId = 'local-admin';
-        let adminUser = users.get(adminId);
+        // Get admin user from database
+        const userData = userService.getUser('local-admin');
+        const adminUser = userData?.user || {
+            id: 'local-admin',
+            provider: 'local',
+            displayName: 'Admin',
+            email: null,
+            avatar: 'bear',
+            isAdmin: true,
+            isAllowed: true
+        };
 
-        if (!adminUser) {
-            adminUser = {
-                id: adminId,
-                provider: 'local',
-                displayName: 'Admin',
-                email: null,
-                avatar: 'bear',
-                isAdmin: true
-            };
-            users.set(adminId, adminUser);
-            userSettings.set(adminId, getDefaultSettings());
-        }
+        sessionUsers.set(adminUser.id, adminUser);
 
         // Log in the user
         req.login(adminUser, (err) => {
@@ -1014,7 +1016,8 @@ app.post('/auth/local', express.urlencoded({ extended: true }), (req, res) => {
 // API: Get current user
 app.get('/api/user', (req, res) => {
     if (req.isAuthenticated()) {
-        const settings = userSettings.get(req.user.id) || getDefaultSettings();
+        const userData = userService.getUser(req.user.id);
+        const settings = userData?.settings || getDefaultSettings();
         res.json({
             authenticated: true,
             user: {
@@ -1036,18 +1039,21 @@ app.get('/api/avatars', (req, res) => {
 // API: Update user settings
 app.post('/api/settings', ensureAuthenticated, (req, res) => {
     const { streaming, profilePicture } = req.body;
-    let settings = userSettings.get(req.user.id) || getDefaultSettings();
-    
-    if (streaming) {
-        settings.streaming = { ...settings.streaming, ...streaming };
+
+    try {
+        const updates = {};
+        if (streaming) {
+            updates.streaming = streaming;
+        }
+        if (profilePicture && DEFAULT_AVATARS.includes(profilePicture)) {
+            updates.profilePicture = profilePicture;
+        }
+
+        const settings = userService.updateSettings(req.user.id, updates);
+        res.json({ success: true, settings });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
-    
-    if (profilePicture && DEFAULT_AVATARS.includes(profilePicture)) {
-        settings.profilePicture = profilePicture;
-    }
-    
-    userSettings.set(req.user.id, settings);
-    res.json({ success: true, settings });
 });
 
 // API: Browse directories (protected)
@@ -1679,6 +1685,66 @@ function streamVideoFile(req, res, filePath) {
 }
 
 // ============================================
+// USER MANAGEMENT API ENDPOINTS (Admin only)
+// ============================================
+
+// API: Get all users (admin only)
+app.get('/api/admin/users', ensureAdmin, (req, res) => {
+    try {
+        const users = userService.getAllUsers();
+        res.json({ users });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Add a new user (admin only)
+app.post('/api/admin/users', ensureAdmin, (req, res) => {
+    const { email, displayName, isAdmin } = req.body;
+
+    if (!email) {
+        return res.status(400).json({ error: 'Email is required' });
+    }
+
+    try {
+        const user = userService.addUser(email, displayName, isAdmin);
+        res.json({ success: true, user });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// API: Update a user (admin only)
+app.put('/api/admin/users/:id', ensureAdmin, (req, res) => {
+    const { id } = req.params;
+    const { displayName, email, isAdmin, isAllowed } = req.body;
+
+    try {
+        const result = userService.updateUser(id, { displayName, email, isAdmin, isAllowed });
+        // Update session cache if user is currently logged in
+        if (result?.user) {
+            sessionUsers.set(id, result.user);
+        }
+        res.json({ success: true, user: result?.user });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// API: Delete a user (admin only)
+app.delete('/api/admin/users/:id', ensureAdmin, (req, res) => {
+    const { id } = req.params;
+
+    try {
+        userService.deleteUser(id);
+        sessionUsers.delete(id);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ============================================
 // METADATA API ENDPOINTS
 // ============================================
 
@@ -1693,8 +1759,8 @@ app.get('/api/metadata/status', ensureAuthenticated, (req, res) => {
     });
 });
 
-// API: Start metadata scan for a directory
-app.post('/api/metadata/scan', ensureAuthenticated, async (req, res) => {
+// API: Start metadata scan for a directory (admin only)
+app.post('/api/metadata/scan', ensureAdmin, async (req, res) => {
     const { path: dirPath } = req.body;
 
     if (!dirPath) {
