@@ -1814,6 +1814,12 @@ body {
     object-fit: cover;
 }
 
+.user-avatar svg {
+    width: 20px;
+    height: 20px;
+    color: var(--color-text-muted);
+}
+
 .user-info {
     flex: 1;
     min-width: 0;
