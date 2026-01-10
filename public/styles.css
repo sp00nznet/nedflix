@@ -1372,6 +1372,50 @@ body {
     box-shadow: 0 0 0 2px var(--color-primary-glow);
 }
 
+.visualizer-fullscreen-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    margin-left: 8px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.visualizer-fullscreen-btn:hover {
+    background: var(--color-bg-hover);
+    border-color: var(--color-border-light);
+    color: var(--color-text);
+}
+
+.visualizer-fullscreen-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* Fullscreen visualizer */
+.video-container:fullscreen {
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.video-container:fullscreen .audio-visualizer {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.video-container:fullscreen #video-player {
+    max-height: none;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
     width: 8px;
