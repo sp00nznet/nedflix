@@ -1161,12 +1161,16 @@ app.get('/api/audio-tracks', ensureAuthenticated, async (req, res) => {
     }
 
     try {
-        const tracks = await getAudioTracksWithCache(normalizedPath);
+        const [tracks, metadata] = await Promise.all([
+            getAudioTracksWithCache(normalizedPath),
+            getVideoMetadata(normalizedPath)
+        ]);
 
         res.json({
             available: ffprobeAvailable,
             switchable: ffmpegAvailable,
             tracks: tracks,
+            duration: metadata?.duration || null,
             message: !ffprobeAvailable
                 ? 'FFprobe not installed - audio track detection unavailable'
                 : !ffmpegAvailable
