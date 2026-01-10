@@ -80,6 +80,17 @@ async function checkAuth() {
             showAdminSection();
         }
 
+        // Show/hide change password section based on provider
+        // Only show for local users, not OAuth (google/github)
+        const changePasswordSection = document.getElementById('change-password-section');
+        if (changePasswordSection) {
+            if (currentUser.provider === 'local') {
+                changePasswordSection.style.display = 'block';
+            } else {
+                changePasswordSection.style.display = 'none';
+            }
+        }
+
         // Show library selector instead of loading directory
         showLibrarySelector();
 
@@ -324,6 +335,12 @@ function setupEventListeners() {
 
     saveSettingsBtn.addEventListener('click', saveSettings);
 
+    // Change password button
+    const changePasswordBtn = document.getElementById('change-password-btn');
+    if (changePasswordBtn) {
+        changePasswordBtn.addEventListener('click', changeOwnPassword);
+    }
+
     // Metadata scan buttons
     document.querySelectorAll('.scan-btn').forEach(btn => {
         btn.addEventListener('click', () => startMetadataScan(btn.dataset.path, btn));
@@ -381,6 +398,71 @@ async function saveSettings() {
     } catch (error) {
         console.error('Failed to save settings:', error);
         alert('Failed to save settings');
+    }
+}
+
+// Change own password
+async function changeOwnPassword() {
+    const currentPasswordInput = document.getElementById('current-password');
+    const newPasswordInput = document.getElementById('new-password');
+    const confirmPasswordInput = document.getElementById('confirm-password');
+    const messageEl = document.getElementById('password-message');
+
+    const currentPassword = currentPasswordInput.value;
+    const newPassword = newPasswordInput.value;
+    const confirmPassword = confirmPasswordInput.value;
+
+    // Clear previous message
+    messageEl.className = 'password-message';
+    messageEl.textContent = '';
+
+    // Validation
+    if (!currentPassword) {
+        showPasswordMessage('Please enter your current password', 'error');
+        return;
+    }
+    if (!newPassword) {
+        showPasswordMessage('Please enter a new password', 'error');
+        return;
+    }
+    if (newPassword.length < 4) {
+        showPasswordMessage('New password must be at least 4 characters', 'error');
+        return;
+    }
+    if (newPassword !== confirmPassword) {
+        showPasswordMessage('New passwords do not match', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/user/change-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentPassword, newPassword })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            currentPasswordInput.value = '';
+            newPasswordInput.value = '';
+            confirmPasswordInput.value = '';
+            showPasswordMessage('Password changed successfully', 'success');
+        } else {
+            showPasswordMessage(data.error || 'Failed to change password', 'error');
+        }
+    } catch (error) {
+        console.error('Failed to change password:', error);
+        showPasswordMessage('Failed to change password', 'error');
+    }
+}
+
+// Show password change message
+function showPasswordMessage(message, type) {
+    const messageEl = document.getElementById('password-message');
+    if (messageEl) {
+        messageEl.textContent = message;
+        messageEl.className = `password-message ${type}`;
     }
 }
 

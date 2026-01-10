@@ -319,6 +319,36 @@ function deleteUser(id) {
 }
 
 /**
+ * Change user's own password (any user)
+ */
+function changePassword(userId, currentPassword, newPassword) {
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+    if (!user) {
+        return { success: false, error: 'User not found' };
+    }
+
+    if (!user.password_hash) {
+        return { success: false, error: 'Cannot change password for OAuth users' };
+    }
+
+    // Verify current password
+    if (!verifyPassword(currentPassword, user.password_hash)) {
+        return { success: false, error: 'Current password is incorrect' };
+    }
+
+    // Validate new password
+    if (!newPassword || newPassword.length < 4) {
+        return { success: false, error: 'New password must be at least 4 characters' };
+    }
+
+    // Update password
+    const newHash = hashPassword(newPassword);
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newHash, userId);
+
+    return { success: true };
+}
+
+/**
  * Get all users (admin only)
  */
 function getAllUsers() {
@@ -426,6 +456,7 @@ module.exports = {
     addUser,
     updateUser,
     deleteUser,
+    changePassword,
     getAllUsers,
     updateSettings,
     getSettings
