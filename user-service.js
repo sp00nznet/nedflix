@@ -1,14 +1,11 @@
 /**
  * User Service for Nedflix
- * Manages users and their settings in SQLite database
+ * Manages users and their settings using the database abstraction layer
+ * Supports both SQLite (local) and PostgreSQL (Docker)
  */
 
-const path = require('path');
 const crypto = require('crypto');
-
-// Database setup
-let db = null;
-const DB_PATH = path.join(__dirname, 'users.db');
+const db = require('./db');
 
 /**
  * Hash a password using scrypt
@@ -29,110 +26,30 @@ function verifyPassword(password, storedHash) {
 }
 
 /**
- * Initialize the user service
+ * Initialize the user service (now just logs - db.js handles initialization)
  */
-function init() {
-    try {
-        const Database = require('better-sqlite3');
-        db = new Database(DB_PATH);
-
-        // Create tables
-        db.exec(`
-            CREATE TABLE IF NOT EXISTS users (
-                id TEXT PRIMARY KEY,
-                username TEXT UNIQUE,
-                password_hash TEXT,
-                provider TEXT NOT NULL DEFAULT 'local',
-                display_name TEXT,
-                email TEXT,
-                avatar TEXT DEFAULT 'cat',
-                is_admin INTEGER DEFAULT 0,
-                is_allowed INTEGER DEFAULT 1,
-                created_at INTEGER DEFAULT (strftime('%s', 'now')),
-                last_login INTEGER
-            );
-
-            CREATE TABLE IF NOT EXISTS user_settings (
-                user_id TEXT PRIMARY KEY,
-                quality TEXT DEFAULT 'auto',
-                autoplay INTEGER DEFAULT 0,
-                volume INTEGER DEFAULT 80,
-                playback_speed REAL DEFAULT 1.0,
-                subtitles INTEGER DEFAULT 0,
-                audio_language TEXT DEFAULT 'eng',
-                subtitle_language TEXT DEFAULT 'en',
-                profile_picture TEXT DEFAULT 'cat',
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-            CREATE INDEX IF NOT EXISTS idx_users_provider ON users(provider);
-        `);
-
-        // Migrate: Add username column if it doesn't exist
-        try {
-            db.exec('ALTER TABLE users ADD COLUMN username TEXT UNIQUE');
-        } catch (e) {
-            // Column already exists
-        }
-
-        // Migrate: Add password_hash column if it doesn't exist
-        try {
-            db.exec('ALTER TABLE users ADD COLUMN password_hash TEXT');
-        } catch (e) {
-            // Column already exists
-        }
-
-        // Migrate: Add library_access column if it doesn't exist
-        // Stores JSON array of allowed libraries: ["movies", "tv", "music", "audiobooks"]
-        try {
-            db.exec("ALTER TABLE users ADD COLUMN library_access TEXT DEFAULT '[\"movies\",\"tv\",\"music\",\"audiobooks\"]'");
-        } catch (e) {
-            // Column already exists
-        }
-
-        // Ensure local-admin exists and is admin + allowed
-        ensureAdminExists();
-
-        console.log('👥 User database initialized');
-        return true;
-    } catch (error) {
-        console.error('Failed to initialize user database:', error.message);
-        return false;
-    }
-}
-
-/**
- * Ensure the local admin user exists
- */
-function ensureAdminExists() {
-    const admin = db.prepare('SELECT * FROM users WHERE id = ?').get('local-admin');
-    if (!admin) {
-        db.prepare(`
-            INSERT INTO users (id, provider, display_name, avatar, is_admin, is_allowed)
-            VALUES (?, ?, ?, ?, ?, ?)
-        `).run('local-admin', 'local', 'Admin', 'bear', 1, 1);
-
-        db.prepare(`
-            INSERT INTO user_settings (user_id)
-            VALUES (?)
-        `).run('local-admin');
-    }
+async function init() {
+    console.log('👥 User service initialized');
+    return true;
 }
 
 /**
  * Authenticate a user with username and password
  */
-function authenticateUser(username, password) {
+async function authenticateUser(username, password) {
     if (!username || !password) return null;
 
-    const row = db.prepare('SELECT * FROM users WHERE username = ?').get(username.toLowerCase());
+    const row = await db.get('SELECT * FROM users WHERE username = ?', [username.toLowerCase()]);
     if (!row || !row.password_hash) return null;
 
     if (!verifyPassword(password, row.password_hash)) return null;
 
     // Update last login
-    db.prepare('UPDATE users SET last_login = strftime(\'%s\', \'now\') WHERE id = ?').run(row.id);
+    if (db.isUsingPostgres()) {
+        await db.run('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [row.id]);
+    } else {
+        await db.run("UPDATE users SET last_login = strftime('%s', 'now') WHERE id = ?", [row.id]);
+    }
 
     return {
         id: row.id,
@@ -141,22 +58,22 @@ function authenticateUser(username, password) {
         displayName: row.display_name,
         email: row.email,
         avatar: row.avatar,
-        isAdmin: row.is_admin === 1,
-        isAllowed: row.is_allowed === 1
+        isAdmin: row.is_admin === 1 || row.is_admin === true,
+        isAllowed: row.is_allowed === 1 || row.is_allowed === true
     };
 }
 
 /**
  * Get user by ID
  */
-function getUser(id) {
-    const row = db.prepare(`
+async function getUser(id) {
+    const row = await db.get(`
         SELECT u.*, s.quality, s.autoplay, s.volume, s.playback_speed,
                s.subtitles, s.audio_language, s.subtitle_language, s.profile_picture
         FROM users u
         LEFT JOIN user_settings s ON u.id = s.user_id
         WHERE u.id = ?
-    `).get(id);
+    `, [id]);
 
     if (!row) return null;
 
@@ -170,6 +87,12 @@ function getUser(id) {
         // Use default if parsing fails
     }
 
+    // Handle boolean conversion for PostgreSQL vs SQLite
+    const isAdmin = row.is_admin === 1 || row.is_admin === true;
+    const isAllowed = row.is_allowed === 1 || row.is_allowed === true;
+    const autoplay = row.autoplay === 1 || row.autoplay === true;
+    const subtitles = row.subtitles === 1 || row.subtitles === true;
+
     return {
         user: {
             id: row.id,
@@ -178,8 +101,8 @@ function getUser(id) {
             displayName: row.display_name,
             email: row.email,
             avatar: row.avatar,
-            isAdmin: row.is_admin === 1,
-            isAllowed: row.is_allowed === 1,
+            isAdmin,
+            isAllowed,
             libraryAccess,
             createdAt: row.created_at,
             lastLogin: row.last_login
@@ -187,10 +110,10 @@ function getUser(id) {
         settings: {
             streaming: {
                 quality: row.quality || 'auto',
-                autoplay: row.autoplay === 1,
+                autoplay,
                 volume: row.volume || 80,
                 playbackSpeed: row.playback_speed || 1.0,
-                subtitles: row.subtitles === 1,
+                subtitles,
                 audioLanguage: row.audio_language || 'eng',
                 subtitleLanguage: row.subtitle_language || 'en'
             },
@@ -202,25 +125,83 @@ function getUser(id) {
 /**
  * Get user by username
  */
-function getUserByUsername(username) {
+async function getUserByUsername(username) {
     if (!username) return null;
-    const row = db.prepare('SELECT * FROM users WHERE username = ?').get(username.toLowerCase());
-    return row ? {
+    const row = await db.get('SELECT * FROM users WHERE username = ?', [username.toLowerCase()]);
+    if (!row) return null;
+
+    return {
         id: row.id,
         username: row.username,
         provider: row.provider,
         displayName: row.display_name,
         email: row.email,
         avatar: row.avatar,
-        isAdmin: row.is_admin === 1,
-        isAllowed: row.is_allowed === 1
-    } : null;
+        isAdmin: row.is_admin === 1 || row.is_admin === true,
+        isAllowed: row.is_allowed === 1 || row.is_allowed === true
+    };
+}
+
+/**
+ * Upsert OAuth user (for Google/GitHub login)
+ */
+async function upsertOAuthUser(profile, provider) {
+    const id = `${provider}-${profile.id}`;
+    const displayName = profile.displayName || profile.username || 'User';
+    const email = profile.emails?.[0]?.value || null;
+    const avatar = 'cat';
+
+    // Check if user exists
+    const existing = await db.get('SELECT * FROM users WHERE id = ?', [id]);
+
+    if (existing) {
+        // Update last login
+        if (db.isUsingPostgres()) {
+            await db.run('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [id]);
+        } else {
+            await db.run("UPDATE users SET last_login = strftime('%s', 'now') WHERE id = ?", [id]);
+        }
+        return {
+            id: existing.id,
+            provider: existing.provider,
+            displayName: existing.display_name,
+            email: existing.email,
+            avatar: existing.avatar,
+            isAdmin: existing.is_admin === 1 || existing.is_admin === true,
+            isAllowed: existing.is_allowed === 1 || existing.is_allowed === true
+        };
+    }
+
+    // Create new user
+    if (db.isUsingPostgres()) {
+        await db.run(`
+            INSERT INTO users (id, provider, display_name, email, avatar, is_admin, is_allowed, created_at, last_login)
+            VALUES (?, ?, ?, ?, ?, FALSE, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `, [id, provider, displayName, email, avatar]);
+    } else {
+        await db.run(`
+            INSERT INTO users (id, provider, display_name, email, avatar, is_admin, is_allowed, created_at, last_login)
+            VALUES (?, ?, ?, ?, ?, 0, 1, strftime('%s', 'now'), strftime('%s', 'now'))
+        `, [id, provider, displayName, email, avatar]);
+    }
+
+    await db.run('INSERT INTO user_settings (user_id) VALUES (?)', [id]);
+
+    return {
+        id,
+        provider,
+        displayName,
+        email,
+        avatar,
+        isAdmin: false,
+        isAllowed: true
+    };
 }
 
 /**
  * Add a new user with username and password (admin only)
  */
-function addUser(username, password, displayName, isAdmin = false) {
+async function addUser(username, password, displayName, isAdmin = false) {
     if (!username) throw new Error('Username is required');
     if (!password) throw new Error('Password is required');
     if (password.length < 4) throw new Error('Password must be at least 4 characters');
@@ -232,7 +213,7 @@ function addUser(username, password, displayName, isAdmin = false) {
         throw new Error('Username can only contain letters, numbers, underscores, and hyphens');
     }
 
-    const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(normalizedUsername);
+    const existing = await db.get('SELECT id FROM users WHERE username = ?', [normalizedUsername]);
     if (existing) {
         throw new Error('Username already exists');
     }
@@ -240,12 +221,19 @@ function addUser(username, password, displayName, isAdmin = false) {
     const userId = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const passwordHash = hashPassword(password);
 
-    db.prepare(`
-        INSERT INTO users (id, username, password_hash, provider, display_name, is_admin, is_allowed)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(userId, normalizedUsername, passwordHash, 'local', displayName || username, isAdmin ? 1 : 0, 1);
+    if (db.isUsingPostgres()) {
+        await db.run(`
+            INSERT INTO users (id, username, password_hash, provider, display_name, is_admin, is_allowed)
+            VALUES (?, ?, ?, ?, ?, ?, TRUE)
+        `, [userId, normalizedUsername, passwordHash, 'local', displayName || username, isAdmin]);
+    } else {
+        await db.run(`
+            INSERT INTO users (id, username, password_hash, provider, display_name, is_admin, is_allowed)
+            VALUES (?, ?, ?, ?, ?, ?, 1)
+        `, [userId, normalizedUsername, passwordHash, 'local', displayName || username, isAdmin ? 1 : 0]);
+    }
 
-    db.prepare('INSERT INTO user_settings (user_id) VALUES (?)').run(userId);
+    await db.run('INSERT INTO user_settings (user_id) VALUES (?)', [userId]);
 
     return {
         id: userId,
@@ -260,8 +248,8 @@ function addUser(username, password, displayName, isAdmin = false) {
 /**
  * Update user (admin only)
  */
-function updateUser(id, updates) {
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+async function updateUser(id, updates) {
+    const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
     if (!user) throw new Error('User not found');
 
     // Don't allow modifying the local-admin's admin status
@@ -282,11 +270,11 @@ function updateUser(id, updates) {
     }
     if (updates.isAdmin !== undefined) {
         fields.push('is_admin = ?');
-        values.push(updates.isAdmin ? 1 : 0);
+        values.push(db.isUsingPostgres() ? updates.isAdmin : (updates.isAdmin ? 1 : 0));
     }
     if (updates.isAllowed !== undefined) {
         fields.push('is_allowed = ?');
-        values.push(updates.isAllowed ? 1 : 0);
+        values.push(db.isUsingPostgres() ? updates.isAllowed : (updates.isAllowed ? 1 : 0));
     }
     if (updates.libraryAccess !== undefined && Array.isArray(updates.libraryAccess)) {
         fields.push('library_access = ?');
@@ -295,25 +283,25 @@ function updateUser(id, updates) {
 
     if (fields.length > 0) {
         values.push(id);
-        db.prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+        await db.run(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values);
     }
 
-    return getUser(id);
+    return await getUser(id);
 }
 
 /**
  * Delete user (admin only)
  */
-function deleteUser(id) {
+async function deleteUser(id) {
     if (id === 'local-admin') {
         throw new Error('Cannot delete local admin');
     }
 
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
     if (!user) throw new Error('User not found');
 
-    db.prepare('DELETE FROM user_settings WHERE user_id = ?').run(id);
-    db.prepare('DELETE FROM users WHERE id = ?').run(id);
+    await db.run('DELETE FROM user_settings WHERE user_id = ?', [id]);
+    await db.run('DELETE FROM users WHERE id = ?', [id]);
 
     return true;
 }
@@ -321,8 +309,8 @@ function deleteUser(id) {
 /**
  * Change user's own password (any user)
  */
-function changePassword(userId, currentPassword, newPassword) {
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+async function changePassword(userId, currentPassword, newPassword) {
+    const user = await db.get('SELECT * FROM users WHERE id = ?', [userId]);
     if (!user) {
         return { success: false, error: 'User not found' };
     }
@@ -343,7 +331,7 @@ function changePassword(userId, currentPassword, newPassword) {
 
     // Update password
     const newHash = hashPassword(newPassword);
-    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newHash, userId);
+    await db.run('UPDATE users SET password_hash = ? WHERE id = ?', [newHash, userId]);
 
     return { success: true };
 }
@@ -351,12 +339,12 @@ function changePassword(userId, currentPassword, newPassword) {
 /**
  * Get all users (admin only)
  */
-function getAllUsers() {
-    const rows = db.prepare(`
+async function getAllUsers() {
+    const rows = await db.all(`
         SELECT id, username, provider, display_name, email, avatar, is_admin, is_allowed, library_access, created_at, last_login
         FROM users
         ORDER BY created_at DESC
-    `).all();
+    `);
 
     return rows.map(row => {
         let libraryAccess = ['movies', 'tv', 'music', 'audiobooks'];
@@ -373,8 +361,8 @@ function getAllUsers() {
             displayName: row.display_name,
             email: row.email,
             avatar: row.avatar,
-            isAdmin: row.is_admin === 1,
-            isAllowed: row.is_allowed === 1,
+            isAdmin: row.is_admin === 1 || row.is_admin === true,
+            isAllowed: row.is_allowed === 1 || row.is_allowed === true,
             libraryAccess,
             createdAt: row.created_at,
             lastLogin: row.last_login
@@ -385,12 +373,12 @@ function getAllUsers() {
 /**
  * Update user settings
  */
-function updateSettings(userId, settings) {
-    const existing = db.prepare('SELECT * FROM user_settings WHERE user_id = ?').get(userId);
+async function updateSettings(userId, settings) {
+    const existing = await db.get('SELECT * FROM user_settings WHERE user_id = ?', [userId]);
 
     if (!existing) {
         // Create settings for this user
-        db.prepare('INSERT INTO user_settings (user_id) VALUES (?)').run(userId);
+        await db.run('INSERT INTO user_settings (user_id) VALUES (?)', [userId]);
     }
 
     const updates = [];
@@ -403,7 +391,7 @@ function updateSettings(userId, settings) {
         }
         if (settings.streaming.autoplay !== undefined) {
             updates.push('autoplay = ?');
-            values.push(settings.streaming.autoplay ? 1 : 0);
+            values.push(db.isUsingPostgres() ? settings.streaming.autoplay : (settings.streaming.autoplay ? 1 : 0));
         }
         if (settings.streaming.volume !== undefined) {
             updates.push('volume = ?');
@@ -415,7 +403,7 @@ function updateSettings(userId, settings) {
         }
         if (settings.streaming.subtitles !== undefined) {
             updates.push('subtitles = ?');
-            values.push(settings.streaming.subtitles ? 1 : 0);
+            values.push(db.isUsingPostgres() ? settings.streaming.subtitles : (settings.streaming.subtitles ? 1 : 0));
         }
         if (settings.streaming.audioLanguage !== undefined) {
             updates.push('audio_language = ?');
@@ -434,31 +422,26 @@ function updateSettings(userId, settings) {
 
     if (updates.length > 0) {
         values.push(userId);
-        db.prepare(`UPDATE user_settings SET ${updates.join(', ')} WHERE user_id = ?`).run(...values);
+        await db.run(`UPDATE user_settings SET ${updates.join(', ')} WHERE user_id = ?`, values);
     }
 
-    return getUser(userId)?.settings;
+    const userData = await getUser(userId);
+    return userData?.settings;
 }
 
 /**
  * Get user settings
  */
-function getSettings(userId) {
-    const data = getUser(userId);
+async function getSettings(userId) {
+    const data = await getUser(userId);
     return data?.settings || null;
-}
-
-/**
- * Get database instance for sharing with other services
- */
-function getDatabase() {
-    return db;
 }
 
 module.exports = {
     init,
     getUser,
     getUserByUsername,
+    upsertOAuthUser,
     authenticateUser,
     addUser,
     updateUser,
@@ -466,6 +449,5 @@ module.exports = {
     changePassword,
     getAllUsers,
     updateSettings,
-    getSettings,
-    getDatabase
+    getSettings
 };

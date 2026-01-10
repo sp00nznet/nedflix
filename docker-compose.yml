@@ -4,12 +4,37 @@ version: '3.8'
 # Docker Compose configuration
 
 services:
+  # PostgreSQL Database Container
+  nedflix-db:
+    image: postgres:16-alpine
+    container_name: nedflix-db
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-nedflix}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-nedflix_secret}
+      - POSTGRES_DB=${POSTGRES_DB:-nedflix}
+    volumes:
+      # Persistent database storage
+      - nedflix-db-data:/var/lib/postgresql/data
+      # Initialization script
+      - ./db-init:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nedflix} -d ${POSTGRES_DB:-nedflix}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Main Nedflix Application
   nedflix:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: nedflix
     image: nedflix:latest
+    depends_on:
+      nedflix-db:
+        condition: service_healthy
     ports:
       - "3000:3000"   # HTTP (redirects to HTTPS)
       - "3443:3443"   # HTTPS
@@ -19,6 +44,13 @@ services:
       - HTTPS_PORT=3443
       - NFS_MOUNT_PATH=/mnt/nfs
       - SESSION_SECRET=${SESSION_SECRET:-change-this-to-a-secure-random-string}
+      # Database connection
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-nedflix}:${POSTGRES_PASSWORD:-nedflix_secret}@nedflix-db:5432/${POSTGRES_DB:-nedflix}
+      - DB_HOST=nedflix-db
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-nedflix}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-nedflix_secret}
+      - DB_NAME=${POSTGRES_DB:-nedflix}
       # OAuth credentials (set in .env file or environment)
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
@@ -44,3 +76,5 @@ services:
 volumes:
   nedflix-certs:
     name: nedflix-certs
+  nedflix-db-data:
+    name: nedflix-db-data
