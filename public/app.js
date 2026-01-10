@@ -12,6 +12,8 @@ let subtitleStatus = { configured: false };
 let audioTrackStatus = { canDetect: false, canSwitch: false };
 let currentAudioTracks = [];
 let selectedAudioTrack = 0;
+let currentEmbeddedSubtitles = [];
+let selectedEmbeddedSubtitle = -1; // -1 means off
 
 // DOM Elements
 const fileList = document.getElementById('file-list');
@@ -388,12 +390,15 @@ async function playVideo(path, name) {
     currentVideoName = name;
     selectedAudioTrack = 0;
     currentAudioTracks = [];
+    currentEmbeddedSubtitles = [];
+    selectedEmbeddedSubtitle = -1;
 
     // Remove any existing subtitle tracks
     removeSubtitleTracks();
 
-    // Hide audio selector while loading
+    // Hide audio and subtitle selectors while loading
     hideAudioTrackSelector();
+    hideEmbeddedSubtitleSelector();
 
     videoPlayer.src = videoUrl;
     videoName.textContent = name;
@@ -418,15 +423,13 @@ async function playVideo(path, name) {
         document.getElementById('player-section').scrollIntoView({ behavior: 'smooth' });
     }
 
-    // Search and load subtitles if enabled
-    if (userSettings?.streaming?.subtitles && subtitleStatus.configured) {
-        await loadSubtitles(path);
-    }
-
     // Load audio tracks if available
     if (audioTrackStatus.canDetect) {
         await loadAudioTracks(path);
     }
+
+    // Load embedded subtitles
+    await loadEmbeddedSubtitles(path);
 }
 
 // Load audio tracks for the current video
@@ -661,6 +664,160 @@ function showAudioTrackMessage(message, type) {
             indicator.style.display = 'none';
         }, 3000);
     }
+}
+
+// Load embedded subtitles for the current video
+async function loadEmbeddedSubtitles(videoPath) {
+    try {
+        const response = await fetch(`/api/embedded-subtitles?path=${encodeURIComponent(videoPath)}`);
+        const data = await response.json();
+
+        if (data.tracks && data.tracks.length > 0) {
+            // Filter to text-based subtitles that can be extracted
+            const extractableTracks = data.tracks.filter(t => t.isTextBased);
+
+            if (extractableTracks.length > 0) {
+                currentEmbeddedSubtitles = extractableTracks;
+                showEmbeddedSubtitleSelector(extractableTracks);
+                console.log(`Found ${extractableTracks.length} extractable subtitle track(s)`);
+
+                // Auto-select preferred language subtitle
+                const preferredLang = userSettings?.streaming?.subtitleLanguage || 'en';
+                const preferredIndex = extractableTracks.findIndex(t =>
+                    t.language && (
+                        t.language.toLowerCase() === preferredLang.toLowerCase() ||
+                        t.language.toLowerCase().startsWith(preferredLang.toLowerCase())
+                    )
+                );
+
+                // If preferred language found, automatically enable it
+                if (preferredIndex >= 0) {
+                    console.log(`Auto-selecting subtitle: ${extractableTracks[preferredIndex].label}`);
+                    await applyEmbeddedSubtitle(preferredIndex);
+                }
+            } else {
+                console.log('No text-based subtitles found (PGS/DVD subtitles cannot be extracted)');
+                hideEmbeddedSubtitleSelector();
+            }
+        } else {
+            hideEmbeddedSubtitleSelector();
+            currentEmbeddedSubtitles = [];
+        }
+    } catch (error) {
+        console.error('Failed to load embedded subtitles:', error);
+        hideEmbeddedSubtitleSelector();
+    }
+}
+
+// Show the embedded subtitle selector UI
+function showEmbeddedSubtitleSelector(tracks) {
+    let container = document.getElementById('embedded-subtitle-container');
+
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'embedded-subtitle-container';
+        container.className = 'embedded-subtitle-container';
+        document.querySelector('.video-header').appendChild(container);
+    }
+
+    container.innerHTML = `
+        <div class="embedded-subtitle-selector">
+            <label for="embedded-subtitle-select">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
+                    <line x1="6" y1="12" x2="18" y2="12"></line>
+                    <line x1="6" y1="16" x2="14" y2="16"></line>
+                </svg>
+                Subtitles
+            </label>
+            <select id="embedded-subtitle-select">
+                <option value="-1">Off</option>
+                ${tracks.map((track, index) => `
+                    <option value="${index}">
+                        ${escapeHtml(track.label)}
+                    </option>
+                `).join('')}
+            </select>
+        </div>
+    `;
+
+    container.style.display = 'flex';
+
+    // Add event listener for subtitle selection
+    const select = document.getElementById('embedded-subtitle-select');
+    select.addEventListener('change', handleEmbeddedSubtitleChange);
+}
+
+// Hide the embedded subtitle selector
+function hideEmbeddedSubtitleSelector() {
+    const container = document.getElementById('embedded-subtitle-container');
+    if (container) {
+        container.style.display = 'none';
+    }
+}
+
+// Apply an embedded subtitle track
+async function applyEmbeddedSubtitle(trackIndex) {
+    // Remove existing subtitle tracks
+    removeSubtitleTracks();
+
+    if (trackIndex < 0) {
+        selectedEmbeddedSubtitle = -1;
+        updateSubtitleIndicator(null);
+        return;
+    }
+
+    const track = currentEmbeddedSubtitles[trackIndex];
+    if (!track) return;
+
+    selectedEmbeddedSubtitle = trackIndex;
+
+    // Update dropdown
+    const select = document.getElementById('embedded-subtitle-select');
+    if (select) {
+        select.value = trackIndex;
+    }
+
+    updateSubtitleIndicator('searching');
+
+    try {
+        // Create subtitle track element
+        const subtitleTrack = document.createElement('track');
+        subtitleTrack.kind = 'subtitles';
+        subtitleTrack.label = track.label;
+        subtitleTrack.srclang = track.language || 'en';
+        subtitleTrack.src = `/api/embedded-subtitles/extract?path=${encodeURIComponent(currentVideoPath)}&track=${track.streamIndex}`;
+        subtitleTrack.default = true;
+
+        videoPlayer.appendChild(subtitleTrack);
+
+        // Wait for track to load then enable it
+        subtitleTrack.addEventListener('load', () => {
+            if (videoPlayer.textTracks.length > 0) {
+                videoPlayer.textTracks[0].mode = 'showing';
+            }
+            updateSubtitleIndicator('loaded', track.label);
+        });
+
+        subtitleTrack.addEventListener('error', () => {
+            updateSubtitleIndicator('error', 'Failed to load subtitle');
+        });
+
+    } catch (error) {
+        console.error('Failed to apply embedded subtitle:', error);
+        updateSubtitleIndicator('error', 'Failed to load subtitle');
+    }
+}
+
+// Handle embedded subtitle change from UI
+async function handleEmbeddedSubtitleChange(event) {
+    const newTrack = parseInt(event.target.value, 10);
+
+    if (newTrack === selectedEmbeddedSubtitle) {
+        return;
+    }
+
+    await applyEmbeddedSubtitle(newTrack);
 }
 
 // Remove all existing subtitle tracks from video player
