@@ -4,10 +4,29 @@
  */
 
 const path = require('path');
+const crypto = require('crypto');
 
 // Database setup
 let db = null;
 const DB_PATH = path.join(__dirname, 'users.db');
+
+/**
+ * Hash a password using scrypt
+ */
+function hashPassword(password) {
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+    return `${salt}:${hash}`;
+}
+
+/**
+ * Verify a password against a hash
+ */
+function verifyPassword(password, storedHash) {
+    const [salt, hash] = storedHash.split(':');
+    const verifyHash = crypto.scryptSync(password, salt, 64).toString('hex');
+    return hash === verifyHash;
+}
 
 /**
  * Initialize the user service
@@ -21,12 +40,14 @@ function init() {
         db.exec(`
             CREATE TABLE IF NOT EXISTS users (
                 id TEXT PRIMARY KEY,
-                provider TEXT NOT NULL,
+                username TEXT UNIQUE,
+                password_hash TEXT,
+                provider TEXT NOT NULL DEFAULT 'local',
                 display_name TEXT,
                 email TEXT,
                 avatar TEXT DEFAULT 'cat',
                 is_admin INTEGER DEFAULT 0,
-                is_allowed INTEGER DEFAULT 0,
+                is_allowed INTEGER DEFAULT 1,
                 created_at INTEGER DEFAULT (strftime('%s', 'now')),
                 last_login INTEGER
             );
@@ -44,9 +65,23 @@ function init() {
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             );
 
-            CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+            CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
             CREATE INDEX IF NOT EXISTS idx_users_provider ON users(provider);
         `);
+
+        // Migrate: Add username column if it doesn't exist
+        try {
+            db.exec('ALTER TABLE users ADD COLUMN username TEXT UNIQUE');
+        } catch (e) {
+            // Column already exists
+        }
+
+        // Migrate: Add password_hash column if it doesn't exist
+        try {
+            db.exec('ALTER TABLE users ADD COLUMN password_hash TEXT');
+        } catch (e) {
+            // Column already exists
+        }
 
         // Ensure local-admin exists and is admin + allowed
         ensureAdminExists();
@@ -78,6 +113,32 @@ function ensureAdminExists() {
 }
 
 /**
+ * Authenticate a user with username and password
+ */
+function authenticateUser(username, password) {
+    if (!username || !password) return null;
+
+    const row = db.prepare('SELECT * FROM users WHERE username = ?').get(username.toLowerCase());
+    if (!row || !row.password_hash) return null;
+
+    if (!verifyPassword(password, row.password_hash)) return null;
+
+    // Update last login
+    db.prepare('UPDATE users SET last_login = strftime(\'%s\', \'now\') WHERE id = ?').run(row.id);
+
+    return {
+        id: row.id,
+        username: row.username,
+        provider: row.provider,
+        displayName: row.display_name,
+        email: row.email,
+        avatar: row.avatar,
+        isAdmin: row.is_admin === 1,
+        isAllowed: row.is_allowed === 1
+    };
+}
+
+/**
  * Get user by ID
  */
 function getUser(id) {
@@ -94,6 +155,7 @@ function getUser(id) {
     return {
         user: {
             id: row.id,
+            username: row.username,
             provider: row.provider,
             displayName: row.display_name,
             email: row.email,
@@ -119,13 +181,14 @@ function getUser(id) {
 }
 
 /**
- * Get user by email (for checking if OAuth user is allowed)
+ * Get user by username
  */
-function getUserByEmail(email) {
-    if (!email) return null;
-    const row = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase());
+function getUserByUsername(username) {
+    if (!username) return null;
+    const row = db.prepare('SELECT * FROM users WHERE username = ?').get(username.toLowerCase());
     return row ? {
         id: row.id,
+        username: row.username,
         provider: row.provider,
         displayName: row.display_name,
         email: row.email,
@@ -136,107 +199,42 @@ function getUserByEmail(email) {
 }
 
 /**
- * Check if a user is allowed to access the system
+ * Add a new user with username and password (admin only)
  */
-function isUserAllowed(id, email) {
-    // Check by ID first
-    const byId = db.prepare('SELECT is_allowed FROM users WHERE id = ?').get(id);
-    if (byId) return byId.is_allowed === 1;
+function addUser(username, password, displayName, isAdmin = false) {
+    if (!username) throw new Error('Username is required');
+    if (!password) throw new Error('Password is required');
+    if (password.length < 4) throw new Error('Password must be at least 4 characters');
 
-    // Check by email (for pre-registered users logging in via OAuth)
-    if (email) {
-        const byEmail = db.prepare('SELECT is_allowed FROM users WHERE email = ?').get(email.toLowerCase());
-        if (byEmail) return byEmail.is_allowed === 1;
+    const normalizedUsername = username.toLowerCase().trim();
+
+    // Validate username format (alphanumeric, underscores, hyphens)
+    if (!/^[a-z0-9_-]+$/.test(normalizedUsername)) {
+        throw new Error('Username can only contain letters, numbers, underscores, and hyphens');
     }
 
-    return false;
-}
-
-/**
- * Create or update user from OAuth login
- */
-function upsertOAuthUser(profile, provider) {
-    const id = profile.id;
-    const email = profile.emails?.[0]?.value?.toLowerCase() || null;
-    const displayName = profile.displayName || profile.username || 'User';
-    const avatar = profile.photos?.[0]?.value || (provider === 'google' ? 'cat' : 'dog');
-
-    // Check if user exists by ID
-    let existing = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
-
-    // If not found by ID, check by email (user might have been pre-registered)
-    if (!existing && email) {
-        existing = db.prepare('SELECT * FROM users WHERE email = ? AND provider = ?').get(email, 'pending');
-        if (existing) {
-            // Update the pre-registered user with OAuth details
-            db.prepare(`
-                UPDATE users
-                SET id = ?, provider = ?, display_name = ?, avatar = ?, last_login = strftime('%s', 'now')
-                WHERE email = ? AND provider = 'pending'
-            `).run(id, provider, displayName, avatar, email);
-
-            // Update settings foreign key
-            db.prepare('UPDATE user_settings SET user_id = ? WHERE user_id = ?').run(id, existing.id);
-
-            existing = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
-        }
-    }
-
+    const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(normalizedUsername);
     if (existing) {
-        // Update last login
-        db.prepare('UPDATE users SET last_login = strftime(\'%s\', \'now\') WHERE id = ?').run(id);
-
-        return {
-            id: existing.id,
-            provider: existing.provider,
-            displayName: existing.display_name,
-            email: existing.email,
-            avatar: existing.avatar,
-            isAdmin: existing.is_admin === 1,
-            isAllowed: existing.is_allowed === 1
-        };
+        throw new Error('Username already exists');
     }
 
-    // User doesn't exist - they're not allowed
-    return {
-        id,
-        provider,
-        displayName,
-        email,
-        avatar,
-        isAdmin: false,
-        isAllowed: false
-    };
-}
-
-/**
- * Add a new user (admin only)
- */
-function addUser(email, displayName, isAdmin = false) {
-    if (!email) throw new Error('Email is required');
-
-    const existingByEmail = db.prepare('SELECT id FROM users WHERE email = ?').get(email.toLowerCase());
-    if (existingByEmail) {
-        throw new Error('User with this email already exists');
-    }
-
-    // Generate a temporary ID for pre-registered users
-    const tempId = `pending-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const userId = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const passwordHash = hashPassword(password);
 
     db.prepare(`
-        INSERT INTO users (id, provider, display_name, email, is_admin, is_allowed)
-        VALUES (?, ?, ?, ?, ?, ?)
-    `).run(tempId, 'pending', displayName || email.split('@')[0], email.toLowerCase(), isAdmin ? 1 : 0, 1);
+        INSERT INTO users (id, username, password_hash, provider, display_name, is_admin, is_allowed)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(userId, normalizedUsername, passwordHash, 'local', displayName || username, isAdmin ? 1 : 0, 1);
 
-    db.prepare('INSERT INTO user_settings (user_id) VALUES (?)').run(tempId);
+    db.prepare('INSERT INTO user_settings (user_id) VALUES (?)').run(userId);
 
     return {
-        id: tempId,
-        email: email.toLowerCase(),
-        displayName: displayName || email.split('@')[0],
+        id: userId,
+        username: normalizedUsername,
+        displayName: displayName || username,
         isAdmin,
         isAllowed: true,
-        provider: 'pending'
+        provider: 'local'
     };
 }
 
@@ -259,9 +257,9 @@ function updateUser(id, updates) {
         fields.push('display_name = ?');
         values.push(updates.displayName);
     }
-    if (updates.email !== undefined) {
-        fields.push('email = ?');
-        values.push(updates.email?.toLowerCase() || null);
+    if (updates.password !== undefined && updates.password.length >= 4) {
+        fields.push('password_hash = ?');
+        values.push(hashPassword(updates.password));
     }
     if (updates.isAdmin !== undefined) {
         fields.push('is_admin = ?');
@@ -302,13 +300,14 @@ function deleteUser(id) {
  */
 function getAllUsers() {
     const rows = db.prepare(`
-        SELECT id, provider, display_name, email, avatar, is_admin, is_allowed, created_at, last_login
+        SELECT id, username, provider, display_name, email, avatar, is_admin, is_allowed, created_at, last_login
         FROM users
         ORDER BY created_at DESC
     `).all();
 
     return rows.map(row => ({
         id: row.id,
+        username: row.username,
         provider: row.provider,
         displayName: row.display_name,
         email: row.email,
@@ -389,9 +388,8 @@ function getSettings(userId) {
 module.exports = {
     init,
     getUser,
-    getUserByEmail,
-    isUserAllowed,
-    upsertOAuthUser,
+    getUserByUsername,
+    authenticateUser,
     addUser,
     updateUser,
     deleteUser,

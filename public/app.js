@@ -1321,24 +1321,22 @@ function renderUsersList(users) {
     }
 
     usersList.innerHTML = users.map(user => {
-        const isPending = user.provider === 'pending';
         const isCurrentUser = user.id === currentUser.id;
         const avatarUrl = user.avatar?.startsWith('http')
             ? user.avatar
             : `/avatars/${user.avatar || 'cat'}.svg`;
 
         return `
-            <div class="user-item ${isPending ? 'pending' : ''}" data-user-id="${user.id}">
+            <div class="user-item" data-user-id="${user.id}">
                 <div class="user-avatar">
                     <img src="${avatarUrl}" alt="${user.displayName}" onerror="this.src='/avatars/cat.svg'">
                 </div>
                 <div class="user-info">
                     <div class="user-name">
-                        ${user.displayName || user.email || 'User'}
+                        ${user.displayName || user.username || 'User'}
                         ${user.isAdmin ? '<span class="user-badge admin">Admin</span>' : ''}
-                        ${isPending ? '<span class="user-badge pending">Pending</span>' : ''}
                     </div>
-                    <div class="user-email">${user.email || user.provider}</div>
+                    <div class="user-email">${user.username || user.provider}</div>
                 </div>
                 <div class="user-actions">
                     ${!isCurrentUser ? `
@@ -1361,16 +1359,26 @@ function renderUsersList(users) {
 
 // Add a new user
 async function addUser() {
-    const emailInput = document.getElementById('new-user-email');
+    const usernameInput = document.getElementById('new-user-username');
+    const passwordInput = document.getElementById('new-user-password');
     const nameInput = document.getElementById('new-user-name');
     const adminCheckbox = document.getElementById('new-user-admin');
 
-    const email = emailInput.value.trim();
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value;
     const displayName = nameInput.value.trim();
     const isAdmin = adminCheckbox.checked;
 
-    if (!email) {
-        alert('Please enter an email address');
+    if (!username) {
+        alert('Please enter a username');
+        return;
+    }
+    if (!password) {
+        alert('Please enter a password');
+        return;
+    }
+    if (password.length < 4) {
+        alert('Password must be at least 4 characters');
         return;
     }
 
@@ -1378,13 +1386,14 @@ async function addUser() {
         const response = await fetch('/api/admin/users', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, displayName, isAdmin })
+            body: JSON.stringify({ username, password, displayName, isAdmin })
         });
 
         const data = await response.json();
 
         if (data.success) {
-            emailInput.value = '';
+            usernameInput.value = '';
+            passwordInput.value = '';
             nameInput.value = '';
             adminCheckbox.checked = false;
             loadUsers();

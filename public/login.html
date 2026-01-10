@@ -56,17 +56,11 @@
         }
 
         if (errorType === 'invalid') {
-            setTimeout(() => {
-                const errorDiv = document.createElement('div');
-                errorDiv.className = 'login-error';
-                errorDiv.textContent = 'Invalid username or password';
-                const form = document.querySelector('.admin-login-form');
-                if (form) {
-                    form.insertBefore(errorDiv, form.firstChild);
-                }
-            }, 100);
+            showError('Invalid username or password');
         } else if (errorType === 'unauthorized') {
             showError('Your account is not authorized to access Nedflix. Please contact an administrator.');
+        } else if (errorType === 'disabled') {
+            showError('Your account has been disabled. Please contact an administrator.');
         }
 
         // Check if already authenticated
@@ -151,7 +145,7 @@
                                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                                 <circle cx="12" cy="7" r="4"></circle>
                             </svg>
-                            Sign in as Admin
+                            Sign In
                         </button>
                     `;
                     container.appendChild(form);
