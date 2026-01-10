@@ -711,9 +711,11 @@ async function playVideo(path, name, clickedElement) {
     videoPlayer.load();
 
     // Apply user settings with fallback defaults
-    videoPlayer.volume = userSettings?.streaming?.volume
+    // Use setAudioVolume to also update gainNode if Web Audio API was connected
+    const volume = userSettings?.streaming?.volume
         ? userSettings.streaming.volume / 100
         : DEFAULT_VOLUME;
+    setAudioVolume(volume);
     videoPlayer.playbackRate = userSettings?.streaming?.playbackSpeed || 1;
 
     videoPlayer.play().catch(e => console.log('Autoplay prevented:', e));
@@ -761,7 +763,7 @@ function playAudio(path, name, clickedElement) {
     const targetVolume = userSettings?.streaming?.volume
         ? userSettings.streaming.volume / 100
         : DEFAULT_VOLUME;
-    videoPlayer.volume = targetVolume;
+    setAudioVolume(targetVolume);
     videoPlayer.playbackRate = userSettings?.streaming?.playbackSpeed || 1;
 
     // Initialize and start visualizer for audio playback
@@ -912,8 +914,8 @@ async function switchToAudioTrack(trackIndex) {
         // Load new stream
         videoPlayer.src = videoUrl;
 
-        // Restore settings
-        videoPlayer.volume = volume;
+        // Restore settings (use setAudioVolume for Web Audio API support)
+        setAudioVolume(volume);
         videoPlayer.playbackRate = playbackRate;
 
         // Wait for video to be ready
