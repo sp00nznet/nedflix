@@ -63,8 +63,8 @@ services:
     volumes:
       # Mount your NFS share or video directory
       - ${NFS_PATH:-/mnt/nfs}:/mnt/nfs:ro
-      # Persist generated certificates
-      - nedflix-certs:/app/certs
+      # Mount SSL certificates from host (create with: npm run generate-certs)
+      - ${CERTS_PATH:-./certs}:/app/certs:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "--no-check-certificate", "https://localhost:3443/api/auth-providers"]
@@ -74,7 +74,5 @@ services:
       start_period: 15s
 
 volumes:
-  nedflix-certs:
-    name: nedflix-certs
   nedflix-db-data:
     name: nedflix-db-data

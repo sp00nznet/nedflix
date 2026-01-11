@@ -66,6 +66,17 @@ OPENSUBTITLES_API_KEY=your-api-key
 OMDB_API_KEY=your-omdb-key
 ```
 
+Generate SSL certificates before starting (or provide your own):
+
+```bash
+# Generate self-signed certificates for development
+npm run generate-certs
+
+# Or copy your own certificates to ./certs/
+# - server.key (private key)
+# - server.cert (certificate)
+```
+
 Then run:
 
 ```bash
@@ -111,12 +122,31 @@ docker run -d \
 ### Docker Features
 
 - **PostgreSQL database** for persistent storage
-- **Auto-generates SSL certificates** on first run
-- **Persists data** in Docker volumes (database, certificates)
+- **Host SSL certificates** - Mount your own certificates from the host
+- **Persists data** in Docker volumes (database)
 - **Read-only video mount** for security
 - **Non-root user** inside container
 - **Health checks** for container orchestration
 - **Alpine-based** for minimal image size
+
+### SSL Certificate Options
+
+**Option 1: Self-signed (Development)**
+```bash
+npm run generate-certs
+```
+
+**Option 2: Let's Encrypt (Production)**
+```bash
+# Point CERTS_PATH to your Let's Encrypt certificates
+CERTS_PATH=/etc/letsencrypt/live/yourdomain.com
+```
+Note: Rename or symlink `fullchain.pem` to `server.cert` and `privkey.pem` to `server.key`.
+
+**Option 3: Custom path**
+```env
+CERTS_PATH=/path/to/your/certs
+```
 
 ---
 
@@ -360,6 +390,7 @@ The index enables:
 | `ADMIN_USERNAME` | Yes* | - | Local admin username |
 | `ADMIN_PASSWORD` | Yes* | - | Local admin password |
 | `NFS_MOUNT_PATH` | No | `/mnt/nfs` | Path to video files |
+| `CERTS_PATH` | No | `./certs` | Path to SSL certificates |
 | `DB_HOST` | No | - | PostgreSQL host |
 | `DB_PORT` | No | `5432` | PostgreSQL port |
 | `DB_USER` | No | - | PostgreSQL username |
@@ -598,8 +629,13 @@ docker compose up -d
 
 **Certificate issues:**
 ```bash
-# Regenerate certificates
-docker compose down
-docker volume rm nedflix-certs
-docker compose up -d
+# Regenerate self-signed certificates
+npm run generate-certs
+
+# Restart containers
+docker compose restart nedflix
+
+# Check certificate files exist
+ls -la ./certs/
+# Should show: server.key and server.cert
 ```
