@@ -856,6 +856,21 @@ const sessionUsers = new Map();
 app.use(express.json());
 app.use(express.static('public'));
 
+// Security headers
+app.use((req, res, next) => {
+    // HSTS - tell browsers to always use HTTPS
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    // Prevent MIME type sniffing
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    // Clickjacking protection
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    // XSS protection
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    // Referrer policy
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    next();
+});
+
 // Session configuration
 app.use(session({
     secret: process.env.SESSION_SECRET || 'change-this-secret-in-production',

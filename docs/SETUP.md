@@ -145,9 +145,13 @@ The server auto-detects Let's Encrypt certificate filenames (`privkey.pem` and `
 mkdir -p ./certs
 cp /etc/letsencrypt/live/yourdomain.com/privkey.pem ./certs/
 cp /etc/letsencrypt/live/yourdomain.com/fullchain.pem ./certs/
+
+# Set permissions for container access (required!)
+# The container runs as non-root user and needs read access
+chmod 644 ./certs/privkey.pem ./certs/fullchain.pem
 ```
 
-Note: Don't mount `/etc/letsencrypt/live/` directly - those files are symlinks that won't resolve inside the container. Copy the actual certificate files instead.
+**Important:** Don't mount `/etc/letsencrypt/live/` directly - those files are symlinks that won't resolve inside the container. Copy the actual certificate files instead.
 
 **Option 3: Custom path**
 ```env
