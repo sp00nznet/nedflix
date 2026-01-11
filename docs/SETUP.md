@@ -137,11 +137,17 @@ npm run generate-certs
 ```
 
 **Option 2: Let's Encrypt (Production)**
+
+The server auto-detects Let's Encrypt certificate filenames (`privkey.pem` and `fullchain.pem`).
+
 ```bash
-# Point CERTS_PATH to your Let's Encrypt certificates
-CERTS_PATH=/etc/letsencrypt/live/yourdomain.com
+# Copy Let's Encrypt certs to local directory (recommended)
+mkdir -p ./certs
+cp /etc/letsencrypt/live/yourdomain.com/privkey.pem ./certs/
+cp /etc/letsencrypt/live/yourdomain.com/fullchain.pem ./certs/
 ```
-Note: Rename or symlink `fullchain.pem` to `server.cert` and `privkey.pem` to `server.key`.
+
+Note: Don't mount `/etc/letsencrypt/live/` directly - those files are symlinks that won't resolve inside the container. Copy the actual certificate files instead.
 
 **Option 3: Custom path**
 ```env

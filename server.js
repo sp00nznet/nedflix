@@ -2237,11 +2237,28 @@ async function startServer() {
     const keyPath = path.join(certsPath, 'server.key');
     const certPath = path.join(certsPath, 'server.cert');
 
-    // Check for SSL certificates
+    // Also check for Let's Encrypt style filenames
+    const leKeyPath = path.join(certsPath, 'privkey.pem');
+    const leCertPath = path.join(certsPath, 'fullchain.pem');
+
+    // Determine which certificate files to use
+    let actualKeyPath = null;
+    let actualCertPath = null;
+
     if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+        actualKeyPath = keyPath;
+        actualCertPath = certPath;
+    } else if (fs.existsSync(leKeyPath) && fs.existsSync(leCertPath)) {
+        actualKeyPath = leKeyPath;
+        actualCertPath = leCertPath;
+        console.log('📜 Using Let\'s Encrypt certificate format');
+    }
+
+    // Check for SSL certificates
+    if (actualKeyPath && actualCertPath) {
         const httpsOptions = {
-            key: fs.readFileSync(keyPath),
-            cert: fs.readFileSync(certPath)
+            key: fs.readFileSync(actualKeyPath),
+            cert: fs.readFileSync(actualCertPath)
         };
 
         // HTTPS server
