@@ -1770,7 +1770,9 @@ async function loadIndexStats() {
 
         if (stats.lastScan?.completedAt) {
             const date = new Date(stats.lastScan.completedAt * 1000);
-            document.getElementById('stat-last-scan').textContent = date.toLocaleDateString();
+            // Use short date format: "Jan 10"
+            const shortDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            document.getElementById('stat-last-scan').textContent = shortDate;
         } else {
             document.getElementById('stat-last-scan').textContent = 'Never';
         }
