@@ -7,7 +7,10 @@ Complete setup and configuration documentation for Nedflix.
 - [Prerequisites](#prerequisites)
 - [Docker Deployment](#docker-deployment)
 - [Manual Installation](#manual-installation)
-- [OAuth Configuration](#oauth-configuration)
+- [Database Configuration](#database-configuration)
+- [Authentication](#authentication)
+- [Admin Panel](#admin-panel)
+- [Media Library Setup](#media-library-setup)
 - [Environment Variables](#environment-variables)
 - [Project Structure](#project-structure)
 - [Security Considerations](#security-considerations)
@@ -21,7 +24,6 @@ Complete setup and configuration documentation for Nedflix.
 - npm (Node Package Manager) - *or Docker*
 - OpenSSL (for generating SSL certificates) - *included in Docker image*
 - An NFS mount point or video directory (default: `/mnt/nfs`)
-- OAuth credentials from Google and/or GitHub
 - FFmpeg and FFprobe (optional, for audio track selection)
 
 ---
@@ -30,13 +32,27 @@ Complete setup and configuration documentation for Nedflix.
 
 ### Docker Compose (Recommended)
 
+Docker Compose sets up both the Nedflix application and a PostgreSQL database for persistent storage.
+
 Create a `.env` file with your settings:
 
 ```env
 # Required: Session secret (use a long random string)
 SESSION_SECRET=your-super-secret-random-string-here
 
-# OAuth Providers (at least one required)
+# Required: Admin credentials
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=your-secure-password
+
+# Path to your video files on the host
+NFS_PATH=/path/to/your/videos
+
+# PostgreSQL credentials (optional - defaults provided)
+POSTGRES_USER=nedflix
+POSTGRES_PASSWORD=nedflix_secret
+POSTGRES_DB=nedflix
+
+# OAuth Providers (optional)
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 GITHUB_CLIENT_ID=your-github-client-id
@@ -45,11 +61,9 @@ GITHUB_CLIENT_SECRET=your-github-client-secret
 # Callback URL for OAuth (change for production)
 CALLBACK_BASE_URL=https://localhost:3443
 
-# Path to your video files on the host
-NFS_PATH=/path/to/your/videos
-
-# Optional: OpenSubtitles API key for automatic subtitles
+# Optional: API keys for enhanced features
 OPENSUBTITLES_API_KEY=your-api-key
+OMDB_API_KEY=your-omdb-key
 ```
 
 Then run:
@@ -58,29 +72,47 @@ Then run:
 docker compose up -d
 ```
 
+This starts two containers:
+- `nedflix` - The main application (ports 3000, 3443)
+- `nedflix-db` - PostgreSQL database (port 5432, internal only)
+
 ### Docker Run (Without Compose)
 
 ```bash
-# Build the image
+# Start PostgreSQL first
+docker run -d \
+  --name nedflix-db \
+  -e POSTGRES_USER=nedflix \
+  -e POSTGRES_PASSWORD=nedflix_secret \
+  -e POSTGRES_DB=nedflix \
+  -v nedflix-db-data:/var/lib/postgresql/data \
+  postgres:16-alpine
+
+# Build and run Nedflix
 docker build -t nedflix .
 
-# Run the container
 docker run -d \
   --name nedflix \
+  --link nedflix-db:db \
   -p 3000:3000 \
   -p 3443:3443 \
   -v /path/to/videos:/mnt/nfs:ro \
   -v nedflix-certs:/app/certs \
   -e SESSION_SECRET=your-secret \
-  -e GOOGLE_CLIENT_ID=xxx \
-  -e GOOGLE_CLIENT_SECRET=xxx \
+  -e ADMIN_USERNAME=admin \
+  -e ADMIN_PASSWORD=your-password \
+  -e DB_HOST=db \
+  -e DB_USER=nedflix \
+  -e DB_PASSWORD=nedflix_secret \
+  -e DB_NAME=nedflix \
   nedflix
 ```
 
 ### Docker Features
 
+- **PostgreSQL database** for persistent storage
 - **Auto-generates SSL certificates** on first run
-- **Persists certificates** in a Docker volume
+- **Persists data** in Docker volumes (database, certificates)
 - **Read-only video mount** for security
 - **Non-root user** inside container
 - **Health checks** for container orchestration
@@ -121,34 +153,83 @@ npm start
    - HTTPS: `https://localhost:3443`
    - HTTP requests are automatically redirected to HTTPS
 
+**Note:** Without PostgreSQL configured, Nedflix uses SQLite for local development. Data is stored in `users.db` in the application directory.
+
+---
+
+## Database Configuration
+
+### PostgreSQL (Production)
+
+Nedflix uses PostgreSQL when the following environment variables are set:
+
+```env
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=nedflix
+DB_PASSWORD=your-password
+DB_NAME=nedflix
+```
+
+Or using a connection string:
+```env
+DATABASE_URL=postgresql://nedflix:password@localhost:5432/nedflix
+```
+
+### SQLite (Development)
+
+When no PostgreSQL configuration is provided, Nedflix automatically uses SQLite. This is suitable for development and single-user scenarios.
+
+### Database Tables
+
+Nedflix creates and manages these tables:
+
+| Table | Purpose |
+|-------|---------|
+| `users` | User accounts, credentials, permissions |
+| `user_settings` | Streaming preferences, profile pictures |
+| `file_index` | Media library index for fast browsing/search |
+| `scan_logs` | History of library scan operations |
+| `media_metadata` | Cached movie/TV show information |
+
 ---
 
 ## Authentication
 
-Nedflix supports multiple authentication methods. You can use OAuth providers (Google/GitHub), a local admin account, or both.
+Nedflix supports multiple authentication methods:
 
 ### Local Admin Account
 
-The simplest way to get started without setting up OAuth. Add these to your `.env` file:
+The simplest way to get started. Add these to your `.env` file:
 
 ```env
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=your-secure-password
 ```
 
-**Important security notes:**
+**Security notes:**
 - Use a strong, unique password
-- Change the default password immediately
-- The admin account has full access to browse and stream all videos
-- Credentials are checked against environment variables (not stored in a database)
+- The admin account has full access to all features
+- Can create additional users via the Admin Panel
 
-When configured, a username/password login form will appear on the login page.
+### Database Users
 
----
+Additional users can be created through the Admin Panel:
 
-## OAuth Configuration
+1. Log in as admin
+2. Open Admin Panel (gear icon)
+3. Go to "User Management"
+4. Click "Add User"
+5. Set username, password, and permissions
 
-### Google OAuth
+Database users can have:
+- Admin or regular user status
+- Custom library access (Movies, TV, Music, Audiobooks)
+- Enabled/disabled status
+
+### OAuth Providers (Optional)
+
+#### Google OAuth
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project or select existing
@@ -158,13 +239,114 @@ When configured, a username/password login form will appear on the login page.
 6. Add authorized redirect URI: `https://localhost:3443/auth/google/callback`
 7. Copy Client ID and Client Secret to your `.env` file
 
-### GitHub OAuth
+#### GitHub OAuth
 
 1. Go to [GitHub Developer Settings](https://github.com/settings/developers)
 2. Click "New OAuth App"
 3. Set Homepage URL: `https://localhost:3443`
 4. Set Authorization callback URL: `https://localhost:3443/auth/github/callback`
 5. Copy Client ID and Client Secret to your `.env` file
+
+---
+
+## Admin Panel
+
+The Admin Panel provides centralized management for administrators.
+
+### Accessing the Admin Panel
+
+1. Log in with an admin account
+2. Click the gear icon in the header (left of your profile picture)
+3. The admin panel opens as an overlay
+
+### User Management
+
+- **View all users** - See username, display name, provider, admin status
+- **Add users** - Create new local accounts with passwords
+- **Edit users** - Change display name, password, admin status
+- **Library access** - Control which libraries each user can access
+- **Enable/disable** - Temporarily disable user accounts
+- **Delete users** - Remove user accounts (except the main admin)
+
+### Media Library Index
+
+The media index enables fast browsing and search:
+
+- **Scan Library** - Index all files in your media directory
+- **View statistics** - Total files, videos, audio files
+- **Last scan info** - When the library was last indexed
+- **Scan logs** - History of all scan operations
+- **Download logs** - Export scan logs as CSV
+
+### Metadata Scanning
+
+Fetch movie and TV show information from online databases:
+
+- **Scan Movies** - Fetch metadata from OMDb for movies
+- **Scan TV Shows** - Fetch metadata from OMDb and TVmaze for TV shows
+
+Requires `OMDB_API_KEY` to be configured.
+
+---
+
+## Media Library Setup
+
+### Directory Structure
+
+Organize your media library with these top-level directories:
+
+```
+/mnt/nfs/
+├── Movies/
+│   ├── Movie Name (2020).mp4
+│   └── Another Movie (2019)/
+│       └── Another Movie (2019).mkv
+├── TV Shows/
+│   └── Show Name/
+│       ├── Season 1/
+│       │   ├── Show Name S01E01.mp4
+│       │   └── Show Name S01E02.mp4
+│       └── Season 2/
+├── Music/
+│   └── Artist/
+│       └── Album/
+│           └── track.mp3
+└── Audiobooks/
+    └── Book Name/
+        └── chapters.mp3
+```
+
+### Library Categories
+
+Each top-level directory maps to a library category:
+
+| Directory | Category | Access Key |
+|-----------|----------|------------|
+| `Movies` | Movies | `movies` |
+| `TV Shows` | TV Shows | `tv` |
+| `Music` | Music | `music` |
+| `Audiobooks` | Audiobooks | `audiobooks` |
+
+### Indexing Your Library
+
+After setting up your media:
+
+1. Log in as admin
+2. Open Admin Panel
+3. Click "Scan Library" under Media Library Index
+4. Wait for the scan to complete
+
+The index enables:
+- Fast file browsing (no disk access required)
+- Instant search across your library
+- Library-scoped search results
+
+### Search Usage
+
+1. Navigate to a library (Movies, TV Shows, etc.)
+2. Use the search bar in the file browser header
+3. Results are filtered to the current library
+4. Click a result to navigate to its location
 
 ---
 
@@ -175,17 +357,27 @@ When configured, a username/password login form will appear on the login page.
 | `PORT` | No | `3000` | HTTP port (redirects to HTTPS) |
 | `HTTPS_PORT` | No | `3443` | HTTPS port |
 | `SESSION_SECRET` | Yes | - | Random string for session encryption |
-| `GOOGLE_CLIENT_ID` | No* | - | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | No* | - | Google OAuth client secret |
-| `GITHUB_CLIENT_ID` | No* | - | GitHub OAuth client ID |
-| `GITHUB_CLIENT_SECRET` | No* | - | GitHub OAuth client secret |
-| `CALLBACK_BASE_URL` | No* | - | Base URL for OAuth callbacks |
+| `ADMIN_USERNAME` | Yes* | - | Local admin username |
+| `ADMIN_PASSWORD` | Yes* | - | Local admin password |
 | `NFS_MOUNT_PATH` | No | `/mnt/nfs` | Path to video files |
+| `DB_HOST` | No | - | PostgreSQL host |
+| `DB_PORT` | No | `5432` | PostgreSQL port |
+| `DB_USER` | No | - | PostgreSQL username |
+| `DB_PASSWORD` | No | - | PostgreSQL password |
+| `DB_NAME` | No | - | PostgreSQL database name |
+| `DATABASE_URL` | No | - | PostgreSQL connection string |
+| `POSTGRES_USER` | No | `nedflix` | Docker Compose PostgreSQL user |
+| `POSTGRES_PASSWORD` | No | `nedflix_secret` | Docker Compose PostgreSQL password |
+| `POSTGRES_DB` | No | `nedflix` | Docker Compose PostgreSQL database |
+| `GOOGLE_CLIENT_ID` | No | - | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | No | - | Google OAuth client secret |
+| `GITHUB_CLIENT_ID` | No | - | GitHub OAuth client ID |
+| `GITHUB_CLIENT_SECRET` | No | - | GitHub OAuth client secret |
+| `CALLBACK_BASE_URL` | No | - | Base URL for OAuth callbacks |
 | `OPENSUBTITLES_API_KEY` | No | - | API key for automatic subtitles |
-| `ADMIN_USERNAME` | No* | - | Local admin username |
-| `ADMIN_PASSWORD` | No* | - | Local admin password |
+| `OMDB_API_KEY` | No | - | API key for movie/TV metadata |
 
-*At least one authentication method is required: either OAuth provider(s) or local admin credentials.
+*Admin credentials or OAuth provider required for authentication.
 
 ---
 
@@ -193,13 +385,18 @@ When configured, a username/password login form will appear on the login page.
 
 ```
 nedflix/
-├── server.js              # Main Express server with OAuth
+├── server.js              # Main Express server
+├── db.js                  # Database abstraction layer (SQLite/PostgreSQL)
+├── user-service.js        # User management service
+├── media-service.js       # Media indexing and search service
+├── metadata-service.js    # Movie/TV metadata fetching
 ├── generate-certs.js      # SSL certificate generator
 ├── package.json           # Project dependencies
 ├── .env.example           # Environment template
 ├── Dockerfile             # Container build configuration
 ├── docker-compose.yml     # Docker Compose orchestration
-├── .dockerignore          # Files excluded from Docker build
+├── db-init/               # PostgreSQL initialization scripts
+│   └── 01-schema.sql      # Database schema
 ├── certs/                 # SSL certificates (generated)
 │   ├── server.key
 │   └── server.cert
@@ -210,6 +407,7 @@ nedflix/
 │   ├── login.html         # Login page
 │   ├── styles.css         # Application styles
 │   ├── app.js             # Client-side JavaScript
+│   ├── thumbnails/        # Cached movie/TV posters
 │   └── images/            # Avatar images
 └── README.md
 ```
@@ -229,6 +427,24 @@ Nedflix can automatically search and load subtitles from OpenSubtitles.
    ```
 
 Subtitles are cached in `subtitle_cache/` directory after first download.
+
+### Media Metadata
+
+Fetch movie and TV show information automatically.
+
+1. Get an API key from [OMDb](https://www.omdbapi.com/)
+2. Add to your `.env` file:
+   ```env
+   OMDB_API_KEY=your-api-key
+   ```
+
+Metadata includes:
+- Clean titles
+- Year, rating, genre
+- Plot summaries
+- Poster images
+- Director, actors
+- Episode information for TV shows
 
 ### Audio Track Selection
 
@@ -266,10 +482,13 @@ brew install ffmpeg
 
 ---
 
-## Supported Video Formats
+## Supported Formats
 
-The application recognizes these video file extensions:
-- `.mp4`, `.webm`, `.ogg`, `.avi`, `.mkv`, `.mov`, `.m4v`
+### Video
+- `.mp4`, `.webm`, `.ogg`, `.avi`, `.mkv`, `.mov`, `.m4v`, `.flv`
+
+### Audio
+- `.mp3`, `.flac`, `.wav`, `.m4a`, `.aac`, `.ogg`, `.wma`, `.opus`, `.aiff`
 
 Actual playback support depends on your browser's codec support. MP4 and WebM have the best compatibility.
 
@@ -285,16 +504,56 @@ The included self-signed certificates are for development only. Your browser wil
 
 1. **Use proper SSL certificates** from a trusted CA (e.g., Let's Encrypt)
 2. **Change the SESSION_SECRET** to a long, random string
-3. **Enable secure cookies** (already configured)
-4. **Use a proper database** instead of in-memory storage for users/sessions
-5. **Add rate limiting** to prevent abuse
-6. **Configure proper CORS** if needed
-7. **Run behind a reverse proxy** (nginx, Apache) for additional security
-8. **Update OAuth callback URLs** to your production domain
+3. **Set strong database passwords** for PostgreSQL
+4. **Use strong admin passwords** - at least 12 characters
+5. **Run behind a reverse proxy** (nginx, Apache) for additional security
+6. **Update OAuth callback URLs** to your production domain
+7. **Restrict network access** to PostgreSQL (internal only)
+8. **Regular backups** of the database volume
 
 ---
 
 ## Troubleshooting
+
+### Database Issues
+
+**Tables not created:**
+- Check PostgreSQL container logs: `docker compose logs nedflix-db`
+- Ensure database credentials match between app and database
+- The app creates tables automatically on startup
+
+**Data not persisting:**
+- Verify Docker volume exists: `docker volume ls | grep nedflix`
+- Check volume mount in docker-compose.yml
+- Don't use `docker compose down -v` (removes volumes)
+
+**Connection refused:**
+- Ensure PostgreSQL container is running
+- Check `DB_HOST` matches container name or network alias
+- Wait for database health check to pass before starting app
+
+### Admin Panel Issues
+
+**Can't see admin button:**
+- Verify you're logged in as an admin user
+- Check user's `is_admin` status in database
+- Clear browser cache and re-login
+
+**Scan not completing:**
+- Check server logs for errors
+- Verify NFS mount is accessible
+- Large libraries may take several minutes
+
+### Search Not Working
+
+**No results:**
+- Run a library scan from Admin Panel first
+- Check if file index has data in Admin Panel stats
+- Verify search query is at least 2 characters
+
+**Wrong results:**
+- Search is scoped to current library
+- Navigate to correct library before searching
 
 ### SSL Certificate Errors
 - For development, accept the self-signed certificate warning
@@ -309,43 +568,35 @@ The included self-signed certificates are for development only. Your browser wil
 - Ensure the video format is supported by your browser
 - Verify NFS mount permissions
 
-### Can't Access Directories
-- Verify NFS mount is properly configured
-- Check file system permissions
-- Ensure Node.js process has read access
-
-### Session/Login Issues
-- Clear browser cookies
-- Restart the server
-- Check SESSION_SECRET is set
-
-### Subtitles Not Loading
-- Verify `OPENSUBTITLES_API_KEY` is set correctly
-- Check server logs for API errors
-- Ensure video filename contains recognizable title information
-
-### Audio Track Selector Not Appearing
-- Verify FFprobe is installed: `ffprobe -version`
-- Check server logs for detection errors
-- Ensure video has multiple audio tracks
-
 ### Docker Issues
 
 **Container won't start:**
 ```bash
 # Check logs
 docker compose logs nedflix
+docker compose logs nedflix-db
 
 # Verify environment variables
 docker compose config
 ```
 
-**Can't access videos:**
-- Ensure the NFS_PATH in `.env` points to valid directory
-- Check volume mount permissions
-- Verify the path exists on host: `ls -la /path/to/your/videos`
+**Database connection errors:**
+```bash
+# Check database is running
+docker compose ps
 
-**Certificate issues in Docker:**
+# Test database connection
+docker compose exec nedflix-db psql -U nedflix -d nedflix -c "SELECT 1"
+```
+
+**Reset database:**
+```bash
+# Warning: This deletes all data
+docker compose down -v
+docker compose up -d
+```
+
+**Certificate issues:**
 ```bash
 # Regenerate certificates
 docker compose down
