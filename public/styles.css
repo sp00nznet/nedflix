@@ -937,6 +937,18 @@ body {
 
 .main-content.video-playing .player-section {
     border-radius: var(--radius-lg);
+    height: calc(100vh - 120px);
+}
+
+.main-content.video-playing .video-container {
+    flex: 1;
+    max-height: none;
+    min-height: auto;
+}
+
+.main-content.video-playing #video-player {
+    max-height: 100%;
+    height: 100%;
 }
 
 /* Show browser button when collapsed */
@@ -952,7 +964,7 @@ body {
     padding: 12px 8px;
     cursor: pointer;
     color: var(--color-text);
-    opacity: 0;
+    opacity: 0.5;
     transition: opacity 0.2s;
     display: none;
 }
@@ -961,12 +973,8 @@ body {
     display: block;
 }
 
-.main-content.video-playing:hover .browser-toggle {
-    opacity: 0.7;
-}
-
 .browser-toggle:hover {
-    opacity: 1 !important;
+    opacity: 1;
     background: var(--color-bg-card);
 }
 
