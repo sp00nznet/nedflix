@@ -852,6 +852,10 @@ const DEFAULT_AVATARS = ['cat', 'dog', 'cow', 'fox', 'owl', 'bear', 'rabbit', 'p
 // In-memory session cache (user data is now stored in database)
 const sessionUsers = new Map();
 
+// Directory listing cache (TTL: 60 seconds) for faster browsing
+const directoryCache = new Map();
+const DIRECTORY_CACHE_TTL = 60 * 1000; // 60 seconds
+
 // Middleware
 app.use(express.json());
 app.use(express.static('public'));
@@ -1179,6 +1183,13 @@ app.get('/api/browse', ensureAuthenticated, async (req, res) => {
     }
 
     try {
+        // Check cache first for faster response
+        const cacheKey = normalizedPath;
+        const cached = directoryCache.get(cacheKey);
+        if (cached && (Date.now() - cached.timestamp < DIRECTORY_CACHE_TTL)) {
+            return res.json(cached.data);
+        }
+
         // Try to use database index first for better performance
         let fileList = [];
         const hasIndexedData = await mediaService.hasIndexedChildren(normalizedPath);
@@ -1258,12 +1269,17 @@ app.get('/api/browse', ensureAuthenticated, async (req, res) => {
             parentPath = NFS_MOUNT_PATH;
         }
 
-        res.json({
+        const response = {
             currentPath: normalizedPath,
             parentPath: parentPath,
             canGoUp: normalizedPath !== NFS_MOUNT_PATH,
             items: fileList
-        });
+        };
+
+        // Store in cache for faster subsequent requests
+        directoryCache.set(cacheKey, { data: response, timestamp: Date.now() });
+
+        res.json(response);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

@@ -379,14 +379,8 @@ function setupEventListeners() {
         }
     });
 
-    // Video playing state - collapse browser when video plays
+    // Browser toggle button - show file browser when collapsed
     const browserToggle = document.getElementById('browser-toggle');
-
-    videoPlayer.addEventListener('play', () => {
-        mainContent.classList.add('video-playing');
-    });
-
-    // Browser toggle button - show file browser
     if (browserToggle) {
         browserToggle.addEventListener('click', () => {
             mainContent.classList.remove('video-playing');
@@ -669,6 +663,9 @@ function renderFileList(items) {
 async function playVideo(path, name, clickedElement) {
     const videoUrl = `/api/video?path=${encodeURIComponent(path)}`;
 
+    // Collapse browser section for larger video view
+    mainContent.classList.add('video-playing');
+
     // Stop visualizer if it was playing
     stopVisualizer();
 
@@ -789,6 +786,9 @@ async function playVideo(path, name, clickedElement) {
 // Play audio file
 function playAudio(path, name, clickedElement) {
     const audioUrl = `/api/audio?path=${encodeURIComponent(path)}`;
+
+    // Collapse browser section for larger player view
+    mainContent.classList.add('video-playing');
 
     // Reset video-related state
     currentVideoPath = null;
