@@ -378,6 +378,20 @@ function setupEventListeners() {
             hideSearchResults();
         }
     });
+
+    // Video playing state - collapse browser when video plays
+    const browserToggle = document.getElementById('browser-toggle');
+
+    videoPlayer.addEventListener('play', () => {
+        mainContent.classList.add('video-playing');
+    });
+
+    // Browser toggle button - show file browser
+    if (browserToggle) {
+        browserToggle.addEventListener('click', () => {
+            mainContent.classList.remove('video-playing');
+        });
+    }
 }
 
 // Close user panel
