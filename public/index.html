@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nedflix</title>
+    <script>
+        // Apply theme immediately to prevent flash
+        const theme = localStorage.getItem('nedflix-theme');
+        if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    </script>
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -92,11 +97,24 @@
                             </div>
                         </div>
                     </section>
-                    
+
+                    <!-- Appearance Section -->
+                    <section class="settings-section">
+                        <h3>Appearance</h3>
+
+                        <div class="setting-item">
+                            <label for="theme-select">Theme</label>
+                            <select id="theme-select" class="setting-select">
+                                <option value="dark">Dark</option>
+                                <option value="light">Light</option>
+                            </select>
+                        </div>
+                    </section>
+
                     <!-- Streaming Settings Section -->
                     <section class="settings-section">
                         <h3>Streaming Settings</h3>
-                        
+
                         <div class="setting-item">
                             <label for="quality-select">Video Quality</label>
                             <select id="quality-select" class="setting-select">
