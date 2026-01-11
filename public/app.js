@@ -53,6 +53,7 @@ const saveSettingsBtn = document.getElementById('save-settings');
 const logoElement = document.querySelector('.logo');
 
 // Settings elements
+const themeSelect = document.getElementById('theme-select');
 const qualitySelect = document.getElementById('quality-select');
 const volumeSlider = document.getElementById('volume-slider');
 const volumeValue = document.getElementById('volume-value');
@@ -61,6 +62,20 @@ const autoplayToggle = document.getElementById('autoplay-toggle');
 const subtitlesToggle = document.getElementById('subtitles-toggle');
 const audioLanguageSelect = document.getElementById('audio-language-select');
 const subtitleLanguageSelect = document.getElementById('subtitle-language-select');
+
+// Apply theme immediately (before page fully loads for no flash)
+function applyTheme(theme) {
+    if (theme === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+    } else {
+        document.documentElement.removeAttribute('data-theme');
+    }
+    if (themeSelect) themeSelect.value = theme || 'dark';
+}
+
+// Check for saved theme preference early
+const savedTheme = localStorage.getItem('nedflix-theme');
+if (savedTheme) applyTheme(savedTheme);
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
@@ -268,6 +283,12 @@ function selectAvatar(avatar) {
 
 // Apply settings to UI
 function applySettings() {
+    // Apply theme from server settings (and sync to localStorage)
+    if (userSettings?.theme) {
+        applyTheme(userSettings.theme);
+        localStorage.setItem('nedflix-theme', userSettings.theme);
+    }
+
     if (!userSettings?.streaming) return;
 
     const s = userSettings.streaming;
@@ -379,14 +400,8 @@ function setupEventListeners() {
         }
     });
 
-    // Video playing state - collapse browser when video plays
+    // Browser toggle button - show file browser when collapsed
     const browserToggle = document.getElementById('browser-toggle');
-
-    videoPlayer.addEventListener('play', () => {
-        mainContent.classList.add('video-playing');
-    });
-
-    // Browser toggle button - show file browser
     if (browserToggle) {
         browserToggle.addEventListener('click', () => {
             mainContent.classList.remove('video-playing');
@@ -402,7 +417,14 @@ function closeUserPanel() {
 
 // Save settings
 async function saveSettings() {
+    const theme = themeSelect.value;
+
+    // Apply theme immediately and save to localStorage for fast loading
+    applyTheme(theme);
+    localStorage.setItem('nedflix-theme', theme);
+
     const settings = {
+        theme: theme,
         streaming: {
             quality: qualitySelect.value,
             volume: parseInt(volumeSlider.value),
@@ -414,7 +436,7 @@ async function saveSettings() {
         },
         profilePicture: selectedAvatar
     };
-    
+
     try {
         const response = await fetch('/api/settings', {
             method: 'POST',
@@ -669,6 +691,9 @@ function renderFileList(items) {
 async function playVideo(path, name, clickedElement) {
     const videoUrl = `/api/video?path=${encodeURIComponent(path)}`;
 
+    // Collapse browser section for larger video view
+    mainContent.classList.add('video-playing');
+
     // Stop visualizer if it was playing
     stopVisualizer();
 
@@ -789,6 +814,9 @@ async function playVideo(path, name, clickedElement) {
 // Play audio file
 function playAudio(path, name, clickedElement) {
     const audioUrl = `/api/audio?path=${encodeURIComponent(path)}`;
+
+    // Collapse browser section for larger player view
+    mainContent.classList.add('video-playing');
 
     // Reset video-related state
     currentVideoPath = null;

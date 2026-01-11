@@ -1179,15 +1179,16 @@ app.get('/api/browse', ensureAuthenticated, async (req, res) => {
     }
 
     try {
-        // Try to use database index first for better performance
+        // Always use database index if scan has been run (fast, no disk access)
+        // Only fall back to filesystem if no index exists at all
         let fileList = [];
-        const hasIndexedData = await mediaService.hasIndexedChildren(normalizedPath);
+        const indexExists = await mediaService.hasIndex();
 
-        if (hasIndexedData) {
-            // Use database index (fast, no disk access)
+        if (indexExists) {
+            // Use database index - instant lookup
             fileList = await mediaService.browse(normalizedPath);
         } else {
-            // Fall back to filesystem scan if path not indexed
+            // No scan has been run - fall back to filesystem (slow)
             const items = fs.readdirSync(normalizedPath, { withFileTypes: true });
 
             fileList = items.map(item => {
