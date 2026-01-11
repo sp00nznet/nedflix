@@ -856,6 +856,21 @@ const sessionUsers = new Map();
 app.use(express.json());
 app.use(express.static('public'));
 
+// Security headers
+app.use((req, res, next) => {
+    // HSTS - tell browsers to always use HTTPS
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    // Prevent MIME type sniffing
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    // Clickjacking protection
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    // XSS protection
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    // Referrer policy
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    next();
+});
+
 // Session configuration
 app.use(session({
     secret: process.env.SESSION_SECRET || 'change-this-secret-in-production',
@@ -2237,11 +2252,28 @@ async function startServer() {
     const keyPath = path.join(certsPath, 'server.key');
     const certPath = path.join(certsPath, 'server.cert');
 
-    // Check for SSL certificates
+    // Also check for Let's Encrypt style filenames
+    const leKeyPath = path.join(certsPath, 'privkey.pem');
+    const leCertPath = path.join(certsPath, 'fullchain.pem');
+
+    // Determine which certificate files to use
+    let actualKeyPath = null;
+    let actualCertPath = null;
+
     if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+        actualKeyPath = keyPath;
+        actualCertPath = certPath;
+    } else if (fs.existsSync(leKeyPath) && fs.existsSync(leCertPath)) {
+        actualKeyPath = leKeyPath;
+        actualCertPath = leCertPath;
+        console.log('📜 Using Let\'s Encrypt certificate format');
+    }
+
+    // Check for SSL certificates
+    if (actualKeyPath && actualCertPath) {
         const httpsOptions = {
-            key: fs.readFileSync(keyPath),
-            cert: fs.readFileSync(certPath)
+            key: fs.readFileSync(actualKeyPath),
+            cert: fs.readFileSync(actualCertPath)
         };
 
         // HTTPS server
