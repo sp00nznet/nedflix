@@ -1743,19 +1743,30 @@ async function addUserFromAdminPanel() {
     }
 }
 
+// Format large numbers compactly (e.g., 101K instead of 101,005)
+function formatCompactNumber(num) {
+    if (num >= 1000000) {
+        return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    }
+    if (num >= 10000) {
+        return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+    }
+    return num.toLocaleString();
+}
+
 // Load index statistics
 async function loadIndexStats() {
     try {
         const response = await fetch('/api/search/stats');
         const stats = await response.json();
 
-        document.getElementById('stat-total-files').textContent = stats.totalFiles?.toLocaleString() || '0';
+        document.getElementById('stat-total-files').textContent = formatCompactNumber(stats.totalFiles || 0);
 
         const videoCount = stats.byType?.find(t => t.file_type === 'video')?.count || 0;
         const audioCount = stats.byType?.find(t => t.file_type === 'audio')?.count || 0;
 
-        document.getElementById('stat-videos').textContent = videoCount.toLocaleString();
-        document.getElementById('stat-audio').textContent = audioCount.toLocaleString();
+        document.getElementById('stat-videos').textContent = formatCompactNumber(videoCount);
+        document.getElementById('stat-audio').textContent = formatCompactNumber(audioCount);
 
         if (stats.lastScan?.completedAt) {
             const date = new Date(stats.lastScan.completedAt * 1000);
