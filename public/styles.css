@@ -2367,7 +2367,7 @@ body {
 /* Index Stats Grid */
 .index-stats {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 12px;
     margin-bottom: 16px;
 }
@@ -2376,16 +2376,21 @@ body {
     background: var(--color-bg-card);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
-    padding: 16px;
+    padding: 12px 8px;
     text-align: center;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .stat-value {
     display: block;
-    font-size: 24px;
+    font-size: 20px;
     font-weight: 600;
     color: var(--color-primary);
     margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .stat-label {
