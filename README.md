@@ -48,6 +48,9 @@ cd nedflix
 cp .env.example .env
 nano .env  # Add your credentials
 
+# Generate SSL certificates (or use your own)
+npm run generate-certs
+
 # Launch (includes PostgreSQL database)
 docker compose up -d
 
@@ -143,6 +146,7 @@ To enable search:
 | `ADMIN_USERNAME` | Local admin username |
 | `ADMIN_PASSWORD` | Local admin password |
 | `NFS_PATH` | Path to your video library |
+| `CERTS_PATH` | Path to SSL certificates (default: ./certs) |
 | `POSTGRES_USER` | PostgreSQL username (default: nedflix) |
 | `POSTGRES_PASSWORD` | PostgreSQL password (default: nedflix_secret) |
 | `POSTGRES_DB` | PostgreSQL database name (default: nedflix) |
