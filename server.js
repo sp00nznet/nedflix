@@ -14,6 +14,7 @@ const db = require('./db');
 const metadataService = require('./metadata-service');
 const userService = require('./user-service');
 const mediaService = require('./media-service');
+const iptvService = require('./iptv-service');
 
 const app = express();
 
@@ -2232,6 +2233,119 @@ app.get('/', (req, res, next) => {
         return res.redirect('/login.html');
     }
     next();
+});
+
+// ==================== IPTV / Live TV API ====================
+
+// API: Get IPTV channels
+app.get('/api/iptv/channels', ensureAuthenticated, async (req, res) => {
+    try {
+        const userData = await userService.getUser(req.user.id);
+        const playlistUrl = userData?.settings?.iptv?.playlistUrl;
+
+        if (!playlistUrl) {
+            return res.json({ configured: false, channels: [], groups: {} });
+        }
+
+        const channels = await iptvService.loadPlaylist(playlistUrl);
+        const groups = iptvService.getChannelsByGroup(channels);
+
+        res.json({
+            configured: true,
+            channels,
+            groups,
+            groupNames: Object.keys(groups).sort()
+        });
+    } catch (error) {
+        console.error('IPTV channels error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Get EPG data for channels
+app.get('/api/iptv/epg', ensureAuthenticated, async (req, res) => {
+    try {
+        const userData = await userService.getUser(req.user.id);
+        const epgUrl = userData?.settings?.iptv?.epgUrl;
+
+        if (!epgUrl) {
+            return res.json({ channels: {}, programs: {} });
+        }
+
+        const epg = await iptvService.loadEPG(epgUrl);
+        res.json(epg);
+    } catch (error) {
+        console.error('IPTV EPG error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Get current program for a channel
+app.get('/api/iptv/now-playing/:channelId', ensureAuthenticated, async (req, res) => {
+    try {
+        const userData = await userService.getUser(req.user.id);
+        const epgUrl = userData?.settings?.iptv?.epgUrl;
+
+        if (!epgUrl) {
+            return res.json({ current: null, next: null });
+        }
+
+        const epg = await iptvService.loadEPG(epgUrl);
+        const result = iptvService.getCurrentProgram(req.params.channelId, epg);
+        res.json(result);
+    } catch (error) {
+        console.error('IPTV now-playing error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Proxy IPTV stream (to handle CORS and add headers)
+app.get('/api/iptv/stream', ensureAuthenticated, async (req, res) => {
+    const streamUrl = req.query.url;
+
+    if (!streamUrl) {
+        return res.status(400).send('Stream URL required');
+    }
+
+    try {
+        const client = streamUrl.startsWith('https') ? https : http;
+
+        const proxyReq = client.request(streamUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+        }, (proxyRes) => {
+            res.writeHead(proxyRes.statusCode, {
+                'Content-Type': proxyRes.headers['content-type'] || 'video/mp2t',
+                'Access-Control-Allow-Origin': '*'
+            });
+            proxyRes.pipe(res);
+        });
+
+        proxyReq.on('error', (err) => {
+            console.error('Stream proxy error:', err);
+            res.status(500).send('Stream error');
+        });
+
+        proxyReq.end();
+
+        req.on('close', () => {
+            proxyReq.destroy();
+        });
+    } catch (error) {
+        console.error('IPTV stream error:', error);
+        res.status(500).send('Stream error');
+    }
+});
+
+// API: Refresh IPTV cache
+app.post('/api/iptv/refresh', ensureAuthenticated, async (req, res) => {
+    try {
+        iptvService.clearCache();
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // Start servers
