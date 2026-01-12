@@ -16,6 +16,10 @@ let settings = {
     },
     controller: {
         vibration: true
+    },
+    iptv: {
+        playlistUrl: '',
+        epgUrl: ''
     }
 };
 
@@ -351,6 +355,15 @@ function setupEventListeners() {
         settings.controller.vibration = e.target.checked;
     });
 
+    // IPTV settings inputs
+    document.getElementById('iptv-playlist-url')?.addEventListener('input', (e) => {
+        settings.iptv.playlistUrl = e.target.value;
+    });
+
+    document.getElementById('iptv-epg-url')?.addEventListener('input', (e) => {
+        settings.iptv.epgUrl = e.target.value;
+    });
+
     // Keyboard shortcuts
     document.addEventListener('keydown', handleKeyboard);
 
@@ -537,6 +550,13 @@ function applySettings() {
 
     const vibrationToggle = document.getElementById('controller-vibration-toggle');
     if (vibrationToggle) vibrationToggle.checked = settings.controller.vibration;
+
+    // IPTV settings
+    const iptvPlaylistUrl = document.getElementById('iptv-playlist-url');
+    if (iptvPlaylistUrl) iptvPlaylistUrl.value = settings.iptv?.playlistUrl || '';
+
+    const iptvEpgUrl = document.getElementById('iptv-epg-url');
+    if (iptvEpgUrl) iptvEpgUrl.value = settings.iptv?.epgUrl || '';
 
     // Apply to player
     videoPlayer.volume = settings.streaming.volume / 100;
