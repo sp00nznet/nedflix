@@ -14,6 +14,7 @@
   <img src="https://img.shields.io/badge/docker-ready-blue?style=flat-square&logo=docker" alt="Docker">
   <img src="https://img.shields.io/badge/electron-desktop-47848F?style=flat-square&logo=electron" alt="Electron">
   <img src="https://img.shields.io/badge/windows-supported-0078D6?style=flat-square&logo=windows" alt="Windows">
+  <img src="https://img.shields.io/badge/linux-supported-FCC624?style=flat-square&logo=linux&logoColor=black" alt="Linux">
   <img src="https://img.shields.io/badge/ErsatzTV-integrated-purple?style=flat-square" alt="ErsatzTV">
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License">
 </p>
@@ -42,9 +43,11 @@
 - **Channel Guide** - Program schedule and now playing information
 
 ### Desktop Application
-- **Windows Installer** - Native Windows app with NSIS installer
+- **Windows & Linux** - Native installers for Windows (NSIS) and Linux (Debian, AppImage)
 - **Xbox Controller Support** - Full gamepad navigation and control
 - **Editable Media Paths** - Configure custom media directories in settings
+- **Live TV (IPTV)** - Built-in IPTV support with M3U playlist and EPG
+- **Auto-Channels** - Connect to ErsatzTV for 24/7 streaming channels
 - **Media Key Support** - Play/pause, next/previous track, F11 fullscreen
 - **No Server Required** - Standalone app with embedded streaming server
 - **Auto Node.js Install** - Build scripts automatically install Node.js if missing
@@ -63,7 +66,8 @@ Nedflix can be deployed in two ways:
 | Option | Best For | Features |
 |--------|----------|----------|
 | **Docker (Web)** | Home servers, multi-user | Full features, PostgreSQL, ErsatzTV, remote access |
-| **Desktop App** | Personal use, HTPC | Xbox controller, local media, no setup required |
+| **Desktop App (Windows)** | Personal use, HTPC | Xbox controller, IPTV, ErsatzTV channels, local media |
+| **Desktop App (Linux)** | Personal use, HTPC | Debian/AppImage, IPTV, ErsatzTV channels, local media |
 
 ---
 
@@ -103,6 +107,25 @@ build.bat
 ```
 
 The installer will be created in `desktop/dist/`.
+
+### Option 3: Linux Desktop App
+
+```bash
+# Navigate to desktop folder
+cd nedflix/desktop
+
+# Make the build script executable and run it
+chmod +x build.sh
+./build.sh
+
+# Choose:
+# 1 for Debian Package (x64)
+# 2 for Debian Package (ARM64)
+# 3 for AppImage (x64)
+# 4 for tar.gz Archive
+```
+
+Packages will be created in `desktop/dist/`.
 
 ---
 
@@ -155,19 +178,21 @@ The installer will be created in `desktop/dist/`.
 
 ## Desktop Application
 
-The desktop version is a standalone Windows application built with Electron.
+The desktop version is a standalone application built with Electron for Windows and Linux.
 
 ### Features
 
 | Feature | Description |
 |---------|-------------|
 | **No Server Setup** | Embedded Express server, just run and play |
+| **Cross-Platform** | Windows (installer/portable) and Linux (Debian/AppImage/tar.gz) |
 | **Editable Media Paths** | Add/remove media directories in Settings |
 | **Xbox Controller** | Full navigation with gamepad support |
 | **Media Keys** | Hardware play/pause, skip, volume controls |
-| **IPTV Support** | Configure M3U playlist and EPG URLs |
+| **Live TV (IPTV)** | Configure M3U playlist and EPG URLs for IPTV |
+| **Channels (ErsatzTV)** | Connect to ErsatzTV server for auto-generated channels |
 | **Audio Visualizer** | Bars, waveform, circular, and particle modes |
-| **Portable Mode** | Optional portable executable (no install) |
+| **Portable Mode** | Optional portable executable (Windows) or tar.gz (Linux) |
 
 ### Xbox/Gamepad Controls
 
@@ -188,10 +213,9 @@ The desktop version is a standalone Windows application built with Electron.
 
 The build process auto-installs Node.js if not present:
 
+**Windows:**
 ```bash
 cd desktop
-
-# Interactive build menu
 build.bat
 
 # Or run specific commands:
@@ -201,15 +225,29 @@ npm run build:portable # Portable executable
 npm run dev            # Development mode with DevTools
 ```
 
+**Linux:**
+```bash
+cd desktop
+chmod +x build.sh
+./build.sh
+
+# Or run specific commands:
+npm run build:linux    # All Linux formats
+npm run build:deb      # Debian package only
+npm run build:appimage # AppImage only
+npm run dev            # Development mode with DevTools
+```
+
 **Output files** (in `desktop/dist/`):
-- `Nedflix Setup x.x.x.exe` - Windows installer
-- `Nedflix-Portable-x.x.x.exe` - Portable version
+- Windows: `Nedflix Setup x.x.x.exe`, `Nedflix-Portable-x.x.x.exe`
+- Linux: `nedflix_x.x.x_amd64.deb`, `Nedflix-x.x.x.AppImage`, `nedflix-x.x.x.tar.gz`
 
 ### Media Path Configuration
 
 The desktop app stores media paths in:
 - **Windows:** `%APPDATA%/nedflix/nedflix-config.json`
-- **Environment:** `NEDFLIX_MEDIA_PATHS` (semicolon-separated)
+- **Linux:** `~/.config/nedflix/nedflix-config.json`
+- **Environment:** `NEDFLIX_MEDIA_PATHS` (semicolon-separated on Windows, colon-separated on Linux)
 
 Configure paths in the Settings panel:
 1. Click the user menu (top right)
@@ -322,6 +360,7 @@ Watch IPTV streams with M3U playlist support and EPG guide.
 | Media Paths | Settings Panel | Directories to scan for media |
 | IPTV Playlist | Settings Panel | M3U/M3U8 URL for Live TV |
 | IPTV EPG | Settings Panel | XMLTV URL for program guide |
+| ErsatzTV URL | Settings Panel | Server URL for auto-generated channels |
 | Theme | Settings Panel | Dark or Light mode |
 | Controller | Settings Panel | Enable/disable vibration feedback |
 
@@ -366,9 +405,11 @@ Watch IPTV streams with M3U playlist support and EPG guide.
 
 | Component | Required | Notes |
 |-----------|----------|-------|
-| Windows | Yes | Windows 10/11 (x64 or x86) |
+| Windows | Supported | Windows 10/11 (x64 or x86) |
+| Linux | Supported | Debian/Ubuntu, Fedora, Arch (x64 or ARM64) |
 | Node.js | Auto-installed | v20.11.0 (via build script) |
 | Xbox Controller | Optional | For gamepad navigation |
+| ErsatzTV Server | Optional | For auto-generated channels feature |
 
 ---
 
@@ -392,11 +433,14 @@ nedflix/
 │   ├── preload.js         # Secure IPC bridge
 │   ├── package.json       # Desktop dependencies
 │   ├── build.bat          # Windows build script
-│   ├── install.bat        # Node.js auto-installer
+│   ├── build.sh           # Linux build script
+│   ├── install.bat        # Node.js auto-installer (Windows)
 │   └── public/
 │       ├── index.html     # Desktop UI
 │       ├── app.js         # Desktop app logic
 │       ├── gamepad.js     # Xbox controller support
+│       ├── livetv.js      # Live TV (IPTV) module
+│       ├── channels.js    # Channels (ErsatzTV) module
 │       └── styles.css     # Desktop styles
 └── docs/
     └── SETUP.md           # Detailed setup guide
@@ -411,7 +455,9 @@ For detailed setup instructions, see **[docs/SETUP.md](docs/SETUP.md)**:
 - SSL certificate configuration
 - OAuth provider setup (Google/GitHub)
 - Docker deployment options
-- Desktop application build guide
+- Desktop application build guide (Windows & Linux)
+- Desktop Live TV (IPTV) configuration
+- Desktop Channels (ErsatzTV) configuration
 - Xbox controller configuration
 - ErsatzTV setup and configuration
 - User management guide
@@ -426,5 +472,5 @@ Open source for personal and educational use.
 ---
 
 <p align="center">
-  <sub>Built for movie nights | Web + Desktop | Gamepad Ready</sub>
+  <sub>Built for movie nights | Web + Desktop (Windows & Linux) | Gamepad Ready | Live TV & Auto-Channels</sub>
 </p>

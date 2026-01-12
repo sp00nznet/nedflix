@@ -527,19 +527,21 @@ The "Channels" card will show "ErsatzTV unavailable" but Nedflix will function n
 
 ## Desktop Application
 
-Nedflix includes a standalone Windows desktop application built with Electron. This is ideal for personal use, HTPCs, and living room setups with Xbox controllers.
+Nedflix includes a standalone desktop application built with Electron for Windows and Linux. This is ideal for personal use, HTPCs, and living room setups with Xbox controllers.
 
 ### Features Overview
 
 | Feature | Description |
 |---------|-------------|
 | **Standalone** | No server required - embedded Express server |
+| **Cross-Platform** | Windows (installer/portable) and Linux (Debian/AppImage/tar.gz) |
 | **Xbox Controller** | Full gamepad navigation support |
 | **Editable Media Paths** | Configure directories in Settings |
 | **Media Keys** | Hardware play/pause, skip controls |
-| **IPTV Support** | M3U playlist and EPG configuration |
+| **Live TV (IPTV)** | M3U playlist and EPG configuration with built-in player |
+| **Channels (ErsatzTV)** | Connect to ErsatzTV server for auto-generated 24/7 channels |
 | **Audio Visualizer** | Multiple visualization modes |
-| **Portable Mode** | Optional no-install executable |
+| **Portable Mode** | Optional no-install executable (Windows) or tar.gz (Linux) |
 | **Auto Node.js Install** | Build scripts install Node.js automatically |
 
 ### Building the Desktop App
@@ -548,7 +550,7 @@ Nedflix includes a standalone Windows desktop application built with Electron. T
 
 The build script automatically installs Node.js if not present. Just run the script!
 
-#### Using build.bat (Recommended)
+#### Windows: Using build.bat (Recommended)
 
 ```batch
 cd desktop
@@ -563,14 +565,42 @@ The interactive menu offers:
 5. **Run development mode** - With DevTools enabled
 6. **Exit**
 
+#### Linux: Using build.sh (Recommended)
+
+```bash
+cd desktop
+chmod +x build.sh
+./build.sh
+```
+
+The interactive menu offers:
+1. **Build Debian Package (x64)** - For Debian/Ubuntu 64-bit
+2. **Build Debian Package (ARM64)** - For ARM64 systems (Raspberry Pi, etc.)
+3. **Build AppImage (x64)** - Universal Linux package
+4. **Build tar.gz Archive** - Portable archive
+5. **Build All Linux Formats** - Creates all variants
+6. **Run development mode** - With DevTools enabled
+7. **Exit**
+
+The Linux build script auto-installs Node.js using your system's package manager (apt, dnf, pacman, or zypper).
+
 #### Using npm Commands
 
 ```bash
 cd desktop
 npm install              # Install dependencies
+
+# Windows builds
 npm run build:win        # Windows x64 installer
 npm run build:win32      # Windows x86 installer
 npm run build:portable   # Portable executable
+
+# Linux builds
+npm run build:linux      # All Linux formats
+npm run build:deb        # Debian package only
+npm run build:appimage   # AppImage only
+
+# Development
 npm run dev              # Development mode
 npm start                # Production mode
 ```
@@ -578,8 +608,16 @@ npm start                # Production mode
 #### Output Files
 
 Built applications are placed in `desktop/dist/`:
+
+**Windows:**
 - `Nedflix Setup x.x.x.exe` - NSIS installer with uninstaller
 - `Nedflix-Portable-x.x.x.exe` - Standalone portable executable
+
+**Linux:**
+- `nedflix_x.x.x_amd64.deb` - Debian/Ubuntu package (x64)
+- `nedflix_x.x.x_arm64.deb` - Debian/Ubuntu package (ARM64)
+- `Nedflix-x.x.x.AppImage` - Universal Linux AppImage
+- `nedflix-x.x.x.tar.gz` - Portable archive
 
 ### Xbox Controller Support
 
@@ -638,8 +676,9 @@ The desktop app includes comprehensive gamepad support for living room use.
 
 Paths are stored in:
 - **Windows:** `%APPDATA%/nedflix/nedflix-config.json`
+- **Linux:** `~/.config/nedflix/nedflix-config.json`
 
-Example configuration file:
+Example configuration file (Windows):
 ```json
 {
   "mediaPaths": [
@@ -651,24 +690,106 @@ Example configuration file:
 }
 ```
 
+Example configuration file (Linux):
+```json
+{
+  "mediaPaths": [
+    "/home/user/Videos",
+    "/mnt/movies",
+    "/mnt/tv-shows",
+    "/home/user/Music"
+  ]
+}
+```
+
 #### Environment Variable
 
 You can also set paths via environment variable:
+
+**Windows:**
 ```batch
 set NEDFLIX_MEDIA_PATHS=C:\Videos;D:\Movies;D:\TV Shows
 ```
 
-Paths are semicolon-separated on Windows.
+**Linux:**
+```bash
+export NEDFLIX_MEDIA_PATHS=/home/user/Videos:/mnt/movies:/mnt/tv-shows
+```
+
+Paths are semicolon-separated on Windows, colon-separated on Linux.
 
 ### Live TV Configuration (Desktop)
 
-The desktop app supports IPTV with configurable URLs:
+The desktop app includes built-in IPTV support with M3U playlist parsing and EPG (Electronic Program Guide) display.
 
-1. Open Settings
+#### Setting Up Live TV
+
+1. Open Settings (click user menu or press Back on controller)
 2. Find "Live TV (IPTV)" section
-3. Enter your playlist URL (M3U/M3U8)
-4. Optionally enter EPG URL (XMLTV)
+3. Enter your playlist URL (M3U/M3U8 format)
+4. Optionally enter EPG URL (XMLTV format)
 5. Settings are saved automatically
+
+#### Live TV Features
+
+- **Channel Groups** - Channels are organized by group from the M3U playlist
+- **EPG Display** - Shows current and next program information
+- **Stream Proxy** - Built-in proxy handles CORS issues with external streams
+- **Channel Logos** - Displays tvg-logo from playlist
+- **Group Filtering** - Filter channels by group (All, News, Sports, etc.)
+
+#### Supported Playlist Formats
+
+- M3U and M3U8 playlists
+- HTTP/HTTPS URLs
+- Local file paths
+
+#### EPG Format
+
+The desktop app supports XMLTV format EPG files:
+- Gzip compressed or plain XML
+- HTTP/HTTPS URLs
+- Program title, description, start/stop times
+
+### Channels Configuration (Desktop)
+
+The desktop app can connect to an ErsatzTV server to display auto-generated 24/7 channels from your media library.
+
+#### Setting Up ErsatzTV Connection
+
+1. Open Settings (click user menu or press Back on controller)
+2. Find "ErsatzTV" section
+3. Enter your ErsatzTV server URL (e.g., `http://192.168.1.100:8409`)
+4. Settings are saved automatically
+5. Click "Channels" card on home screen to view channels
+
+#### Requirements
+
+- ErsatzTV server running and accessible on your network
+- Channels created in ErsatzTV (via web UI at port 8409)
+- Network connectivity between desktop app and ErsatzTV server
+
+#### Channels Features
+
+- **Connection Status** - Shows ErsatzTV availability and channel count
+- **Channel List** - Displays all channels with number and name
+- **Now Playing** - Shows current program from ErsatzTV guide
+- **Direct Streaming** - Streams directly from ErsatzTV server
+
+#### Using with Docker Web Deployment
+
+If you're running Nedflix via Docker Compose with ErsatzTV:
+
+1. Find your Docker host IP address
+2. In desktop app settings, enter: `http://<docker-host-ip>:8409`
+3. Channels created in the web interface will appear in the desktop app
+
+#### Troubleshooting Connection
+
+If channels show "ErsatzTV unavailable":
+- Verify ErsatzTV is running: `curl http://<server-ip>:8409/api/health`
+- Check firewall allows port 8409
+- Ensure the URL doesn't have a trailing slash
 
 ### Media Key Support
 
@@ -703,9 +824,11 @@ Electron App
 ├── Main Process (main.js)
 │   ├── BrowserWindow - Main app window
 │   ├── Express Server - Media streaming API
-│   ├── IPC Handlers - Config, fullscreen, paths
+│   ├── IPTV Service - M3U parsing, EPG, stream proxy
+│   ├── ErsatzTV Client - Channels API integration
+│   ├── IPC Handlers - Config, fullscreen, paths, settings
 │   ├── Global Shortcuts - Media keys
-│   └── Config Store - %APPDATA%/nedflix/
+│   └── Config Store - %APPDATA%/nedflix/ or ~/.config/nedflix/
 │
 ├── Preload Script (preload.js)
 │   └── Secure IPC bridge (nedflixDesktop API)
@@ -714,6 +837,8 @@ Electron App
     ├── index.html - UI structure
     ├── app.js - Application logic
     ├── gamepad.js - Controller support
+    ├── livetv.js - Live TV (IPTV) module
+    ├── channels.js - Channels (ErsatzTV) module
     └── styles.css - Styling
 ```
 
@@ -729,6 +854,15 @@ The embedded server provides these endpoints:
 | `/api/audio?path=` | Stream audio file |
 | `/api/user` | Mock user (always authenticated) |
 | `/api/settings` | Get/set user settings |
+| `/api/iptv/channels` | Get IPTV channels from M3U playlist |
+| `/api/iptv/epg` | Get EPG data from XMLTV source |
+| `/api/iptv/stream?url=` | Proxy IPTV stream (handles CORS) |
+| `/api/iptv/settings` | Get/set IPTV configuration |
+| `/api/iptv/refresh` | Force refresh IPTV data cache |
+| `/api/ersatztv/status` | Get ErsatzTV status and channels |
+| `/api/ersatztv/channels` | List all ErsatzTV channels |
+| `/api/ersatztv/channels/:id/guide` | Get channel program guide |
+| `/api/ersatztv/settings` | Get/set ErsatzTV configuration |
 
 ### Security Features
 
@@ -821,12 +955,15 @@ nedflix/
 │   ├── preload.js         # Secure IPC bridge script
 │   ├── package.json       # Desktop app configuration
 │   ├── build.bat          # Windows build script (auto-installs Node.js)
-│   ├── install.bat        # Node.js auto-installer utility
+│   ├── build.sh           # Linux build script (auto-installs Node.js)
+│   ├── install.bat        # Node.js auto-installer utility (Windows)
 │   ├── README.md          # Desktop-specific documentation
 │   └── public/            # Desktop UI files
 │       ├── index.html     # Desktop application UI
 │       ├── app.js         # Desktop application logic
 │       ├── gamepad.js     # Xbox/gamepad controller support
+│       ├── livetv.js      # Live TV (IPTV) functionality
+│       ├── channels.js    # Channels (ErsatzTV) functionality
 │       └── styles.css     # Desktop styling
 └── README.md
 ```
@@ -1068,10 +1205,32 @@ docker compose restart ersatztv
 
 ### Desktop Application Issues
 
-**Build fails - Node.js not found:**
+**Build fails - Node.js not found (Windows):**
 - Run `build.bat` which auto-installs Node.js
 - Or manually install Node.js v20+ from nodejs.org
 - Restart command prompt after Node.js installation
+
+**Build fails - Node.js not found (Linux):**
+- Run `./build.sh` which auto-installs Node.js via package manager
+- Or manually install: `sudo apt install nodejs npm` (Debian/Ubuntu)
+- Or: `sudo dnf install nodejs npm` (Fedora)
+- Or: `sudo pacman -S nodejs npm` (Arch)
+
+**Linux package fails to install:**
+- Debian: `sudo dpkg -i nedflix_*.deb && sudo apt-get -f install`
+- AppImage: `chmod +x Nedflix-*.AppImage && ./Nedflix-*.AppImage`
+- tar.gz: Extract and run `./nedflix`
+
+**Live TV not loading channels:**
+- Verify M3U URL is accessible from the desktop
+- Check browser console (F12) for network errors
+- Ensure URL is HTTP/HTTPS (not local file for remote playlists)
+
+**Channels showing "ErsatzTV unavailable":**
+- Verify ErsatzTV server is running and accessible
+- Check the URL format (e.g., `http://192.168.1.100:8409`)
+- Ensure no trailing slash in the URL
+- Check firewall allows connections to port 8409
 
 **Controller not detected:**
 - Ensure controller is connected before starting app
