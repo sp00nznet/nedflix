@@ -10,7 +10,39 @@ const fs = require('fs');
 
 // Configuration
 const PORT = 3000;
-const MEDIA_PATHS = process.env.NEDFLIX_MEDIA_PATHS || 'C:\\Videos;D:\\Movies;D:\\TV Shows';
+const CONFIG_FILE = path.join(app.getPath('userData'), 'nedflix-config.json');
+
+// Load or initialize media paths
+let mediaPaths = [];
+
+function loadConfig() {
+    try {
+        if (fs.existsSync(CONFIG_FILE)) {
+            const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+            mediaPaths = config.mediaPaths || [];
+        }
+    } catch (error) {
+        console.error('Failed to load config:', error);
+        mediaPaths = [];
+    }
+
+    // Fall back to environment variable if no paths configured
+    if (mediaPaths.length === 0 && process.env.NEDFLIX_MEDIA_PATHS) {
+        mediaPaths = process.env.NEDFLIX_MEDIA_PATHS.split(';').filter(p => p.trim());
+    }
+}
+
+function saveConfig() {
+    try {
+        const configDir = path.dirname(CONFIG_FILE);
+        if (!fs.existsSync(configDir)) {
+            fs.mkdirSync(configDir, { recursive: true });
+        }
+        fs.writeFileSync(CONFIG_FILE, JSON.stringify({ mediaPaths }, null, 2));
+    } catch (error) {
+        console.error('Failed to save config:', error);
+    }
+}
 
 let mainWindow;
 let server;
@@ -22,9 +54,6 @@ function createServer() {
     // Static files
     expressApp.use(express.static(path.join(__dirname, 'public')));
     expressApp.use(express.json());
-
-    // Parse media paths from environment or config
-    const mediaPaths = MEDIA_PATHS.split(';').filter(p => p.trim());
 
     // API: Get libraries (directories)
     expressApp.get('/api/libraries', (req, res) => {
@@ -312,6 +341,9 @@ function setupGamepadSupport() {
 
 // App ready
 app.whenReady().then(() => {
+    // Load configuration
+    loadConfig();
+
     // Start embedded server
     const expressApp = createServer();
     server = expressApp.listen(PORT, () => {
@@ -339,7 +371,13 @@ app.on('window-all-closed', () => {
 
 // IPC handlers
 ipcMain.handle('get-media-paths', () => {
-    return MEDIA_PATHS.split(';').filter(p => p.trim());
+    return mediaPaths;
+});
+
+ipcMain.handle('set-media-paths', (event, paths) => {
+    mediaPaths = paths || [];
+    saveConfig();
+    return { success: true, paths: mediaPaths };
 });
 
 ipcMain.handle('toggle-fullscreen', () => {

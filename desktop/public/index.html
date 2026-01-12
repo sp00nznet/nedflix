@@ -140,8 +140,19 @@
                     <!-- Media Paths Section -->
                     <section class="settings-section">
                         <h3>Media Paths</h3>
-                        <p class="setting-description">Configure using NEDFLIX_MEDIA_PATHS environment variable</p>
-                        <div id="media-paths-list" class="scan-logs-list">
+                        <p class="setting-description">Add folders containing your media files</p>
+                        <div class="setting-item">
+                            <div class="media-path-input-container">
+                                <input type="text" id="media-path-input" class="setting-input" placeholder="Enter folder path (e.g., D:\Movies)">
+                                <button type="button" id="add-media-path-btn" class="add-path-btn" title="Add path">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="media-paths-list" class="media-paths-list">
                             <!-- Paths will be populated here -->
                         </div>
                     </section>
