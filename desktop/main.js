@@ -3,7 +3,7 @@
  * Windows standalone version without authentication
  */
 
-const { app, BrowserWindow, ipcMain, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, dialog } = require('electron');
 const path = require('path');
 const express = require('express');
 const fs = require('fs');
@@ -384,4 +384,15 @@ ipcMain.handle('toggle-fullscreen', () => {
     if (mainWindow) {
         mainWindow.setFullScreen(!mainWindow.isFullScreen());
     }
+});
+
+ipcMain.handle('choose-folder', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openDirectory'],
+        title: 'Choose Media Folder'
+    });
+    if (result.canceled || result.filePaths.length === 0) {
+        return null;
+    }
+    return result.filePaths[0];
 });

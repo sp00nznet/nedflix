@@ -3171,6 +3171,32 @@ body {
     height: 20px;
 }
 
+.choose-folder-btn {
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-surface-light);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all var(--transition-fast);
+}
+
+.choose-folder-btn:hover {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+}
+
+.choose-folder-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
 .media-paths-list {
     display: flex;
     flex-direction: column;

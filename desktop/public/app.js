@@ -89,6 +89,7 @@ function renderLibraries() {
 async function setupMediaPaths() {
     const mediaPathsList = document.getElementById('media-paths-list');
     const addPathBtn = document.getElementById('add-media-path-btn');
+    const chooseFolderBtn = document.getElementById('choose-folder-btn');
     const pathInput = document.getElementById('media-path-input');
 
     if (!mediaPathsList) return;
@@ -108,6 +109,17 @@ async function setupMediaPaths() {
         pathInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
+                addMediaPath();
+            }
+        });
+    }
+
+    // Choose folder button handler
+    if (chooseFolderBtn && window.nedflixDesktop) {
+        chooseFolderBtn.addEventListener('click', async () => {
+            const folderPath = await window.nedflixDesktop.chooseFolder();
+            if (folderPath) {
+                pathInput.value = folderPath;
                 addMediaPath();
             }
         });
