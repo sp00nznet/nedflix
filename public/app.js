@@ -289,6 +289,14 @@ function applySettings() {
         localStorage.setItem('nedflix-theme', userSettings.theme);
     }
 
+    // Apply IPTV settings
+    if (userSettings?.iptv) {
+        const iptvPlaylistInput = document.getElementById('iptv-playlist-url');
+        const iptvEpgInput = document.getElementById('iptv-epg-url');
+        if (iptvPlaylistInput) iptvPlaylistInput.value = userSettings.iptv.playlistUrl || '';
+        if (iptvEpgInput) iptvEpgInput.value = userSettings.iptv.epgUrl || '';
+    }
+
     if (!userSettings?.streaming) return;
 
     const s = userSettings.streaming;
@@ -423,8 +431,16 @@ async function saveSettings() {
     applyTheme(theme);
     localStorage.setItem('nedflix-theme', theme);
 
+    // Get IPTV settings
+    const iptvPlaylistInput = document.getElementById('iptv-playlist-url');
+    const iptvEpgInput = document.getElementById('iptv-epg-url');
+
     const settings = {
         theme: theme,
+        iptv: {
+            playlistUrl: iptvPlaylistInput?.value || '',
+            epgUrl: iptvEpgInput?.value || ''
+        },
         streaming: {
             quality: qualitySelect.value,
             volume: parseInt(volumeSlider.value),

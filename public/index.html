@@ -196,6 +196,21 @@
                         </div>
                     </section>
 
+                    <!-- Live TV Settings Section -->
+                    <section class="settings-section">
+                        <h3>Live TV (IPTV)</h3>
+
+                        <div class="setting-item">
+                            <label for="iptv-playlist-url">Playlist URL (M3U/M3U8)</label>
+                            <input type="text" id="iptv-playlist-url" class="setting-input" placeholder="https://example.com/playlist.m3u">
+                        </div>
+
+                        <div class="setting-item">
+                            <label for="iptv-epg-url">EPG URL (XMLTV) - Optional</label>
+                            <input type="text" id="iptv-epg-url" class="setting-input" placeholder="https://example.com/epg.xml">
+                        </div>
+                    </section>
+
                 </div>
 
                 <div class="panel-footer">
@@ -380,6 +395,18 @@
                         </div>
                         <span class="library-name">Audiobooks</span>
                     </button>
+                    <button class="library-card" data-type="livetv" id="livetv-card">
+                        <div class="library-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
+                                <polyline points="17 2 12 7 7 2"></polyline>
+                                <circle cx="12" cy="14" r="2" fill="currentColor"></circle>
+                                <line x1="8" y1="18" x2="8" y2="18.01" stroke-width="2" stroke-linecap="round"></line>
+                                <line x1="16" y1="18" x2="16" y2="18.01" stroke-width="2" stroke-linecap="round"></line>
+                            </svg>
+                        </div>
+                        <span class="library-name">Live TV</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -482,8 +509,83 @@
                 </div>
             </div>
         </main>
+
+        <!-- Live TV View -->
+        <div class="livetv-view" id="livetv-view" style="display: none;">
+            <div class="livetv-container">
+                <div class="livetv-sidebar">
+                    <div class="livetv-header">
+                        <button class="livetv-back-btn" id="livetv-back-btn" title="Back to libraries">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                        </button>
+                        <h2>Live TV</h2>
+                        <button class="livetv-refresh-btn" id="livetv-refresh-btn" title="Refresh channels">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="livetv-groups" id="livetv-groups">
+                        <!-- Channel groups will be populated here -->
+                    </div>
+                    <div class="livetv-channels" id="livetv-channels">
+                        <!-- Channels will be populated here -->
+                    </div>
+                </div>
+                <div class="livetv-main">
+                    <div class="livetv-player-container">
+                        <video id="livetv-player" controls autoplay>
+                            Your browser does not support the video tag.
+                        </video>
+                        <div class="livetv-placeholder" id="livetv-placeholder">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
+                                <polyline points="17 2 12 7 7 2"></polyline>
+                            </svg>
+                            <p>Select a channel to watch</p>
+                        </div>
+                    </div>
+                    <div class="livetv-info" id="livetv-info">
+                        <div class="livetv-channel-info">
+                            <img class="livetv-channel-logo" id="livetv-channel-logo" src="" alt="">
+                            <div class="livetv-channel-details">
+                                <h3 id="livetv-channel-name">No channel selected</h3>
+                                <p id="livetv-program-title">-</p>
+                            </div>
+                        </div>
+                        <div class="livetv-program-info" id="livetv-program-info">
+                            <div class="livetv-now-playing">
+                                <span class="livetv-label">Now</span>
+                                <span class="livetv-program-name" id="livetv-now-title">-</span>
+                                <span class="livetv-program-time" id="livetv-now-time">-</span>
+                            </div>
+                            <div class="livetv-up-next">
+                                <span class="livetv-label">Next</span>
+                                <span class="livetv-program-name" id="livetv-next-title">-</span>
+                                <span class="livetv-program-time" id="livetv-next-time">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="livetv-no-config" id="livetv-no-config" style="display: none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <h3>Live TV Not Configured</h3>
+                <p>Add your IPTV playlist URL in Settings to get started.</p>
+                <button class="livetv-open-settings" id="livetv-open-settings">Open Settings</button>
+            </div>
+        </div>
     </div>
-    
+
     <script src="app.js"></script>
+    <script src="livetv.js"></script>
 </body>
 </html>
