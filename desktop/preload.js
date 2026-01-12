@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld('nedflixDesktop', {
     // Get configured media paths
     getMediaPaths: () => ipcRenderer.invoke('get-media-paths'),
 
+    // Set media paths (save to config)
+    setMediaPaths: (paths) => ipcRenderer.invoke('set-media-paths', paths),
+
     // Toggle fullscreen
     toggleFullscreen: () => ipcRenderer.invoke('toggle-fullscreen'),
 

@@ -6,6 +6,7 @@
 // State
 let currentPath = '';
 let libraries = [];
+let mediaPaths = [];
 let settings = {
     theme: 'dark',
     streaming: {
@@ -87,28 +88,110 @@ function renderLibraries() {
 // Setup media paths display in settings
 async function setupMediaPaths() {
     const mediaPathsList = document.getElementById('media-paths-list');
+    const addPathBtn = document.getElementById('add-media-path-btn');
+    const pathInput = document.getElementById('media-path-input');
+
     if (!mediaPathsList) return;
 
-    // Use Electron IPC if available, otherwise use API
-    let paths = [];
+    // Load paths from Electron IPC
     if (window.nedflixDesktop) {
-        paths = await window.nedflixDesktop.getMediaPaths();
+        mediaPaths = await window.nedflixDesktop.getMediaPaths();
     } else {
-        paths = libraries.map(l => l.path);
+        mediaPaths = libraries.map(l => l.path);
     }
 
-    if (paths.length === 0) {
-        mediaPathsList.innerHTML = '<p class="no-users-message">No media paths configured</p>';
+    renderMediaPaths();
+
+    // Add path button handler
+    if (addPathBtn && pathInput) {
+        addPathBtn.addEventListener('click', () => addMediaPath());
+        pathInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addMediaPath();
+            }
+        });
+    }
+}
+
+// Render media paths list
+function renderMediaPaths() {
+    const mediaPathsList = document.getElementById('media-paths-list');
+    if (!mediaPathsList) return;
+
+    if (mediaPaths.length === 0) {
+        mediaPathsList.innerHTML = '<div class="media-paths-empty">No media paths configured. Add a folder path above.</div>';
         return;
     }
 
-    mediaPathsList.innerHTML = paths.map(path => `
-        <div class="scan-log-item">
-            <div class="scan-log-info">
-                <div class="scan-log-date">${escapeHtml(path)}</div>
+    mediaPathsList.innerHTML = mediaPaths.map((path, index) => `
+        <div class="media-path-item" data-index="${index}">
+            <div class="path-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                </svg>
             </div>
+            <span class="path-text">${escapeHtml(path)}</span>
+            <button type="button" class="remove-path-btn" data-index="${index}" title="Remove path">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
         </div>
     `).join('');
+
+    // Add remove button handlers
+    mediaPathsList.querySelectorAll('.remove-path-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const index = parseInt(btn.dataset.index);
+            removeMediaPath(index);
+        });
+    });
+}
+
+// Add a new media path
+async function addMediaPath() {
+    const pathInput = document.getElementById('media-path-input');
+    if (!pathInput) return;
+
+    const newPath = pathInput.value.trim();
+    if (!newPath) return;
+
+    // Check for duplicates
+    if (mediaPaths.includes(newPath)) {
+        pathInput.value = '';
+        return;
+    }
+
+    mediaPaths.push(newPath);
+    pathInput.value = '';
+    renderMediaPaths();
+
+    // Save to Electron
+    if (window.nedflixDesktop) {
+        await window.nedflixDesktop.setMediaPaths(mediaPaths);
+    }
+
+    // Refresh libraries
+    await loadLibraries();
+}
+
+// Remove a media path
+async function removeMediaPath(index) {
+    if (index < 0 || index >= mediaPaths.length) return;
+
+    mediaPaths.splice(index, 1);
+    renderMediaPaths();
+
+    // Save to Electron
+    if (window.nedflixDesktop) {
+        await window.nedflixDesktop.setMediaPaths(mediaPaths);
+    }
+
+    // Refresh libraries
+    await loadLibraries();
 }
 
 // Open a library
