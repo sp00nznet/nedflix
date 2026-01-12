@@ -137,6 +137,17 @@
                         </div>
                     </section>
 
+                    <!-- Channels (ErsatzTV) Settings Section -->
+                    <section class="settings-section">
+                        <h3>Channels (ErsatzTV)</h3>
+                        <p class="setting-description">Connect to an ErsatzTV server for 24/7 auto-generated channels</p>
+
+                        <div class="setting-item">
+                            <label for="ersatztv-url">ErsatzTV Server URL</label>
+                            <input type="text" id="ersatztv-url" class="setting-input" placeholder="http://192.168.1.100:8409">
+                        </div>
+                    </section>
+
                     <!-- Media Paths Section -->
                     <section class="settings-section">
                         <h3>Media Paths</h3>
@@ -171,6 +182,171 @@
                 <p>Choose your media library</p>
                 <div class="library-cards" id="library-cards">
                     <!-- Libraries loaded dynamically based on media paths -->
+                </div>
+
+                <!-- Fixed Library Cards for Live TV and Channels -->
+                <div class="library-cards-fixed">
+                    <button class="library-card livetv-card" id="livetv-card">
+                        <div class="library-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
+                                <polyline points="17 2 12 7 7 2"></polyline>
+                            </svg>
+                        </div>
+                        <span class="library-name">Live TV</span>
+                    </button>
+                    <button class="library-card channels-card" id="channels-card">
+                        <div class="library-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                <line x1="8" y1="21" x2="16" y2="21"></line>
+                                <line x1="12" y1="17" x2="12" y2="21"></line>
+                                <circle cx="12" cy="10" r="2"></circle>
+                            </svg>
+                        </div>
+                        <span class="library-name">Channels</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live TV View -->
+        <div class="livetv-view" id="livetv-view" style="display: none;">
+            <div class="livetv-header">
+                <button class="back-btn" id="livetv-back-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    Back
+                </button>
+                <h1>Live TV</h1>
+                <button class="refresh-btn" id="livetv-refresh-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- No Config Message -->
+            <div class="livetv-no-config" id="livetv-no-config" style="display: none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
+                    <polyline points="17 2 12 7 7 2"></polyline>
+                </svg>
+                <h2>Live TV Not Configured</h2>
+                <p>Add an IPTV playlist URL in Settings to watch live TV channels.</p>
+                <button class="btn-primary" id="livetv-open-settings">Open Settings</button>
+            </div>
+
+            <!-- Live TV Container -->
+            <div class="livetv-container">
+                <div class="livetv-sidebar">
+                    <div class="livetv-groups" id="livetv-groups">
+                        <!-- Group filters -->
+                    </div>
+                    <div class="livetv-channels" id="livetv-channels">
+                        <!-- Channel list -->
+                    </div>
+                </div>
+                <div class="livetv-player-container">
+                    <div class="livetv-player-wrapper">
+                        <video id="livetv-player" controls autoplay></video>
+                        <div class="livetv-placeholder" id="livetv-placeholder">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
+                                <polyline points="17 2 12 7 7 2"></polyline>
+                            </svg>
+                            <p>Select a channel to watch</p>
+                        </div>
+                    </div>
+                    <div class="livetv-info">
+                        <img id="livetv-channel-logo" src="" alt="" style="display: none;">
+                        <div class="livetv-channel-info">
+                            <h2 id="livetv-channel-name">No channel selected</h2>
+                            <div class="livetv-epg">
+                                <div class="epg-now">
+                                    <span class="epg-label">Now:</span>
+                                    <span id="livetv-now-title">-</span>
+                                    <span class="epg-time" id="livetv-now-time">-</span>
+                                </div>
+                                <div class="epg-next">
+                                    <span class="epg-label">Next:</span>
+                                    <span id="livetv-next-title">-</span>
+                                    <span class="epg-time" id="livetv-next-time">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Channels View (ErsatzTV) -->
+        <div class="channels-view" id="channels-view" style="display: none;">
+            <div class="channels-header">
+                <button class="back-btn" id="channels-back-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    Back
+                </button>
+                <h1>Channels</h1>
+                <div class="channels-status" id="channels-status">
+                    <span class="status-indicator status-loading"></span>
+                    <span class="status-text">Checking...</span>
+                </div>
+                <button class="refresh-btn" id="channels-refresh-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- No Config Message -->
+            <div class="channels-no-config" id="channels-no-config" style="display: none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                    <line x1="12" y1="17" x2="12" y2="21"></line>
+                </svg>
+                <h2>Channels Not Configured</h2>
+                <p>Configure an ErsatzTV server URL in Settings to access 24/7 auto-generated channels.</p>
+                <button class="btn-primary" id="channels-open-settings">Open Settings</button>
+            </div>
+
+            <!-- Channels Container -->
+            <div class="channels-container">
+                <div class="channels-sidebar">
+                    <div class="channels-list" id="channels-list">
+                        <!-- Channel list -->
+                    </div>
+                </div>
+                <div class="channels-player-container">
+                    <div class="channels-player-wrapper">
+                        <video id="channels-player" controls autoplay></video>
+                        <div class="channels-placeholder" id="channels-placeholder">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                <line x1="8" y1="21" x2="16" y2="21"></line>
+                                <line x1="12" y1="17" x2="12" y2="21"></line>
+                            </svg>
+                            <p>Select a channel to watch</p>
+                        </div>
+                    </div>
+                    <div class="channels-info">
+                        <div class="channels-channel-info">
+                            <span class="channel-number" id="channels-channel-number">-</span>
+                            <h2 id="channels-channel-name">No channel selected</h2>
+                        </div>
+                        <div class="channels-now-playing">
+                            <span class="now-label">Now Playing:</span>
+                            <span id="channels-now-title">-</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -263,6 +439,8 @@
     </div>
 
     <script src="app.js"></script>
+    <script src="livetv.js"></script>
+    <script src="channels.js"></script>
     <script src="gamepad.js"></script>
 </body>
 </html>

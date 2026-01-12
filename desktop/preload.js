@@ -19,6 +19,14 @@ contextBridge.exposeInMainWorld('nedflixDesktop', {
     // Toggle fullscreen
     toggleFullscreen: () => ipcRenderer.invoke('toggle-fullscreen'),
 
+    // IPTV settings
+    getIptvSettings: () => ipcRenderer.invoke('get-iptv-settings'),
+    setIptvSettings: (settings) => ipcRenderer.invoke('set-iptv-settings', settings),
+
+    // ErsatzTV settings
+    getErsatztvSettings: () => ipcRenderer.invoke('get-ersatztv-settings'),
+    setErsatztvSettings: (settings) => ipcRenderer.invoke('set-ersatztv-settings', settings),
+
     // Listen for fullscreen changes
     onFullscreenChange: (callback) => {
         ipcRenderer.on('fullscreen-change', (event, isFullscreen) => {

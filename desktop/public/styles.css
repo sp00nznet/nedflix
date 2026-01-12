@@ -3267,3 +3267,366 @@ body {
         max-height: 60px;
     }
 }
+
+/* ==================== */
+/* Channels (ErsatzTV) Styles */
+/* ==================== */
+
+.channels-view {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+}
+
+.channels-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.channels-header h1 {
+    flex: 1;
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.back-btn,
+.refresh-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-text);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.back-btn:hover,
+.refresh-btn:hover {
+    background: var(--color-bg-hover);
+    border-color: var(--color-border-light);
+}
+
+.back-btn svg,
+.refresh-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+.channels-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.status-indicator.status-loading {
+    background: var(--color-warning);
+    animation: pulse 1s infinite;
+}
+
+.status-indicator.status-connected {
+    background: var(--color-success);
+}
+
+.status-indicator.status-error {
+    background: var(--color-danger);
+}
+
+.status-indicator.status-warning {
+    background: var(--color-warning);
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.status-text {
+    color: var(--color-text-muted);
+}
+
+.channels-container {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 24px;
+    height: calc(100vh - 180px);
+}
+
+.channels-sidebar {
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.channels-list {
+    padding: 8px;
+    overflow-y: auto;
+    height: 100%;
+}
+
+.channels-channel-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    border: 1px solid transparent;
+    margin-bottom: 4px;
+}
+
+.channels-channel-item:hover {
+    background: var(--color-bg-hover);
+}
+
+.channels-channel-item.active {
+    background: var(--color-primary-glow);
+    border-color: var(--color-primary);
+}
+
+.channels-channel-item .channel-number {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-bg-card);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-primary);
+    flex-shrink: 0;
+}
+
+.channels-channel-item .channel-name {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.channels-player-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.channels-player-wrapper {
+    position: relative;
+    background: #000;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    flex: 1;
+    min-height: 400px;
+}
+
+#channels-player {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.channels-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-dim);
+    gap: 16px;
+}
+
+.channels-placeholder svg {
+    width: 64px;
+    height: 64px;
+    opacity: 0.5;
+}
+
+.channels-placeholder.hidden {
+    display: none;
+}
+
+.channels-info {
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+.channels-channel-info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex: 1;
+}
+
+.channels-channel-info .channel-number {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+    border-radius: var(--radius-md);
+    font-size: 20px;
+    font-weight: 700;
+    color: white;
+}
+
+.channels-channel-info h2 {
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.channels-now-playing {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.channels-now-playing .now-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    color: var(--color-text-dim);
+    font-weight: 600;
+}
+
+.channels-now-playing #channels-now-title {
+    font-size: 14px;
+    color: var(--color-text);
+}
+
+.channels-no-config {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-bg);
+    gap: 16px;
+    text-align: center;
+    padding: 24px;
+}
+
+.channels-no-config svg {
+    width: 64px;
+    height: 64px;
+    color: var(--color-text-dim);
+}
+
+.channels-no-config h2 {
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.channels-no-config p {
+    color: var(--color-text-muted);
+    max-width: 400px;
+    line-height: 1.6;
+}
+
+.btn-primary {
+    margin-top: 16px;
+    padding: 12px 24px;
+    background: var(--color-primary);
+    border: none;
+    border-radius: var(--radius-sm);
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+.btn-primary:hover {
+    background: var(--color-primary-hover);
+}
+
+/* Fixed Library Cards (Live TV and Channels) */
+.library-cards-fixed {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-top: 32px;
+    padding-top: 32px;
+    border-top: 1px solid var(--color-border);
+}
+
+.library-cards-fixed .library-card {
+    min-width: 180px;
+}
+
+.library-cards-fixed .livetv-card .library-icon {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+}
+
+.library-cards-fixed .channels-card .library-icon {
+    background: linear-gradient(135deg, #9b59b6, #8e44ad);
+}
+
+/* Channel logo placeholder */
+.channel-logo-placeholder {
+    width: 40px;
+    height: 40px;
+    background: var(--color-bg-card);
+    border-radius: var(--radius-sm);
+}
+
+/* Responsive Channels */
+@media (max-width: 900px) {
+    .channels-container {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+    }
+
+    .channels-sidebar {
+        max-height: 200px;
+    }
+
+    .channels-info {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .library-cards-fixed {
+        flex-direction: column;
+        align-items: center;
+    }
+}
+
+@media (max-width: 768px) {
+    .channels-header h1 {
+        font-size: 18px;
+    }
+
+    .channels-status {
+        display: none;
+    }
+}
