@@ -6,13 +6,15 @@
 
 <p align="center">
   <strong>Your personal video streaming platform</strong><br>
-  Stream your NFS-mounted media library with style
+  Stream your media library with style - Web or Desktop
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/node-%3E%3D14.0.0-brightgreen?style=flat-square" alt="Node">
   <img src="https://img.shields.io/badge/docker-ready-blue?style=flat-square&logo=docker" alt="Docker">
-  <img src="https://img.shields.io/badge/PostgreSQL-supported-336791?style=flat-square&logo=postgresql" alt="PostgreSQL">
+  <img src="https://img.shields.io/badge/electron-desktop-47848F?style=flat-square&logo=electron" alt="Electron">
+  <img src="https://img.shields.io/badge/windows-supported-0078D6?style=flat-square&logo=windows" alt="Windows">
+  <img src="https://img.shields.io/badge/ErsatzTV-integrated-purple?style=flat-square" alt="ErsatzTV">
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License">
 </p>
 
@@ -20,24 +22,54 @@
 
 ## Features
 
+### Core Features
 - **Multi-User Support** - Create and manage multiple users with individual permissions
 - **Admin Panel** - Dedicated admin interface for user management and system controls
 - **Media Search** - Fast indexed search across your entire library
 - **Library Categories** - Separate Movies, TV Shows, Music, and Audiobooks
 - **Secure Authentication** - Local admin login or OAuth (Google/GitHub)
-- **Video Streaming** - Browse and stream from NFS-mounted directories
+
+### Streaming Features
+- **Video Streaming** - Browse and stream from local or NFS-mounted directories
 - **Automatic Subtitles** - Search and download via OpenSubtitles API
 - **Multi-Audio Support** - Switch between audio tracks (requires FFmpeg)
 - **Metadata Fetching** - Automatic movie/TV show information from OMDb and TVmaze
-- **Persistent Database** - PostgreSQL for reliable data storage
+- **Audio Visualizer** - Multiple visualization modes (bars, wave, circular, particles)
+
+### Live TV & Channels
+- **Live TV (IPTV)** - Watch live streams via M3U playlists and XMLTV EPG
+- **Auto-Generated Channels** - 24/7 streaming channels from your media library via ErsatzTV
+- **Channel Guide** - Program schedule and now playing information
+
+### Desktop Application
+- **Windows Installer** - Native Windows app with NSIS installer
+- **Xbox Controller Support** - Full gamepad navigation and control
+- **Editable Media Paths** - Configure custom media directories in settings
+- **Media Key Support** - Play/pause, next/previous track, F11 fullscreen
+- **No Server Required** - Standalone app with embedded streaming server
+- **Auto Node.js Install** - Build scripts automatically install Node.js if missing
+
+### User Experience
 - **User Profiles** - Customizable avatars and streaming preferences
-- **Dark Theme** - Modern, responsive interface
+- **Dark/Light Theme** - Modern, responsive interface
+- **Persistent Database** - PostgreSQL for reliable data storage
+
+---
+
+## Deployment Options
+
+Nedflix can be deployed in two ways:
+
+| Option | Best For | Features |
+|--------|----------|----------|
+| **Docker (Web)** | Home servers, multi-user | Full features, PostgreSQL, ErsatzTV, remote access |
+| **Desktop App** | Personal use, HTPC | Xbox controller, local media, no setup required |
 
 ---
 
 ## Quick Start
 
-### Using Docker Compose (Recommended)
+### Option 1: Docker Compose (Web Server)
 
 ```bash
 # Clone the repository
@@ -51,94 +83,225 @@ nano .env  # Add your credentials
 # Generate SSL certificates (or use your own)
 npm run generate-certs
 
-# Launch (includes PostgreSQL database)
+# Launch (includes PostgreSQL and ErsatzTV)
 docker compose up -d
 
 # Access at https://localhost:3443
 ```
 
-### Minimal Setup (Local Admin Only)
+### Option 2: Windows Desktop App
 
-Add to your `.env` file:
+```bash
+# Navigate to desktop folder
+cd nedflix/desktop
 
-```env
-SESSION_SECRET=your-random-secret-string
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=your-secure-password
-NFS_PATH=/path/to/your/videos
+# Run the build script (auto-installs Node.js if needed)
+build.bat
+
+# Choose option 1 for Windows x64 installer
+# Or option 3 for portable executable
 ```
 
-No OAuth setup required - just username and password login.
+The installer will be created in `desktop/dist/`.
 
 ---
 
 ## Architecture
 
-Nedflix runs as a multi-container Docker application:
+### Web Deployment (Docker)
 
 ```
-┌─────────────────────────────────────────────┐
-│                  Docker                      │
-│  ┌─────────────┐      ┌─────────────────┐   │
-│  │   Nedflix   │      │   PostgreSQL    │   │
-│  │   (Node.js) │◄────►│   (Database)    │   │
-│  │   Port 3443 │      │   Port 5432     │   │
-│  └─────────────┘      └─────────────────┘   │
-│         │                     │             │
-│         ▼                     ▼             │
-│  ┌─────────────┐      ┌─────────────────┐   │
-│  │ NFS Volume  │      │   DB Volume     │   │
-│  │ (read-only) │      │  (persistent)   │   │
-│  └─────────────┘      └─────────────────┘   │
-└─────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                         Docker                                 │
+│                                                                │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────────┐    │
+│  │   Nedflix   │    │  ErsatzTV   │    │   PostgreSQL    │    │
+│  │  (Node.js)  │◄──►│  (Channels) │    │   (Database)    │    │
+│  │  Port 3443  │    │  Port 8409  │    │   Port 5432     │    │
+│  └──────┬──────┘    └──────┬──────┘    └────────┬────────┘    │
+│         │                  │                    │              │
+│         ▼                  ▼                    ▼              │
+│  ┌────────────────────────────────┐    ┌─────────────────┐    │
+│  │        NFS Volume              │    │    DB Volume    │    │
+│  │        (read-only)             │    │   (persistent)  │    │
+│  └────────────────────────────────┘    └─────────────────┘    │
+└───────────────────────────────────────────────────────────────┘
+```
+
+### Desktop Application (Electron)
+
+```
+┌─────────────────────────────────────────────────────┐
+│              Nedflix Desktop (Electron)              │
+│                                                      │
+│  ┌──────────────────┐    ┌───────────────────────┐  │
+│  │   Main Process   │    │   Renderer Process    │  │
+│  │                  │    │                       │  │
+│  │  - Express Server│◄──►│  - UI (HTML/CSS/JS)   │  │
+│  │  - IPC Handlers  │    │  - Gamepad Support    │  │
+│  │  - Media Keys    │    │  - Audio Visualizer   │  │
+│  │  - Config Store  │    │  - Settings Panel     │  │
+│  └────────┬─────────┘    └───────────────────────┘  │
+│           │                                          │
+│           ▼                                          │
+│  ┌──────────────────────────────────────────────┐   │
+│  │         Local Media Directories               │   │
+│  │   C:\Videos, D:\Movies, Custom Paths...       │   │
+│  └──────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Admin Panel
+## Desktop Application
 
-The admin panel provides centralized management for:
+The desktop version is a standalone Windows application built with Electron.
 
-### User Management
-- Create, edit, and delete users
-- Set admin privileges
-- Control library access per user (Movies, TV, Music, Audiobooks)
-- Enable/disable user accounts
-- Reset passwords
+### Features
 
-### Media Library Index
-- Scan your media library to build a searchable index
-- View scan statistics (total files, videos, audio)
-- Monitor scan progress and history
-- Download scan logs
+| Feature | Description |
+|---------|-------------|
+| **No Server Setup** | Embedded Express server, just run and play |
+| **Editable Media Paths** | Add/remove media directories in Settings |
+| **Xbox Controller** | Full navigation with gamepad support |
+| **Media Keys** | Hardware play/pause, skip, volume controls |
+| **IPTV Support** | Configure M3U playlist and EPG URLs |
+| **Audio Visualizer** | Bars, waveform, circular, and particle modes |
+| **Portable Mode** | Optional portable executable (no install) |
 
-### How to Access
-1. Log in as an admin user
-2. Click the gear icon in the header (next to your profile)
-3. The admin panel opens as an overlay
+### Xbox/Gamepad Controls
+
+| Button | Action |
+|--------|--------|
+| **A** | Select / Confirm |
+| **B** | Back / Cancel |
+| **X / Start** | Play / Pause |
+| **Y** | Toggle Fullscreen |
+| **LB / RB** | Previous / Next File |
+| **LT / RT** | Volume Down / Up |
+| **Back** | Open Settings |
+| **D-Pad** | Navigate menus |
+| **Left Stick** | Navigate (with repeat) |
+| **Right Stick** | Seek video (while playing) |
+
+### Building the Desktop App
+
+The build process auto-installs Node.js if not present:
+
+```bash
+cd desktop
+
+# Interactive build menu
+build.bat
+
+# Or run specific commands:
+npm run build:win      # Windows x64 installer
+npm run build:win32    # Windows x86 installer
+npm run build:portable # Portable executable
+npm run dev            # Development mode with DevTools
+```
+
+**Output files** (in `desktop/dist/`):
+- `Nedflix Setup x.x.x.exe` - Windows installer
+- `Nedflix-Portable-x.x.x.exe` - Portable version
+
+### Media Path Configuration
+
+The desktop app stores media paths in:
+- **Windows:** `%APPDATA%/nedflix/nedflix-config.json`
+- **Environment:** `NEDFLIX_MEDIA_PATHS` (semicolon-separated)
+
+Configure paths in the Settings panel:
+1. Click the user menu (top right)
+2. Scroll to "Media Paths"
+3. Click "Add Path" and select directories
+4. Paths are saved automatically
 
 ---
 
-## Search
+## Auto-Generated Channels
 
-Nedflix includes a powerful search feature:
+Nedflix integrates with [ErsatzTV](https://ersatztv.org/) to create 24/7 streaming channels from your media library.
 
-- **Indexed Search** - Searches a database index instead of scanning disks
-- **Category Scoped** - Results are filtered to your current library (Movies, TV, etc.)
-- **Fast Results** - Instant results from the PostgreSQL database
-- **Click to Navigate** - Jump directly to search results
+### How It Works
 
-To enable search:
-1. Open the Admin Panel
-2. Click "Scan Library" under Media Library Index
-3. Wait for the scan to complete
-4. Use the search bar in the file browser
+```
+┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
+│   Your Media    │      │    ErsatzTV     │      │    Nedflix      │
+│                 │      │                 │      │                 │
+│  /Movies        │─────►│  Creates        │─────►│  Displays       │
+│  /TV Shows      │      │  Libraries &    │      │  Channels UI    │
+│  /Music         │      │  24/7 Channels  │      │  with Player    │
+└─────────────────┘      └─────────────────┘      └─────────────────┘
+```
+
+### Default Channels
+
+| Channel | Number | Content | Playback Mode |
+|---------|--------|---------|---------------|
+| **Movies 24/7** | 1 | All movies | Shuffled |
+| **TV Shows Marathon** | 2 | All TV episodes | Shuffled |
+| **Music Videos** | 3 | All music files | Shuffled |
+
+### Setup
+
+1. **Navigate to Channels** - Click the "Channels" card on the home screen
+2. **Auto-Setup** - Admin users click "Setup Auto-Channels" button
+3. **Wait for Scan** - ErsatzTV scans your media library
+4. **Start Watching** - Channels appear automatically
+
+---
+
+## Library Cards
+
+<table>
+<tr>
+<td width="33%">
+
+### Movies
+Browse and stream your movie collection with poster art and metadata.
+
+</td>
+<td width="33%">
+
+### TV Shows
+Navigate seasons and episodes with show information and artwork.
+
+</td>
+<td width="33%">
+
+### Music
+Play your music library with audio visualizer options.
+
+</td>
+</tr>
+<tr>
+<td>
+
+### Audiobooks
+Listen to your audiobook collection with playback controls.
+
+</td>
+<td>
+
+### Live TV
+Watch IPTV streams with M3U playlist support and EPG guide.
+
+</td>
+<td>
+
+### Channels
+24/7 auto-generated channels from your media via ErsatzTV.
+
+</td>
+</tr>
+</table>
 
 ---
 
 ## Configuration
 
-### Environment Variables
+### Web (Docker) Environment Variables
 
 | Variable | Description |
 |----------|-------------|
@@ -146,34 +309,98 @@ To enable search:
 | `ADMIN_USERNAME` | Local admin username |
 | `ADMIN_PASSWORD` | Local admin password |
 | `NFS_PATH` | Path to your video library |
-| `CERTS_PATH` | Path to SSL certificates (default: ./certs) |
-| `POSTGRES_USER` | PostgreSQL username (default: nedflix) |
-| `POSTGRES_PASSWORD` | PostgreSQL password (default: nedflix_secret) |
-| `POSTGRES_DB` | PostgreSQL database name (default: nedflix) |
+| `ERSATZTV_URL` | ErsatzTV API URL (default: http://ersatztv:8409) |
+| `TIMEZONE` | Timezone for ErsatzTV EPG (default: America/New_York) |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID (optional) |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth secret (optional) |
-| `GITHUB_CLIENT_ID` | GitHub OAuth client ID (optional) |
-| `GITHUB_CLIENT_SECRET` | GitHub OAuth secret (optional) |
 | `OPENSUBTITLES_API_KEY` | For automatic subtitles (optional) |
 | `OMDB_API_KEY` | For movie/TV metadata (optional) |
 
+### Desktop Configuration
+
+| Setting | Location | Description |
+|---------|----------|-------------|
+| Media Paths | Settings Panel | Directories to scan for media |
+| IPTV Playlist | Settings Panel | M3U/M3U8 URL for Live TV |
+| IPTV EPG | Settings Panel | XMLTV URL for program guide |
+| Theme | Settings Panel | Dark or Light mode |
+| Controller | Settings Panel | Enable/disable vibration feedback |
+
 ---
 
-## Database
+## API Endpoints
 
-Nedflix uses PostgreSQL for persistent storage of:
+### Channels API (ErsatzTV)
 
-- **Users** - Account information and credentials
-- **User Settings** - Streaming preferences and profile pictures
-- **File Index** - Cached media library for fast browsing and search
-- **Scan Logs** - History of library scan operations
-- **Media Metadata** - Cached movie/TV show information
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/ersatztv/status` | GET | Get ErsatzTV status and channels |
+| `/api/ersatztv/channels` | GET | List all channels |
+| `/api/ersatztv/setup` | POST | Setup auto-channels (admin) |
+| `/api/ersatztv/libraries` | GET | List ErsatzTV libraries |
+| `/api/ersatztv/playlist-url` | GET | Get M3U playlist URL |
+| `/api/ersatztv/epg-url` | GET | Get XMLTV EPG URL |
 
-Data is stored in a Docker volume (`nedflix-db-data`) that persists across container restarts.
+### Live TV API (IPTV)
 
-### Local Development (SQLite)
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/iptv/channels` | GET | Get IPTV channels |
+| `/api/iptv/epg` | GET | Get EPG data |
+| `/api/iptv/stream` | GET | Proxy IPTV stream |
 
-When running without Docker or without PostgreSQL configured, Nedflix automatically falls back to SQLite for local development.
+---
+
+## Requirements
+
+### Web Deployment
+
+| Component | Required | Notes |
+|-----------|----------|-------|
+| Docker | Recommended | Or Node.js v14+ |
+| Auth | Yes | Local admin OR OAuth provider |
+| PostgreSQL | Included | Via Docker Compose |
+| ErsatzTV | Included | Via Docker Compose (for Channels) |
+| FFmpeg | Optional | For audio track switching |
+
+### Desktop Application
+
+| Component | Required | Notes |
+|-----------|----------|-------|
+| Windows | Yes | Windows 10/11 (x64 or x86) |
+| Node.js | Auto-installed | v20.11.0 (via build script) |
+| Xbox Controller | Optional | For gamepad navigation |
+
+---
+
+## Project Structure
+
+```
+nedflix/
+├── server.js              # Main Express server (web)
+├── ersatztv-service.js    # ErsatzTV API integration
+├── iptv-service.js        # IPTV/Live TV service
+├── db.js                  # Database abstraction layer
+├── docker-compose.yml     # Docker orchestration
+├── public/                # Web UI files
+│   ├── index.html
+│   ├── app.js
+│   ├── livetv.js
+│   ├── channels.js
+│   └── styles.css
+├── desktop/               # Electron desktop app
+│   ├── main.js            # Electron main process
+│   ├── preload.js         # Secure IPC bridge
+│   ├── package.json       # Desktop dependencies
+│   ├── build.bat          # Windows build script
+│   ├── install.bat        # Node.js auto-installer
+│   └── public/
+│       ├── index.html     # Desktop UI
+│       ├── app.js         # Desktop app logic
+│       ├── gamepad.js     # Xbox controller support
+│       └── styles.css     # Desktop styles
+└── docs/
+    └── SETUP.md           # Detailed setup guide
+```
 
 ---
 
@@ -184,23 +411,11 @@ For detailed setup instructions, see **[docs/SETUP.md](docs/SETUP.md)**:
 - SSL certificate configuration
 - OAuth provider setup (Google/GitHub)
 - Docker deployment options
-- PostgreSQL configuration
+- Desktop application build guide
+- Xbox controller configuration
+- ErsatzTV setup and configuration
 - User management guide
-- FFmpeg installation for audio tracks
 - Troubleshooting guide
-
----
-
-## Requirements
-
-| Component | Required | Notes |
-|-----------|----------|-------|
-| Docker | Recommended | Or Node.js v14+ |
-| Auth | Yes | Local admin OR OAuth provider |
-| PostgreSQL | Included | Via Docker Compose |
-| FFmpeg | Optional | For audio track switching |
-| OpenSubtitles API | Optional | For automatic subtitles |
-| OMDb API | Optional | For movie/TV metadata |
 
 ---
 
@@ -211,5 +426,5 @@ Open source for personal and educational use.
 ---
 
 <p align="center">
-  <sub>Built for movie nights</sub>
+  <sub>Built for movie nights | Web + Desktop | Gamepad Ready</sub>
 </p>

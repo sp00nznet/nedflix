@@ -35,6 +35,8 @@ services:
     depends_on:
       nedflix-db:
         condition: service_healthy
+      ersatztv:
+        condition: service_healthy
     ports:
       - "3000:3000"   # HTTP (redirects to HTTPS)
       - "3443:3443"   # HTTPS
@@ -60,6 +62,8 @@ services:
       # Local admin authentication (set in .env file)
       - ADMIN_USERNAME=${ADMIN_USERNAME:-}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      # ErsatzTV integration
+      - ERSATZTV_URL=${ERSATZTV_URL:-http://ersatztv:8409}
     volumes:
       # Mount your NFS share or video directory
       - ${NFS_PATH:-/mnt/nfs}:/mnt/nfs:ro
@@ -73,6 +77,29 @@ services:
       retries: 3
       start_period: 15s
 
+  # ErsatzTV - Auto-generated IPTV channels from local media
+  ersatztv:
+    image: jasongdove/ersatztv:latest
+    container_name: ersatztv
+    environment:
+      - TZ=${TIMEZONE:-America/New_York}
+    ports:
+      - "8409:8409"   # ErsatzTV Web UI and API
+    volumes:
+      # Same NFS mount as Nedflix for media access
+      - ${NFS_PATH:-/mnt/nfs}:/mnt/nfs:ro
+      # Persistent ErsatzTV configuration
+      - ersatztv-config:/root/.local/share/ersatztv
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8409/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
 volumes:
   nedflix-db-data:
     name: nedflix-db-data
+  ersatztv-config:
+    name: ersatztv-config

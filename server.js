@@ -15,6 +15,7 @@ const metadataService = require('./metadata-service');
 const userService = require('./user-service');
 const mediaService = require('./media-service');
 const iptvService = require('./iptv-service');
+const ersatztvService = require('./ersatztv-service');
 
 const app = express();
 
@@ -2346,6 +2347,156 @@ app.get('/api/iptv/stream', ensureAuthenticated, async (req, res) => {
 app.post('/api/iptv/refresh', ensureAuthenticated, async (req, res) => {
     try {
         iptvService.clearCache();
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ==================== ErsatzTV / Auto-Channels API ====================
+
+// API: Get ErsatzTV status
+app.get('/api/ersatztv/status', ensureAuthenticated, async (req, res) => {
+    try {
+        const status = await ersatztvService.getStatus();
+        res.json(status);
+    } catch (error) {
+        console.error('ErsatzTV status error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Get ErsatzTV health check
+app.get('/api/ersatztv/health', ensureAuthenticated, async (req, res) => {
+    try {
+        const health = await ersatztvService.checkHealth();
+        res.json(health);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Get all ErsatzTV channels
+app.get('/api/ersatztv/channels', ensureAuthenticated, async (req, res) => {
+    try {
+        const channels = await ersatztvService.getChannels();
+        res.json({
+            channels: channels,
+            playlistUrl: ersatztvService.getPlaylistUrl(),
+            epgUrl: ersatztvService.getEpgUrl()
+        });
+    } catch (error) {
+        console.error('ErsatzTV channels error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Get ErsatzTV libraries
+app.get('/api/ersatztv/libraries', ensureAuthenticated, async (req, res) => {
+    try {
+        const libraries = await ersatztvService.getLocalLibraries();
+        res.json({ libraries });
+    } catch (error) {
+        console.error('ErsatzTV libraries error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Create ErsatzTV library (admin only)
+app.post('/api/ersatztv/libraries', ensureAdmin, async (req, res) => {
+    const { name, paths, mediaKind } = req.body;
+
+    if (!name || !paths || !Array.isArray(paths)) {
+        return res.status(400).json({ error: 'Name and paths array are required' });
+    }
+
+    try {
+        const library = await ersatztvService.createLocalLibrary(name, paths, mediaKind || 'Movies');
+        res.json({ success: true, library });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Scan ErsatzTV library (admin only)
+app.post('/api/ersatztv/libraries/:id/scan', ensureAdmin, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        await ersatztvService.scanLibrary(id);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Create ErsatzTV channel (admin only)
+app.post('/api/ersatztv/channels', ensureAdmin, async (req, res) => {
+    const { name, number } = req.body;
+
+    if (!name || !number) {
+        return res.status(400).json({ error: 'Name and number are required' });
+    }
+
+    try {
+        const channel = await ersatztvService.createChannel(name, number);
+        res.json({ success: true, channel });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Delete ErsatzTV channel (admin only)
+app.delete('/api/ersatztv/channels/:id', ensureAdmin, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        await ersatztvService.deleteChannel(id);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Get channel guide/schedule
+app.get('/api/ersatztv/channels/:id/guide', ensureAuthenticated, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const guide = await ersatztvService.getChannelGuide(id);
+        res.json({ guide });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Setup auto-channels from NFS media (admin only)
+app.post('/api/ersatztv/setup', ensureAdmin, async (req, res) => {
+    try {
+        const result = await ersatztvService.setupAutoChannels();
+        res.json(result);
+    } catch (error) {
+        console.error('ErsatzTV setup error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Get M3U playlist URL for ErsatzTV channels
+app.get('/api/ersatztv/playlist-url', ensureAuthenticated, (req, res) => {
+    res.json({ url: ersatztvService.getPlaylistUrl() });
+});
+
+// API: Get EPG URL for ErsatzTV channels
+app.get('/api/ersatztv/epg-url', ensureAuthenticated, (req, res) => {
+    res.json({ url: ersatztvService.getEpgUrl() });
+});
+
+// API: Rebuild channel playout (admin only)
+app.post('/api/ersatztv/channels/:id/rebuild', ensureAdmin, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        await ersatztvService.rebuildChannelPlayout(id);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
