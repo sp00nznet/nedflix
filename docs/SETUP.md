@@ -11,6 +11,7 @@ Complete setup and configuration documentation for Nedflix.
 - [Authentication](#authentication)
 - [Admin Panel](#admin-panel)
 - [Media Library Setup](#media-library-setup)
+- [ErsatzTV / Auto-Channels](#ersatztv--auto-channels)
 - [Environment Variables](#environment-variables)
 - [Project Structure](#project-structure)
 - [Security Considerations](#security-considerations)
@@ -32,7 +33,10 @@ Complete setup and configuration documentation for Nedflix.
 
 ### Docker Compose (Recommended)
 
-Docker Compose sets up both the Nedflix application and a PostgreSQL database for persistent storage.
+Docker Compose sets up the complete Nedflix stack:
+- **Nedflix** - Main streaming application
+- **PostgreSQL** - Persistent database
+- **ErsatzTV** - Auto-generated 24/7 channels
 
 Create a `.env` file with your settings:
 
@@ -51,6 +55,10 @@ NFS_PATH=/path/to/your/videos
 POSTGRES_USER=nedflix
 POSTGRES_PASSWORD=nedflix_secret
 POSTGRES_DB=nedflix
+
+# ErsatzTV Configuration (optional - defaults provided)
+ERSATZTV_URL=http://ersatztv:8409
+TIMEZONE=America/New_York
 
 # OAuth Providers (optional)
 GOOGLE_CLIENT_ID=your-google-client-id
@@ -83,9 +91,10 @@ Then run:
 docker compose up -d
 ```
 
-This starts two containers:
+This starts three containers:
 - `nedflix` - The main application (ports 3000, 3443)
 - `nedflix-db` - PostgreSQL database (port 5432, internal only)
+- `ersatztv` - Auto-channel generation (port 8409)
 
 ### Docker Run (Without Compose)
 
@@ -390,6 +399,131 @@ The index enables:
 
 ---
 
+## ErsatzTV / Auto-Channels
+
+Nedflix integrates with [ErsatzTV](https://ersatztv.org/) to create 24/7 streaming channels from your media library.
+
+### What is ErsatzTV?
+
+ErsatzTV is an open-source application that creates custom IPTV channels from your local media. It generates:
+- Continuous 24/7 playback streams
+- M3U playlists compatible with any IPTV player
+- XMLTV EPG (Electronic Program Guide) data
+
+### Architecture
+
+```
+┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
+│   NFS Media     │      │    ErsatzTV     │      │    Nedflix      │
+│   /mnt/nfs      │◄────►│  Port 8409      │◄────►│  Port 3443      │
+│                 │      │                 │      │                 │
+│  - Movies/      │      │  Creates:       │      │  Displays:      │
+│  - TV Shows/    │      │  - Libraries    │      │  - Channel List │
+│  - Music/       │      │  - Channels     │      │  - Video Player │
+│                 │      │  - M3U/EPG      │      │  - EPG Info     │
+└─────────────────┘      └─────────────────┘      └─────────────────┘
+```
+
+### How It Works
+
+1. **ErsatzTV scans** the same NFS mount as Nedflix
+2. **Creates libraries** for Movies, TV Shows, and Music
+3. **Generates channels** with shuffled content playback
+4. **Nedflix displays** channels with a built-in player
+
+### Default Channels
+
+When you run "Setup Auto-Channels", these channels are created:
+
+| Channel | Number | Content | Playback Mode |
+|---------|--------|---------|---------------|
+| Movies 24/7 | 1 | All movies | Shuffled |
+| TV Shows Marathon | 2 | All TV episodes | Shuffled |
+| Music Videos | 3 | All music files | Shuffled |
+
+### Setting Up Channels
+
+#### Quick Setup (Recommended)
+
+1. **Start the Docker stack** - `docker compose up -d`
+2. **Log in as admin** to Nedflix
+3. **Click "Channels"** card on home screen
+4. **Click "Setup Auto-Channels"** button
+5. **Wait** for ErsatzTV to scan your media
+6. **Enjoy** your 24/7 channels!
+
+#### Manual ErsatzTV Configuration
+
+For advanced users, you can access ErsatzTV directly:
+
+1. **Open ErsatzTV UI** - `http://localhost:8409`
+2. **Add Local Libraries**:
+   - Movies: `/mnt/nfs/Movies`
+   - TV Shows: `/mnt/nfs/TV Shows`
+   - Music: `/mnt/nfs/Music`
+3. **Create Channels** manually with custom names/numbers
+4. **Configure Schedules** with specific content
+
+### Configuration Options
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ERSATZTV_URL` | `http://ersatztv:8409` | ErsatzTV API endpoint |
+| `TIMEZONE` | `America/New_York` | Timezone for EPG scheduling |
+
+### API Endpoints
+
+Nedflix provides these endpoints for ErsatzTV integration:
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/ersatztv/status` | GET | User | Get status, libraries, channels |
+| `/api/ersatztv/health` | GET | User | Check ErsatzTV availability |
+| `/api/ersatztv/channels` | GET | User | List all channels |
+| `/api/ersatztv/setup` | POST | Admin | Auto-setup libraries and channels |
+| `/api/ersatztv/libraries` | GET | User | List ErsatzTV libraries |
+| `/api/ersatztv/libraries` | POST | Admin | Create a new library |
+| `/api/ersatztv/libraries/:id/scan` | POST | Admin | Trigger library scan |
+| `/api/ersatztv/channels` | POST | Admin | Create a new channel |
+| `/api/ersatztv/channels/:id` | DELETE | Admin | Delete a channel |
+| `/api/ersatztv/channels/:id/guide` | GET | User | Get channel program guide |
+| `/api/ersatztv/channels/:id/rebuild` | POST | Admin | Rebuild channel playout |
+| `/api/ersatztv/playlist-url` | GET | User | Get M3U playlist URL |
+| `/api/ersatztv/epg-url` | GET | User | Get XMLTV EPG URL |
+
+### Using Channels in External Players
+
+ErsatzTV generates standard IPTV outputs that work with any compatible player:
+
+**M3U Playlist:**
+```
+http://localhost:8409/iptv/channels.m3u
+```
+
+**XMLTV EPG:**
+```
+http://localhost:8409/iptv/xmltv.xml
+```
+
+Compatible players:
+- VLC Media Player
+- Kodi (with IPTV Simple Client)
+- Jellyfin (with IPTV plugin)
+- Plex (with IPTV plugin)
+- Any M3U-compatible player
+
+### Disabling ErsatzTV
+
+If you don't need auto-channels, you can disable ErsatzTV:
+
+1. Comment out the `ersatztv` service in `docker-compose.yml`
+2. Remove the `ersatztv` dependency from the `nedflix` service
+3. Run `docker compose up -d`
+
+The "Channels" card will show "ErsatzTV unavailable" but Nedflix will function normally.
+
+---
+
 ## Environment Variables
 
 | Variable | Required | Default | Description |
@@ -417,6 +551,8 @@ The index enables:
 | `CALLBACK_BASE_URL` | No | - | Base URL for OAuth callbacks |
 | `OPENSUBTITLES_API_KEY` | No | - | API key for automatic subtitles |
 | `OMDB_API_KEY` | No | - | API key for movie/TV metadata |
+| `ERSATZTV_URL` | No | `http://ersatztv:8409` | ErsatzTV API endpoint |
+| `TIMEZONE` | No | `America/New_York` | Timezone for ErsatzTV EPG |
 
 *Admin credentials or OAuth provider required for authentication.
 
@@ -431,11 +567,13 @@ nedflix/
 ├── user-service.js        # User management service
 ├── media-service.js       # Media indexing and search service
 ├── metadata-service.js    # Movie/TV metadata fetching
+├── iptv-service.js        # Live TV (IPTV) service
+├── ersatztv-service.js    # ErsatzTV API integration for auto-channels
 ├── generate-certs.js      # SSL certificate generator
 ├── package.json           # Project dependencies
 ├── .env.example           # Environment template
 ├── Dockerfile             # Container build configuration
-├── docker-compose.yml     # Docker Compose orchestration
+├── docker-compose.yml     # Docker Compose (Nedflix + PostgreSQL + ErsatzTV)
 ├── db-init/               # PostgreSQL initialization scripts
 │   └── 01-schema.sql      # Database schema
 ├── certs/                 # SSL certificates (generated)
@@ -447,7 +585,9 @@ nedflix/
 │   ├── index.html         # Main application page
 │   ├── login.html         # Login page
 │   ├── styles.css         # Application styles
-│   ├── app.js             # Client-side JavaScript
+│   ├── app.js             # Core client-side JavaScript
+│   ├── livetv.js          # Live TV (IPTV) functionality
+│   ├── channels.js        # Channels (ErsatzTV) functionality
 │   ├── thumbnails/        # Cached movie/TV posters
 │   └── images/            # Avatar images
 └── README.md
@@ -649,3 +789,41 @@ docker compose restart nedflix
 ls -la ./certs/
 # Should show: server.key and server.cert
 ```
+
+### ErsatzTV / Channels Issues
+
+**Channels card shows "ErsatzTV unavailable":**
+- Check ErsatzTV container is running: `docker compose ps ersatztv`
+- View ErsatzTV logs: `docker compose logs ersatztv`
+- Verify health check: `curl http://localhost:8409/api/health`
+- Ensure `ERSATZTV_URL` is correct in environment
+
+**No channels after setup:**
+- ErsatzTV needs time to scan media (can take several minutes)
+- Check ErsatzTV UI at `http://localhost:8409` for scan progress
+- Verify media paths are accessible inside container
+- Check ErsatzTV logs for errors: `docker compose logs ersatztv`
+
+**Channels not playing:**
+- Verify stream URL format in browser console
+- Check if ErsatzTV has built playout for channel
+- Try accessing M3U directly: `http://localhost:8409/iptv/channels.m3u`
+- Ensure media files are playable format (MP4 recommended)
+
+**Setup Auto-Channels fails:**
+```bash
+# Check ErsatzTV API is responding
+curl http://localhost:8409/api/health
+
+# View Nedflix logs for API errors
+docker compose logs nedflix | grep -i ersatz
+
+# Restart ErsatzTV
+docker compose restart ersatztv
+```
+
+**Media not showing in ErsatzTV:**
+- Verify NFS mount is accessible: `docker compose exec ersatztv ls /mnt/nfs`
+- Check library paths match your directory structure
+- Run a manual scan from ErsatzTV UI
+- Ensure file permissions allow read access
