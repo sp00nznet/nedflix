@@ -407,6 +407,19 @@
                         </div>
                         <span class="library-name">Live TV</span>
                     </button>
+                    <button class="library-card" data-type="channels" id="channels-card">
+                        <div class="library-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                <path d="M8 21h8"></path>
+                                <path d="M12 17v4"></path>
+                                <path d="M7 8h2v4H7z" fill="currentColor"></path>
+                                <path d="M11 7h2v5h-2z" fill="currentColor"></path>
+                                <path d="M15 9h2v3h-2z" fill="currentColor"></path>
+                            </svg>
+                        </div>
+                        <span class="library-name">Channels</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -583,9 +596,93 @@
                 <button class="livetv-open-settings" id="livetv-open-settings">Open Settings</button>
             </div>
         </div>
+
+        <!-- Channels View (ErsatzTV Auto-Channels) -->
+        <div class="channels-view" id="channels-view" style="display: none;">
+            <div class="channels-container">
+                <div class="channels-sidebar">
+                    <div class="channels-header">
+                        <button class="channels-back-btn" id="channels-back-btn" title="Back to libraries">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                        </button>
+                        <h2>Channels</h2>
+                        <button class="channels-refresh-btn" id="channels-refresh-btn" title="Refresh channels">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="channels-status" id="channels-status">
+                        <span class="status-indicator"></span>
+                        <span class="status-text">Checking...</span>
+                    </div>
+                    <div class="channels-list" id="channels-list">
+                        <!-- Channels will be populated here -->
+                    </div>
+                    <div class="channels-admin-actions admin-only" id="channels-admin-actions" style="display: none;">
+                        <button class="channels-setup-btn" id="channels-setup-btn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"></path>
+                            </svg>
+                            Setup Auto-Channels
+                        </button>
+                    </div>
+                </div>
+                <div class="channels-main">
+                    <div class="channels-player-container">
+                        <video id="channels-player" controls autoplay>
+                            Your browser does not support the video tag.
+                        </video>
+                        <div class="channels-placeholder" id="channels-placeholder">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                <path d="M8 21h8"></path>
+                                <path d="M12 17v4"></path>
+                            </svg>
+                            <p>Select a channel to watch</p>
+                        </div>
+                    </div>
+                    <div class="channels-info" id="channels-info">
+                        <div class="channels-channel-info">
+                            <div class="channels-channel-number" id="channels-channel-number">--</div>
+                            <div class="channels-channel-details">
+                                <h3 id="channels-channel-name">No channel selected</h3>
+                                <p id="channels-program-title">-</p>
+                            </div>
+                        </div>
+                        <div class="channels-program-info" id="channels-program-info">
+                            <div class="channels-now-playing">
+                                <span class="channels-label">Now Playing</span>
+                                <span class="channels-program-name" id="channels-now-title">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="channels-no-config" id="channels-no-config" style="display: none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                    <path d="M8 21h8"></path>
+                    <path d="M12 17v4"></path>
+                </svg>
+                <h3>Channels Not Set Up</h3>
+                <p>Auto-generated channels from your media library are not configured yet.</p>
+                <p class="admin-only" id="channels-admin-hint">Click "Setup Auto-Channels" to create channels from your media.</p>
+                <button class="channels-setup-btn admin-only" id="channels-setup-btn-main">Setup Auto-Channels</button>
+            </div>
+            <div class="channels-loading" id="channels-loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Setting up channels...</p>
+            </div>
+        </div>
     </div>
 
     <script src="app.js"></script>
     <script src="livetv.js"></script>
+    <script src="channels.js"></script>
 </body>
 </html>
