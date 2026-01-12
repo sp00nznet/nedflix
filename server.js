@@ -31,6 +31,10 @@ const OPENSUBTITLES_API_URL = 'https://api.opensubtitles.com/api/v1';
 // OMDb API configuration (for movie/show metadata)
 const OMDB_API_KEY = process.env.OMDB_API_KEY || '';
 
+// IPTV / Live TV configuration (default URLs, can be overridden per-user)
+const IPTV_PLAYLIST_URL = process.env.IPTV_PLAYLIST_URL || '';
+const IPTV_EPG_URL = process.env.IPTV_EPG_URL || '';
+
 // Initialize metadata service
 metadataService.init(OMDB_API_KEY);
 
@@ -2241,7 +2245,7 @@ app.get('/', (req, res, next) => {
 app.get('/api/iptv/channels', ensureAuthenticated, async (req, res) => {
     try {
         const userData = await userService.getUser(req.user.id);
-        const playlistUrl = userData?.settings?.iptv?.playlistUrl;
+        const playlistUrl = userData?.settings?.iptv?.playlistUrl || IPTV_PLAYLIST_URL;
 
         if (!playlistUrl) {
             return res.json({ configured: false, channels: [], groups: {} });
@@ -2266,7 +2270,7 @@ app.get('/api/iptv/channels', ensureAuthenticated, async (req, res) => {
 app.get('/api/iptv/epg', ensureAuthenticated, async (req, res) => {
     try {
         const userData = await userService.getUser(req.user.id);
-        const epgUrl = userData?.settings?.iptv?.epgUrl;
+        const epgUrl = userData?.settings?.iptv?.epgUrl || IPTV_EPG_URL;
 
         if (!epgUrl) {
             return res.json({ channels: {}, programs: {} });
@@ -2284,7 +2288,7 @@ app.get('/api/iptv/epg', ensureAuthenticated, async (req, res) => {
 app.get('/api/iptv/now-playing/:channelId', ensureAuthenticated, async (req, res) => {
     try {
         const userData = await userService.getUser(req.user.id);
-        const epgUrl = userData?.settings?.iptv?.epgUrl;
+        const epgUrl = userData?.settings?.iptv?.epgUrl || IPTV_EPG_URL;
 
         if (!epgUrl) {
             return res.json({ current: null, next: null });
