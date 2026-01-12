@@ -12,6 +12,7 @@ Complete setup and configuration documentation for Nedflix.
 - [Admin Panel](#admin-panel)
 - [Media Library Setup](#media-library-setup)
 - [ErsatzTV / Auto-Channels](#ersatztv--auto-channels)
+- [Desktop Application](#desktop-application)
 - [Environment Variables](#environment-variables)
 - [Project Structure](#project-structure)
 - [Security Considerations](#security-considerations)
@@ -524,6 +525,231 @@ The "Channels" card will show "ErsatzTV unavailable" but Nedflix will function n
 
 ---
 
+## Desktop Application
+
+Nedflix includes a standalone Windows desktop application built with Electron. This is ideal for personal use, HTPCs, and living room setups with Xbox controllers.
+
+### Features Overview
+
+| Feature | Description |
+|---------|-------------|
+| **Standalone** | No server required - embedded Express server |
+| **Xbox Controller** | Full gamepad navigation support |
+| **Editable Media Paths** | Configure directories in Settings |
+| **Media Keys** | Hardware play/pause, skip controls |
+| **IPTV Support** | M3U playlist and EPG configuration |
+| **Audio Visualizer** | Multiple visualization modes |
+| **Portable Mode** | Optional no-install executable |
+| **Auto Node.js Install** | Build scripts install Node.js automatically |
+
+### Building the Desktop App
+
+#### Prerequisites
+
+The build script automatically installs Node.js if not present. Just run the script!
+
+#### Using build.bat (Recommended)
+
+```batch
+cd desktop
+build.bat
+```
+
+The interactive menu offers:
+1. **Build Windows x64 installer** - For 64-bit Windows
+2. **Build Windows x86 installer** - For 32-bit Windows
+3. **Build portable version** - No installation required
+4. **Build all versions** - Creates all variants
+5. **Run development mode** - With DevTools enabled
+6. **Exit**
+
+#### Using npm Commands
+
+```bash
+cd desktop
+npm install              # Install dependencies
+npm run build:win        # Windows x64 installer
+npm run build:win32      # Windows x86 installer
+npm run build:portable   # Portable executable
+npm run dev              # Development mode
+npm start                # Production mode
+```
+
+#### Output Files
+
+Built applications are placed in `desktop/dist/`:
+- `Nedflix Setup x.x.x.exe` - NSIS installer with uninstaller
+- `Nedflix-Portable-x.x.x.exe` - Standalone portable executable
+
+### Xbox Controller Support
+
+The desktop app includes comprehensive gamepad support for living room use.
+
+#### Button Mapping
+
+| Button | Action |
+|--------|--------|
+| **A** | Select / Confirm |
+| **B** | Back / Cancel |
+| **X** | Play / Pause |
+| **Y** | Toggle Fullscreen |
+| **Start** | Play / Pause |
+| **Back/Select** | Open Settings |
+| **LB** | Previous File |
+| **RB** | Next File |
+| **LT** | Volume Down |
+| **RT** | Volume Up |
+| **D-Pad Up/Down** | Navigate vertically |
+| **D-Pad Left/Right** | Navigate horizontally |
+| **Left Stick** | Navigate (with repeat delay) |
+| **Right Stick X** | Seek video (while playing) |
+
+#### Controller Features
+
+- **60fps polling** for responsive input
+- **Vibration feedback** with dual rumble support
+- **Auto-detection** of controller connection/disconnection
+- **Focus indicators** with visual glow effects
+- **Multi-controller support** (Xbox, PlayStation, Nintendo)
+
+#### Enabling Vibration
+
+1. Open Settings (click user menu or press Back button)
+2. Scroll to "Controller Settings"
+3. Toggle "Controller Vibration" on
+
+### Media Path Configuration
+
+#### Adding Media Paths
+
+1. Click the user menu (top right corner)
+2. Scroll to "Media Paths" section
+3. Click "Add Path"
+4. Select a directory in the file dialog
+5. The path is saved automatically
+
+#### Removing Media Paths
+
+1. Open Settings
+2. Find the path in the Media Paths list
+3. Click the X button next to the path
+
+#### Configuration Storage
+
+Paths are stored in:
+- **Windows:** `%APPDATA%/nedflix/nedflix-config.json`
+
+Example configuration file:
+```json
+{
+  "mediaPaths": [
+    "C:\\Videos",
+    "D:\\Movies",
+    "D:\\TV Shows",
+    "E:\\Music"
+  ]
+}
+```
+
+#### Environment Variable
+
+You can also set paths via environment variable:
+```batch
+set NEDFLIX_MEDIA_PATHS=C:\Videos;D:\Movies;D:\TV Shows
+```
+
+Paths are semicolon-separated on Windows.
+
+### Live TV Configuration (Desktop)
+
+The desktop app supports IPTV with configurable URLs:
+
+1. Open Settings
+2. Find "Live TV (IPTV)" section
+3. Enter your playlist URL (M3U/M3U8)
+4. Optionally enter EPG URL (XMLTV)
+5. Settings are saved automatically
+
+### Media Key Support
+
+The desktop app responds to hardware media keys:
+
+| Key | Action |
+|-----|--------|
+| **Play/Pause** | Toggle video playback |
+| **Stop** | Stop playback |
+| **Previous Track** | Go to previous file |
+| **Next Track** | Go to next file |
+| **F11** | Toggle fullscreen |
+
+### Audio Visualizer
+
+When playing audio files, the visualizer offers multiple modes:
+
+| Mode | Description |
+|------|-------------|
+| **Bars** | Classic equalizer bars |
+| **Wave** | Waveform visualization |
+| **Circular** | Radial frequency display |
+| **Particles** | Particle system reacting to audio |
+| **None** | Disable visualizer |
+
+Select the mode from the dropdown above the player.
+
+### Desktop Architecture
+
+```
+Electron App
+├── Main Process (main.js)
+│   ├── BrowserWindow - Main app window
+│   ├── Express Server - Media streaming API
+│   ├── IPC Handlers - Config, fullscreen, paths
+│   ├── Global Shortcuts - Media keys
+│   └── Config Store - %APPDATA%/nedflix/
+│
+├── Preload Script (preload.js)
+│   └── Secure IPC bridge (nedflixDesktop API)
+│
+└── Renderer Process (public/)
+    ├── index.html - UI structure
+    ├── app.js - Application logic
+    ├── gamepad.js - Controller support
+    └── styles.css - Styling
+```
+
+### Desktop API Endpoints
+
+The embedded server provides these endpoints:
+
+| Endpoint | Description |
+|----------|-------------|
+| `/api/libraries` | List configured media directories |
+| `/api/browse?path=` | Browse directory contents |
+| `/api/video?path=` | Stream video file (range requests) |
+| `/api/audio?path=` | Stream audio file |
+| `/api/user` | Mock user (always authenticated) |
+| `/api/settings` | Get/set user settings |
+
+### Security Features
+
+- **Context Isolation** - Renderer cannot access Node modules
+- **Preload Script** - Secure IPC bridge
+- **Path Validation** - Prevents directory traversal
+- **No Node Integration** - Enhanced security
+- **Whitelisted Paths** - Only configured directories accessible
+
+### Supported Formats
+
+#### Video
+- MP4, WebM, Ogg, AVI, MKV, MOV, M4V, WMV
+
+#### Audio
+- MP3, M4A, FLAC, WAV, AAC, OGG, WMA, Opus, AIFF
+
+Actual playback depends on system codecs. MP4/WebM have best compatibility.
+
+---
+
 ## Environment Variables
 
 | Variable | Required | Default | Description |
@@ -562,7 +788,7 @@ The "Channels" card will show "ErsatzTV unavailable" but Nedflix will function n
 
 ```
 nedflix/
-├── server.js              # Main Express server
+├── server.js              # Main Express server (web)
 ├── db.js                  # Database abstraction layer (SQLite/PostgreSQL)
 ├── user-service.js        # User management service
 ├── media-service.js       # Media indexing and search service
@@ -581,7 +807,7 @@ nedflix/
 │   └── server.cert
 ├── docs/
 │   └── SETUP.md           # This file
-├── public/
+├── public/                # Web application UI
 │   ├── index.html         # Main application page
 │   ├── login.html         # Login page
 │   ├── styles.css         # Application styles
@@ -590,6 +816,18 @@ nedflix/
 │   ├── channels.js        # Channels (ErsatzTV) functionality
 │   ├── thumbnails/        # Cached movie/TV posters
 │   └── images/            # Avatar images
+├── desktop/               # Electron desktop application
+│   ├── main.js            # Electron main process
+│   ├── preload.js         # Secure IPC bridge script
+│   ├── package.json       # Desktop app configuration
+│   ├── build.bat          # Windows build script (auto-installs Node.js)
+│   ├── install.bat        # Node.js auto-installer utility
+│   ├── README.md          # Desktop-specific documentation
+│   └── public/            # Desktop UI files
+│       ├── index.html     # Desktop application UI
+│       ├── app.js         # Desktop application logic
+│       ├── gamepad.js     # Xbox/gamepad controller support
+│       └── styles.css     # Desktop styling
 └── README.md
 ```
 
@@ -827,3 +1065,48 @@ docker compose restart ersatztv
 - Check library paths match your directory structure
 - Run a manual scan from ErsatzTV UI
 - Ensure file permissions allow read access
+
+### Desktop Application Issues
+
+**Build fails - Node.js not found:**
+- Run `build.bat` which auto-installs Node.js
+- Or manually install Node.js v20+ from nodejs.org
+- Restart command prompt after Node.js installation
+
+**Controller not detected:**
+- Ensure controller is connected before starting app
+- Check browser console for gamepad events
+- Try reconnecting the controller
+- Xbox controllers work best; other controllers may vary
+
+**Controller buttons not working:**
+- Click inside the app window first to give it focus
+- Check Settings > Controller Settings > Vibration toggle
+- Verify gamepad is detected (indicator shows in UI)
+
+**Media paths not saving:**
+- Check write permissions to `%APPDATA%/nedflix/`
+- Delete `nedflix-config.json` and reconfigure
+- Run app as administrator if needed
+
+**Videos won't play:**
+- Check browser/Electron codec support
+- Convert to MP4 (H.264) for best compatibility
+- Verify file path doesn't contain special characters
+
+**App crashes on startup:**
+```batch
+# Run in development mode to see errors
+cd desktop
+npm run dev
+```
+
+**Build creates empty installer:**
+- Clear `desktop/dist/` folder
+- Run `npm install` to refresh dependencies
+- Check for build errors in console output
+
+**Media keys not working:**
+- Some keyboards require Fn key for media keys
+- Check if another app is capturing media keys
+- Try restarting the app
