@@ -12,6 +12,10 @@
     "build:win": "electron-builder --win --x64",
     "build:win32": "electron-builder --win --ia32",
     "build:portable": "electron-builder --win portable",
+    "build:linux": "electron-builder --linux --x64",
+    "build:linux-arm": "electron-builder --linux --arm64",
+    "build:deb": "electron-builder --linux deb --x64",
+    "build:appimage": "electron-builder --linux AppImage --x64",
     "pack": "electron-builder --dir"
   },
   "dependencies": {
@@ -47,6 +51,47 @@
       ],
       "icon": "build/icon.ico",
       "publisherName": "Nedflix"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "deb",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        },
+        {
+          "target": "tar.gz",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "build/icons",
+      "category": "Video",
+      "maintainer": "Nedflix",
+      "desktop": {
+        "Name": "Nedflix",
+        "Comment": "Personal Video Streaming Platform",
+        "Categories": "Video;AudioVideo;Player",
+        "Keywords": "video;streaming;media;player;iptv"
+      }
+    },
+    "deb": {
+      "depends": [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libuuid1"
+      ],
+      "artifactName": "nedflix_${version}_${arch}.deb"
+    },
+    "appImage": {
+      "artifactName": "Nedflix-${version}-${arch}.AppImage"
     },
     "nsis": {
       "oneClick": false,
