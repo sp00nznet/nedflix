@@ -1,0 +1,51 @@
+{
+  "name": "nedflix-xbox",
+  "version": "1.0.0",
+  "description": "Nedflix Xbox Series S/X Client",
+  "author": "Nedflix",
+  "license": "MIT",
+  "scripts": {
+    "prebuild": "echo Nedflix Xbox requires Windows with .NET SDK and Windows SDK",
+    "build": "dotnet build -c Release -p:Platform=x64",
+    "build:debug": "dotnet build -c Debug -p:Platform=x64",
+    "build:xbox": "dotnet build -c Xbox -p:Platform=x64",
+    "publish": "dotnet publish -c Release -p:Platform=x64 -p:AppxPackageSigningEnabled=false",
+    "clean": "dotnet clean && rimraf bin obj",
+    "restore": "dotnet restore",
+    "help": "echo Use build.bat (Windows) or build.ps1 (PowerShell) for full build options"
+  },
+  "keywords": [
+    "nedflix",
+    "xbox",
+    "series-x",
+    "series-s",
+    "uwp",
+    "streaming",
+    "video"
+  ],
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "os": [
+    "win32"
+  ],
+  "devDependencies": {
+    "rimraf": "^5.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sp00nznet/nedflix.git",
+    "directory": "xbox"
+  },
+  "xbox": {
+    "requirements": {
+      "dotnet": ">=6.0",
+      "windowsSDK": ">=10.0.19041.0",
+      "devMode": true
+    },
+    "deployment": {
+      "method": "sideload",
+      "portal": "https://<xbox-ip>:11443"
+    }
+  }
+}
