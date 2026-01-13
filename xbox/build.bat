@@ -17,14 +17,27 @@ echo.
 :: Check for .NET SDK
 where dotnet >nul 2>nul
 if %errorlevel% neq 0 (
-    echo .NET SDK is not installed.
+    echo .NET SDK is not installed. Installing automatically...
     echo.
-    echo Please install .NET 6.0 SDK or later from:
-    echo   https://dotnet.microsoft.com/download/dotnet/6.0
-    echo.
-    echo After installation, restart this script.
-    pause
-    exit /b 1
+    call :install_dotnet_sdk
+    if !errorlevel! neq 0 (
+        echo ERROR: Failed to install .NET SDK
+        echo Please install manually from: https://dotnet.microsoft.com/download/dotnet/8.0
+        pause
+        exit /b 1
+    )
+
+    :: Refresh environment
+    call :refresh_path
+
+    :: Check again
+    where dotnet >nul 2>nul
+    if !errorlevel! neq 0 (
+        echo ERROR: .NET SDK was installed but not found in PATH
+        echo Please restart your terminal and run this script again.
+        pause
+        exit /b 1
+    )
 )
 
 :: Check .NET SDK version
@@ -231,4 +244,83 @@ exit /b 0
 :end
 echo.
 pause
+exit /b 0
+
+:: ========================================
+:: Function to refresh PATH environment
+:: ========================================
+:refresh_path
+for /f "tokens=2*" %%a in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path 2^>nul') do set "SYS_PATH=%%b"
+for /f "tokens=2*" %%a in ('reg query "HKCU\Environment" /v Path 2^>nul') do set "USER_PATH=%%b"
+set "PATH=%SYS_PATH%;%USER_PATH%"
+exit /b 0
+
+:: ========================================
+:: Function to install .NET SDK
+:: ========================================
+:install_dotnet_sdk
+echo ----------------------------------------
+echo Installing .NET SDK 8.0...
+echo ----------------------------------------
+echo.
+
+:: Try winget first (Windows 11 / Windows 10 with App Installer)
+where winget >nul 2>nul
+if %errorlevel% equ 0 (
+    echo Installing via winget...
+    winget install Microsoft.DotNet.SDK.8 --silent --accept-package-agreements --accept-source-agreements
+    if !errorlevel! equ 0 (
+        echo .NET SDK installed successfully via winget!
+        goto :install_dotnet_done
+    )
+    echo Winget install failed, trying alternative method...
+    echo.
+)
+
+:: Try Chocolatey
+where choco >nul 2>nul
+if %errorlevel% equ 0 (
+    echo Installing via Chocolatey...
+    choco install dotnet-sdk -y
+    if !errorlevel! equ 0 (
+        echo .NET SDK installed successfully via Chocolatey!
+        goto :install_dotnet_done
+    )
+    echo Chocolatey install failed, trying manual download...
+    echo.
+)
+
+:: Manual download and install
+echo Downloading .NET SDK installer...
+set "DOTNET_URL=https://download.visualstudio.microsoft.com/download/pr/69f3e301-5243-4c5f-8b8e-e98e5d59ef3a/74e7b8d48b6a7bb60ec6eb0e5c6c8f0e/dotnet-sdk-8.0.101-win-x64.exe"
+set "DOTNET_INSTALLER=%TEMP%\dotnet-sdk-installer.exe"
+
+echo Downloading from Microsoft...
+powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%DOTNET_URL%' -OutFile '%DOTNET_INSTALLER%' -UseBasicParsing}"
+
+if not exist "%DOTNET_INSTALLER%" (
+    echo ERROR: Failed to download .NET SDK installer
+    exit /b 1
+)
+
+echo.
+echo Installing .NET SDK (this may take several minutes)...
+echo You may see a UAC prompt - click Yes to continue.
+echo.
+
+:: Try silent install first
+"%DOTNET_INSTALLER%" /install /quiet /norestart
+if !errorlevel! neq 0 (
+    echo Silent install failed. Trying interactive install...
+    "%DOTNET_INSTALLER%"
+)
+
+:: Clean up
+del "%DOTNET_INSTALLER%" 2>nul
+
+:install_dotnet_done
+echo.
+echo ----------------------------------------
+echo .NET SDK installation complete!
+echo ----------------------------------------
 exit /b 0
