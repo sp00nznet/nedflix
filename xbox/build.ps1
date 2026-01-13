@@ -39,6 +39,70 @@ Write-Host "Nedflix Xbox - Build Script" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
+function Install-DotNetSDK {
+    Write-Host "Installing .NET SDK..." -ForegroundColor Yellow
+    Write-Host ""
+
+    # Check if winget is available (Windows 11 / Windows 10 with App Installer)
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        Write-Host "Installing .NET SDK via winget..." -ForegroundColor Cyan
+        winget install Microsoft.DotNet.SDK.8 --silent --accept-package-agreements --accept-source-agreements
+
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host ".NET SDK installed successfully!" -ForegroundColor Green
+            # Refresh environment variables
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+            return $true
+        }
+    }
+
+    # Check if Chocolatey is available
+    if (Get-Command choco -ErrorAction SilentlyContinue) {
+        Write-Host "Installing .NET SDK via Chocolatey..." -ForegroundColor Cyan
+        choco install dotnet-sdk -y
+
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host ".NET SDK installed successfully!" -ForegroundColor Green
+            # Refresh environment variables
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+            return $true
+        }
+    }
+
+    # Manual download and install
+    Write-Host "Downloading .NET SDK installer..." -ForegroundColor Cyan
+    $dotnetVersion = "8.0.1"
+    $installerUrl = "https://download.visualstudio.microsoft.com/download/pr/69f3e301-5243-4c5f-8b8e-e98e5d59ef3a/74e7b8d48b6a7bb60ec6eb0e5c6c8f0e/dotnet-sdk-8.0.101-win-x64.exe"
+    $installerPath = "$env:TEMP\dotnet-sdk-installer.exe"
+
+    try {
+        Write-Host "Downloading from: $installerUrl" -ForegroundColor Cyan
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath -UseBasicParsing
+
+        Write-Host "Installing .NET SDK (this may take a few minutes)..." -ForegroundColor Cyan
+        Write-Host "You may see a UAC prompt..." -ForegroundColor Yellow
+
+        Start-Process -FilePath $installerPath -ArgumentList "/install","/quiet","/norestart" -Wait -Verb RunAs
+
+        # Clean up
+        Remove-Item $installerPath -Force -ErrorAction SilentlyContinue
+
+        # Refresh environment variables
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+
+        Write-Host ""
+        Write-Host ".NET SDK installation complete!" -ForegroundColor Green
+        Write-Host "Please restart your PowerShell session to use the SDK" -ForegroundColor Yellow
+        return $true
+    }
+    catch {
+        Write-Host "ERROR: Failed to download or install .NET SDK" -ForegroundColor Red
+        Write-Host "Please install manually from: https://dotnet.microsoft.com/download/dotnet/8.0" -ForegroundColor Yellow
+        return $false
+    }
+}
+
 function Test-DotNetSDK {
     try {
         $version = dotnet --version
@@ -46,9 +110,29 @@ function Test-DotNetSDK {
         return $true
     }
     catch {
-        Write-Host "ERROR: .NET SDK not found" -ForegroundColor Red
-        Write-Host "Install from: https://dotnet.microsoft.com/download" -ForegroundColor Yellow
-        return $false
+        Write-Host ".NET SDK not found. Installing automatically..." -ForegroundColor Yellow
+        Write-Host ""
+
+        $installed = Install-DotNetSDK
+
+        if ($installed) {
+            # Try again after install
+            try {
+                $version = dotnet --version
+                Write-Host "Found .NET SDK: $version" -ForegroundColor Green
+                return $true
+            }
+            catch {
+                Write-Host "ERROR: .NET SDK was installed but not found in PATH" -ForegroundColor Red
+                Write-Host "Please restart your PowerShell session and run this script again" -ForegroundColor Yellow
+                return $false
+            }
+        }
+        else {
+            Write-Host "ERROR: Failed to install .NET SDK" -ForegroundColor Red
+            Write-Host "Please install manually from: https://dotnet.microsoft.com/download/dotnet/8.0" -ForegroundColor Yellow
+            return $false
+        }
     }
 }
 
