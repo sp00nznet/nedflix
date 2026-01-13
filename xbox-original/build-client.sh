@@ -29,18 +29,107 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+# Detect OS
+detect_os() {
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        echo "linux"
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "macos"
+    elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]]; then
+        echo "windows"
+    else
+        echo "unknown"
+    fi
+}
+
+# Install system dependencies
+install_dependencies() {
+    local os=$(detect_os)
+    echo -e "${YELLOW}Installing system dependencies...${NC}"
+
+    case $os in
+        linux)
+            if command -v apt-get &> /dev/null; then
+                echo -e "${CYAN}Detected Debian/Ubuntu system${NC}"
+                sudo apt-get update
+                sudo apt-get install -y git build-essential cmake flex bison clang lld llvm
+            elif command -v dnf &> /dev/null; then
+                echo -e "${CYAN}Detected Fedora/RHEL system${NC}"
+                sudo dnf install -y git gcc gcc-c++ make cmake flex bison clang lld llvm
+            elif command -v pacman &> /dev/null; then
+                echo -e "${CYAN}Detected Arch Linux system${NC}"
+                sudo pacman -S --noconfirm git base-devel cmake flex bison clang lld llvm
+            else
+                echo -e "${YELLOW}WARNING: Unknown package manager. Install git, gcc, make, cmake manually${NC}"
+            fi
+            ;;
+        macos)
+            if ! command -v brew &> /dev/null; then
+                echo -e "${YELLOW}Installing Homebrew...${NC}"
+                /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            fi
+            echo -e "${CYAN}Installing dependencies via Homebrew...${NC}"
+            brew install git cmake flex bison llvm
+            ;;
+        windows)
+            echo -e "${YELLOW}Please install the following manually on Windows:${NC}"
+            echo "  - Git for Windows: https://git-scm.com/download/win"
+            echo "  - LLVM: https://releases.llvm.org/"
+            echo "  - CMake: https://cmake.org/download/"
+            ;;
+    esac
+}
+
+# Install nxdk toolchain
+install_nxdk() {
+    echo ""
+    echo -e "${YELLOW}Installing nxdk toolchain...${NC}"
+
+    local install_dir="$HOME/nxdk"
+
+    if [ -d "$install_dir" ]; then
+        echo -e "${CYAN}nxdk already exists at $install_dir, updating...${NC}"
+        cd "$install_dir"
+        git pull
+    else
+        echo -e "${CYAN}Cloning nxdk from GitHub...${NC}"
+        git clone --recursive https://github.com/XboxDev/nxdk.git "$install_dir"
+        cd "$install_dir"
+    fi
+
+    echo -e "${CYAN}Building nxdk toolchain...${NC}"
+    ./build.sh
+
+    export NXDK_DIR="$install_dir"
+    echo ""
+    echo -e "${GREEN}nxdk installed successfully at: $install_dir${NC}"
+    echo -e "${YELLOW}Add this to your ~/.bashrc or ~/.zshrc:${NC}"
+    echo -e "${CYAN}export NXDK_DIR=$install_dir${NC}"
+
+    cd "$SCRIPT_DIR"
+}
+
 # Check for nxdk toolchain
 check_nxdk() {
     if [ -z "$NXDK_DIR" ]; then
-        echo -e "${RED}ERROR: NXDK_DIR environment variable not set${NC}"
-        echo -e "${YELLOW}Install nxdk from: https://github.com/XboxDev/nxdk${NC}"
-        echo -e "${YELLOW}Then set NXDK_DIR to the installation path${NC}"
-        return 1
+        echo -e "${YELLOW}NXDK_DIR not set. Checking default location...${NC}"
+        if [ -d "$HOME/nxdk" ]; then
+            export NXDK_DIR="$HOME/nxdk"
+            echo -e "${GREEN}Found nxdk at: $NXDK_DIR${NC}"
+            return 0
+        else
+            echo -e "${YELLOW}nxdk not found. Installing automatically...${NC}"
+            install_dependencies
+            install_nxdk
+            return 0
+        fi
     fi
 
     if [ ! -d "$NXDK_DIR" ]; then
-        echo -e "${RED}ERROR: NXDK directory not found at $NXDK_DIR${NC}"
-        return 1
+        echo -e "${YELLOW}NXDK directory not found at $NXDK_DIR. Installing...${NC}"
+        install_dependencies
+        install_nxdk
+        return 0
     fi
 
     echo -e "${GREEN}Found nxdk toolchain at: $NXDK_DIR${NC}"

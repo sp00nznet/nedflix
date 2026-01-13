@@ -30,21 +30,195 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+# Detect OS
+detect_os() {
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        echo "linux"
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "macos"
+    elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]]; then
+        echo "windows"
+    else
+        echo "unknown"
+    fi
+}
+
+# Install JDK
+install_jdk() {
+    local os=$(detect_os)
+    echo -e "${YELLOW}Installing JDK 17...${NC}"
+
+    case $os in
+        linux)
+            if command -v apt-get &> /dev/null; then
+                echo -e "${CYAN}Installing via apt (Debian/Ubuntu)${NC}"
+                sudo apt-get update
+                sudo apt-get install -y openjdk-17-jdk
+            elif command -v dnf &> /dev/null; then
+                echo -e "${CYAN}Installing via dnf (Fedora/RHEL)${NC}"
+                sudo dnf install -y java-17-openjdk-devel
+            elif command -v pacman &> /dev/null; then
+                echo -e "${CYAN}Installing via pacman (Arch Linux)${NC}"
+                sudo pacman -S --noconfirm jdk17-openjdk
+            else
+                echo -e "${YELLOW}Please install JDK 17 manually from: https://adoptium.net/${NC}"
+                return 1
+            fi
+            ;;
+        macos)
+            if ! command -v brew &> /dev/null; then
+                echo -e "${YELLOW}Installing Homebrew first...${NC}"
+                /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            fi
+            echo -e "${CYAN}Installing via Homebrew${NC}"
+            brew install openjdk@17
+            # Link it
+            sudo ln -sfn /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-17.jdk 2>/dev/null || true
+            ;;
+        windows)
+            echo -e "${YELLOW}Please install JDK 17 manually from: https://adoptium.net/${NC}"
+            return 1
+            ;;
+    esac
+
+    echo -e "${GREEN}JDK installed successfully!${NC}"
+}
+
+# Install Android SDK command-line tools
+install_android_sdk() {
+    local os=$(detect_os)
+    local install_dir="$HOME/Android/Sdk"
+
+    echo -e "${YELLOW}Installing Android SDK...${NC}"
+
+    # Create directory
+    mkdir -p "$install_dir"
+    cd "$install_dir"
+
+    # Download command-line tools
+    echo -e "${CYAN}Downloading Android command-line tools...${NC}"
+
+    local cmdtools_url=""
+    case $os in
+        linux)
+            cmdtools_url="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
+            ;;
+        macos)
+            cmdtools_url="https://dl.google.com/android/repository/commandlinetools-mac-11076708_latest.zip"
+            ;;
+        windows)
+            cmdtools_url="https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
+            ;;
+    esac
+
+    # Download and extract
+    if command -v wget &> /dev/null; then
+        wget -q "$cmdtools_url" -O cmdtools.zip
+    elif command -v curl &> /dev/null; then
+        curl -L "$cmdtools_url" -o cmdtools.zip
+    else
+        echo -e "${RED}ERROR: wget or curl required to download Android SDK${NC}"
+        return 1
+    fi
+
+    # Extract command-line tools
+    if command -v unzip &> /dev/null; then
+        unzip -q cmdtools.zip
+        rm cmdtools.zip
+        mkdir -p cmdline-tools/latest
+        mv cmdline-tools/* cmdline-tools/latest/ 2>/dev/null || true
+    else
+        echo -e "${RED}ERROR: unzip required to extract Android SDK${NC}"
+        return 1
+    fi
+
+    # Set ANDROID_HOME
+    export ANDROID_HOME="$install_dir"
+    export PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools"
+
+    # Accept licenses
+    echo -e "${CYAN}Accepting Android SDK licenses...${NC}"
+    yes | sdkmanager --licenses > /dev/null 2>&1 || true
+
+    # Install required SDK packages
+    echo -e "${CYAN}Installing Android SDK packages...${NC}"
+    sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0" "extras;google;google_play_services" "extras;android;m2repository"
+
+    echo -e "${GREEN}Android SDK installed at: $install_dir${NC}"
+    echo -e "${YELLOW}Add these to your ~/.bashrc or ~/.zshrc:${NC}"
+    echo -e "${CYAN}export ANDROID_HOME=$install_dir${NC}"
+    echo -e "${CYAN}export PATH=\$PATH:\$ANDROID_HOME/cmdline-tools/latest/bin:\$ANDROID_HOME/platform-tools${NC}"
+
+    cd "$SCRIPT_DIR"
+}
+
+# Install Gradle
+install_gradle() {
+    local os=$(detect_os)
+    echo -e "${YELLOW}Installing Gradle...${NC}"
+
+    case $os in
+        linux)
+            if command -v apt-get &> /dev/null; then
+                sudo apt-get install -y gradle
+            elif command -v dnf &> /dev/null; then
+                sudo dnf install -y gradle
+            elif command -v pacman &> /dev/null; then
+                sudo pacman -S --noconfirm gradle
+            else
+                echo -e "${YELLOW}Using Gradle wrapper instead${NC}"
+            fi
+            ;;
+        macos)
+            if command -v brew &> /dev/null; then
+                brew install gradle
+            else
+                echo -e "${YELLOW}Using Gradle wrapper instead${NC}"
+            fi
+            ;;
+        windows)
+            echo -e "${YELLOW}Using Gradle wrapper instead${NC}"
+            ;;
+    esac
+}
+
 # Check for Android SDK
 check_android_sdk() {
     if [ -z "$ANDROID_HOME" ]; then
-        echo -e "${RED}ERROR: ANDROID_HOME environment variable not set${NC}"
-        echo -e "${YELLOW}Install Android SDK and set ANDROID_HOME${NC}"
-        echo -e "${YELLOW}Download from: https://developer.android.com/studio${NC}"
-        return 1
+        echo -e "${YELLOW}ANDROID_HOME not set. Checking default locations...${NC}"
+
+        # Check common default locations
+        local default_locations=(
+            "$HOME/Android/Sdk"
+            "$HOME/Library/Android/sdk"
+            "/usr/local/android-sdk"
+        )
+
+        for location in "${default_locations[@]}"; do
+            if [ -d "$location" ]; then
+                export ANDROID_HOME="$location"
+                export PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools"
+                echo -e "${GREEN}Found Android SDK at: $ANDROID_HOME${NC}"
+                return 0
+            fi
+        done
+
+        echo -e "${YELLOW}Android SDK not found. Installing automatically...${NC}"
+        install_android_sdk
+        return 0
     fi
 
     if [ ! -d "$ANDROID_HOME" ]; then
-        echo -e "${RED}ERROR: Android SDK not found at $ANDROID_HOME${NC}"
-        return 1
+        echo -e "${YELLOW}ANDROID_HOME directory not found. Installing...${NC}"
+        install_android_sdk
+        return 0
     fi
 
     echo -e "${GREEN}Found Android SDK at: $ANDROID_HOME${NC}"
+
+    # Ensure PATH includes SDK tools
+    export PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools"
+
     return 0
 }
 
@@ -58,8 +232,16 @@ check_gradle() {
         echo -e "${GREEN}Found Gradle wrapper${NC}"
         return 0
     else
-        echo -e "${YELLOW}WARNING: Gradle not found, but will use Gradle wrapper${NC}"
-        return 0
+        echo -e "${YELLOW}Gradle not found, attempting to install...${NC}"
+        install_gradle
+
+        # Check again
+        if command -v gradle &> /dev/null; then
+            return 0
+        else
+            echo -e "${YELLOW}Will use Gradle wrapper${NC}"
+            return 0
+        fi
     fi
 }
 
@@ -68,11 +250,20 @@ check_jdk() {
     if command -v java &> /dev/null; then
         local java_version=$(java -version 2>&1 | head -n 1 | awk -F '"' '{print $2}')
         echo -e "${GREEN}Found Java: $java_version${NC}"
-        return 0
+
+        # Check if version is 17 or higher
+        local major_version=$(echo "$java_version" | cut -d'.' -f1)
+        if [ "$major_version" -ge 17 ] 2>/dev/null; then
+            return 0
+        else
+            echo -e "${YELLOW}Java version is too old (need 17+). Installing...${NC}"
+            install_jdk
+            return 0
+        fi
     else
-        echo -e "${RED}ERROR: Java not found${NC}"
-        echo -e "${YELLOW}Install JDK 17+ from: https://adoptium.net/${NC}"
-        return 1
+        echo -e "${YELLOW}Java not found. Installing...${NC}"
+        install_jdk
+        return 0
     fi
 }
 

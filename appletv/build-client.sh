@@ -30,16 +30,100 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+# Install Xcode Command Line Tools
+install_xcode_cli() {
+    if ! xcode-select -p &> /dev/null; then
+        echo -e "${YELLOW}Installing Xcode Command Line Tools...${NC}"
+        xcode-select --install
+        echo -e "${YELLOW}Please complete the Xcode CLI Tools installation in the popup window.${NC}"
+        echo -e "${YELLOW}Press Enter when installation is complete...${NC}"
+        read
+    else
+        echo -e "${GREEN}Xcode Command Line Tools already installed${NC}"
+    fi
+}
+
+# Install Homebrew
+install_homebrew() {
+    if ! command -v brew &> /dev/null; then
+        echo -e "${YELLOW}Installing Homebrew...${NC}"
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+        # Add Homebrew to PATH for Apple Silicon Macs
+        if [[ $(uname -m) == "arm64" ]]; then
+            echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+            eval "$(/opt/homebrew/bin/brew shellenv)"
+        fi
+    else
+        echo -e "${GREEN}Homebrew already installed${NC}"
+    fi
+}
+
+# Install CocoaPods
+install_cocoapods() {
+    if ! command -v pod &> /dev/null; then
+        echo -e "${YELLOW}Installing CocoaPods...${NC}"
+        sudo gem install cocoapods
+    else
+        echo -e "${GREEN}CocoaPods already installed: $(pod --version)${NC}"
+    fi
+}
+
+# Install tvOS Simulator
+install_tvos_simulator() {
+    echo -e "${CYAN}Checking tvOS Simulator...${NC}"
+
+    # List available simulators
+    if xcodebuild -showsdks | grep -q tvOS; then
+        echo -e "${GREEN}tvOS SDK found${NC}"
+
+        # Try to install the latest tvOS runtime if not present
+        local latest_tvos=$(xcodebuild -showsdks | grep tvOS | tail -n 1 | awk '{print $NF}')
+        echo -e "${CYAN}Latest tvOS version: $latest_tvos${NC}"
+    else
+        echo -e "${YELLOW}tvOS SDK not found. Installing via Xcode...${NC}"
+        echo -e "${YELLOW}Please open Xcode > Settings > Platforms and install tvOS${NC}"
+        echo -e "${YELLOW}Press Enter when installation is complete...${NC}"
+        read
+    fi
+}
+
 # Check for Xcode
 check_xcode() {
     if ! command -v xcodebuild &> /dev/null; then
-        echo -e "${RED}ERROR: Xcode not found${NC}"
-        echo -e "${YELLOW}Install Xcode from the Mac App Store${NC}"
-        return 1
+        echo -e "${YELLOW}Xcode not found. Attempting to install components...${NC}"
+
+        # Check if we're on macOS
+        if [[ "$OSTYPE" != "darwin"* ]]; then
+            echo -e "${RED}ERROR: This script requires macOS to build for Apple TV${NC}"
+            return 1
+        fi
+
+        # Install Xcode CLI Tools
+        install_xcode_cli
+
+        # Check again for Xcode
+        if ! command -v xcodebuild &> /dev/null; then
+            echo -e "${RED}ERROR: Xcode still not found${NC}"
+            echo -e "${YELLOW}Please install Xcode from the Mac App Store:${NC}"
+            echo -e "${CYAN}  1. Open Mac App Store${NC}"
+            echo -e "${CYAN}  2. Search for 'Xcode'${NC}"
+            echo -e "${CYAN}  3. Click 'Get' or 'Install'${NC}"
+            echo -e "${CYAN}  4. Wait for installation to complete (can take 30+ minutes)${NC}"
+            echo -e "${CYAN}  5. Open Xcode once to accept license${NC}"
+            echo -e "${CYAN}  6. Run this script again${NC}"
+            return 1
+        fi
     fi
 
     local xcode_version=$(xcodebuild -version | head -n 1 | awk '{print $2}')
     echo -e "${GREEN}Found Xcode: $xcode_version${NC}"
+
+    # Accept Xcode license if needed
+    if ! xcodebuild -license check &> /dev/null; then
+        echo -e "${YELLOW}Xcode license needs to be accepted${NC}"
+        sudo xcodebuild -license accept
+    fi
 
     # Check for tvOS SDK
     if xcodebuild -showsdks | grep -q tvOS; then
@@ -47,23 +131,31 @@ check_xcode() {
         echo -e "${GREEN}Found tvOS SDK: $tvos_version${NC}"
         return 0
     else
-        echo -e "${RED}ERROR: tvOS SDK not found${NC}"
-        echo -e "${YELLOW}Install tvOS support in Xcode preferences${NC}"
-        return 1
+        echo -e "${YELLOW}tvOS SDK not found, attempting to install...${NC}"
+        install_tvos_simulator
+
+        # Check again
+        if xcodebuild -showsdks | grep -q tvOS; then
+            return 0
+        else
+            echo -e "${RED}ERROR: tvOS SDK still not found${NC}"
+            echo -e "${YELLOW}Install tvOS support in Xcode:${NC}"
+            echo -e "${CYAN}  Xcode > Settings > Platforms > tvOS${NC}"
+            return 1
+        fi
     fi
 }
 
 # Check for dependencies
 check_dependencies() {
     echo ""
-    echo -e "${CYAN}Checking build dependencies...${NC}"
+    echo -e "${CYAN}Checking and installing build dependencies...${NC}"
 
-    # Check for CocoaPods
-    if command -v pod &> /dev/null; then
-        echo -e "${GREEN}Found CocoaPods: $(pod --version)${NC}"
-    else
-        echo -e "${YELLOW}CocoaPods not found (optional)${NC}"
-    fi
+    # Install Homebrew
+    install_homebrew
+
+    # Install CocoaPods
+    install_cocoapods
 
     return 0
 }
