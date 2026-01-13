@@ -23,12 +23,21 @@
     <DefaultLanguage>en-US</DefaultLanguage>
   </PropertyGroup>
 
+  <!-- Assets -->
   <ItemGroup>
     <Content Include="Assets\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
 
+  <!-- Web UI files for Desktop mode -->
+  <ItemGroup Condition="'$(Configuration)' == 'Desktop' Or '$(Configuration)' == 'DesktopXbox'">
+    <Content Include="WebUI\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Core dependencies -->
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2210.55" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.22621.756" />
@@ -36,23 +45,54 @@
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
 
-  <!-- Xbox-specific configuration -->
-  <PropertyGroup Condition="'$(Configuration)' == 'Xbox'">
-    <DefineConstants>$(DefineConstants);XBOX</DefineConstants>
-    <AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>
-    <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
-  </PropertyGroup>
+  <!-- Embedded web server for Desktop mode -->
+  <ItemGroup Condition="'$(Configuration)' == 'Desktop' Or '$(Configuration)' == 'DesktopXbox'">
+    <PackageReference Include="EmbedIO" Version="3.5.2" />
+  </ItemGroup>
+
+  <!-- ========== CLIENT MODE CONFIGURATIONS ========== -->
+  <!-- Client mode: Connects to remote Nedflix server -->
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DefineConstants>DEBUG;TRACE;CLIENT_MODE</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <DefineConstants>TRACE;CLIENT_MODE</DefineConstants>
     <Optimize>True</Optimize>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Xbox|x64'">
-    <DefineConstants>XBOX;TRACE</DefineConstants>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Client|x64'">
+    <DefineConstants>TRACE;CLIENT_MODE</DefineConstants>
     <Optimize>True</Optimize>
+    <AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ClientXbox|x64'">
+    <DefineConstants>XBOX;TRACE;CLIENT_MODE</DefineConstants>
+    <Optimize>True</Optimize>
+    <AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>
+  </PropertyGroup>
+
+  <!-- ========== DESKTOP MODE CONFIGURATIONS ========== -->
+  <!-- Desktop mode: Standalone with embedded server, no auth required -->
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Desktop|x64'">
+    <DefineConstants>TRACE;DESKTOP_MODE</DefineConstants>
+    <Optimize>True</Optimize>
+    <AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DesktopXbox|x64'">
+    <DefineConstants>XBOX;TRACE;DESKTOP_MODE</DefineConstants>
+    <Optimize>True</Optimize>
+    <AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>
+  </PropertyGroup>
+
+  <!-- Legacy Xbox configuration (defaults to Client mode) -->
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Xbox|x64'">
+    <DefineConstants>XBOX;TRACE;CLIENT_MODE</DefineConstants>
+    <Optimize>True</Optimize>
+    <AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>
   </PropertyGroup>
 </Project>

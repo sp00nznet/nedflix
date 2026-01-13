@@ -4,8 +4,9 @@ echo ========================================
 echo Nedflix Xbox - Build Script
 echo ========================================
 echo.
-echo This script builds the Nedflix Xbox app
-echo for Xbox Series S/X (via Dev Mode sideload)
+echo Two versions available:
+echo   CLIENT  - Connect to remote Nedflix server
+echo   DESKTOP - Standalone with local media (no auth)
 echo.
 
 :: Navigate to script directory
@@ -31,16 +32,6 @@ for /f "tokens=1" %%a in ('dotnet --version') do set DOTNET_VERSION=%%a
 echo Found .NET SDK %DOTNET_VERSION%
 echo.
 
-:: Check for Windows SDK
-if not exist "%ProgramFiles(x86)%\Windows Kits\10\bin" (
-    echo WARNING: Windows 10 SDK not detected.
-    echo Some features may not work correctly.
-    echo.
-    echo Install Windows 10 SDK from Visual Studio Installer
-    echo or download from: https://developer.microsoft.com/windows/downloads/windows-sdk/
-    echo.
-)
-
 :: Restore dependencies
 echo Restoring NuGet packages...
 dotnet restore
@@ -55,87 +46,112 @@ echo.
 echo ========================================
 echo Build Options:
 echo ========================================
-echo   1. Build Debug (x64) - For PC testing
-echo   2. Build Release (x64) - For Xbox sideload
-echo   3. Build Xbox Configuration (x64)
-echo   4. Create MSIX Package (for sideload)
-echo   5. Build All Configurations
-echo   6. Clean Build Output
-echo   7. Open in Visual Studio
-echo   8. Exit
+echo.
+echo  CLIENT VERSION (connects to server):
+echo   1. Build Client (Debug)
+echo   2. Build Client (Release)
+echo   3. Package Client for Xbox
+echo.
+echo  DESKTOP VERSION (standalone, no auth):
+echo   4. Build Desktop (Debug)
+echo   5. Build Desktop (Release)
+echo   6. Package Desktop for Xbox
+echo.
+echo  BOTH VERSIONS:
+echo   7. Package Both for Xbox
+echo.
+echo  UTILITIES:
+echo   8. Clean Build Output
+echo   9. Copy Web UI (for Desktop mode)
+echo  10. Open in Visual Studio
+echo   0. Exit
 echo.
 
-set /p choice="Enter your choice (1-8): "
+set /p choice="Enter your choice (0-10): "
 
-if "%choice%"=="1" goto build_debug
-if "%choice%"=="2" goto build_release
-if "%choice%"=="3" goto build_xbox
-if "%choice%"=="4" goto create_msix
-if "%choice%"=="5" goto build_all
-if "%choice%"=="6" goto clean
-if "%choice%"=="7" goto open_vs
-if "%choice%"=="8" exit /b 0
+if "%choice%"=="1" goto build_client_debug
+if "%choice%"=="2" goto build_client_release
+if "%choice%"=="3" goto package_client
+if "%choice%"=="4" goto build_desktop_debug
+if "%choice%"=="5" goto build_desktop_release
+if "%choice%"=="6" goto package_desktop
+if "%choice%"=="7" goto package_both
+if "%choice%"=="8" goto clean
+if "%choice%"=="9" goto copy_webui
+if "%choice%"=="10" goto open_vs
+if "%choice%"=="0" exit /b 0
 
 echo Invalid choice. Please run the script again.
 pause
 exit /b 1
 
-:build_debug
+:build_client_debug
 echo.
-echo Building Debug (x64)...
+echo Building Client (Debug)...
 dotnet build -c Debug -p:Platform=x64
 goto build_done
 
-:build_release
+:build_client_release
 echo.
-echo Building Release (x64)...
-dotnet build -c Release -p:Platform=x64
+echo Building Client (Release)...
+dotnet build -c Client -p:Platform=x64
 goto build_done
 
-:build_xbox
+:package_client
 echo.
-echo Building Xbox Configuration (x64)...
-dotnet build -c Xbox -p:Platform=x64
-goto build_done
-
-:create_msix
-echo.
-echo Creating MSIX Package for Xbox sideload...
-echo.
-echo NOTE: For Xbox sideloading, the package must NOT be signed
-echo       or signed with a developer certificate.
-echo.
-dotnet publish -c Release -p:Platform=x64 -p:AppxPackageSigningEnabled=false
+echo Creating Client MSIX Package for Xbox...
+dotnet publish -c ClientXbox -p:Platform=x64 -p:AppxPackageSigningEnabled=false
 if %errorlevel% equ 0 (
-    echo.
-    echo ========================================
-    echo MSIX package created successfully!
-    echo.
-    echo To install on Xbox:
-    echo   1. Enable Dev Mode on your Xbox
-    echo   2. Note your Xbox's IP address from Dev Home
-    echo   3. Open Device Portal in browser: https://[xbox-ip]:11443
-    echo   4. Go to "Apps" section
-    echo   5. Click "Add" under "Install app"
-    echo   6. Browse to the .msix file in:
-    echo      bin\Release\net6.0-windows10.0.19041.0\win10-x64\publish\
-    echo   7. Click "Next" then "Install"
-    echo ========================================
+    call :show_install_instructions "Client"
 )
 goto build_done
 
-:build_all
+:build_desktop_debug
 echo.
-echo Building all configurations...
+echo Building Desktop (Debug)...
+call :ensure_webui
+dotnet build -c Desktop -p:Platform=x64
+goto build_done
+
+:build_desktop_release
 echo.
-echo [1/3] Building Debug...
-dotnet build -c Debug -p:Platform=x64
+echo Building Desktop (Release)...
+call :ensure_webui
+dotnet build -c Desktop -p:Platform=x64
+goto build_done
+
+:package_desktop
 echo.
-echo [2/3] Building Release...
-dotnet build -c Release -p:Platform=x64
+echo Creating Desktop MSIX Package for Xbox...
+call :ensure_webui
+dotnet publish -c DesktopXbox -p:Platform=x64 -p:AppxPackageSigningEnabled=false
+if %errorlevel% equ 0 (
+    call :show_install_instructions "Desktop"
+)
+goto build_done
+
+:package_both
 echo.
-echo [3/3] Creating MSIX Package...
-dotnet publish -c Release -p:Platform=x64 -p:AppxPackageSigningEnabled=false
+echo Creating both Client and Desktop packages...
+echo.
+echo [1/2] Building Client package...
+dotnet publish -c ClientXbox -p:Platform=x64 -p:AppxPackageSigningEnabled=false
+echo.
+echo [2/2] Building Desktop package...
+call :ensure_webui
+dotnet publish -c DesktopXbox -p:Platform=x64 -p:AppxPackageSigningEnabled=false
+echo.
+echo ========================================
+echo Both packages created!
+echo.
+echo Client version: Connect to your Nedflix server
+echo   - Requires server URL configuration
+echo   - Best for remote access
+echo.
+echo Desktop version: Standalone local playback
+echo   - No authentication required
+echo   - Access media from Xbox storage
+echo ========================================
 goto build_done
 
 :clean
@@ -145,6 +161,13 @@ dotnet clean
 if exist "bin" rmdir /s /q bin
 if exist "obj" rmdir /s /q obj
 echo Clean complete.
+goto end
+
+:copy_webui
+echo.
+echo Copying Web UI files for Desktop mode...
+call :ensure_webui
+echo Web UI files copied.
 goto end
 
 :open_vs
@@ -168,20 +191,42 @@ if %errorlevel% equ 0 (
     echo ========================================
     echo Build completed successfully!
     echo ========================================
-    echo.
-    echo Output location:
-    echo   bin\[Configuration]\net6.0-windows10.0.19041.0\win10-x64\
-    echo.
 ) else (
     echo ========================================
     echo Build failed with error code %errorlevel%
     echo ========================================
-    echo.
-    echo Common issues:
-    echo   - Missing Windows SDK: Install via Visual Studio
-    echo   - Missing workloads: Run 'dotnet workload install maui-windows'
-    echo   - NuGet errors: Check internet connection
 )
+goto end
+
+:ensure_webui
+:: Copy desktop public folder to WebUI if it exists
+if not exist "WebUI" mkdir WebUI
+if exist "..\desktop\public" (
+    echo Copying desktop Web UI files...
+    xcopy /s /y /q "..\desktop\public\*" "WebUI\" >nul
+) else (
+    echo WARNING: Desktop public folder not found at ..\desktop\public
+    echo Desktop mode requires the Web UI files.
+)
+exit /b 0
+
+:show_install_instructions
+echo.
+echo ========================================
+echo %~1 MSIX package created successfully!
+echo ========================================
+echo.
+echo To install on Xbox:
+echo   1. Enable Dev Mode on your Xbox
+echo   2. Note your Xbox's IP address from Dev Home
+echo   3. Open Device Portal: https://[xbox-ip]:11443
+echo   4. Go to "Apps" section
+echo   5. Click "Add" under "Install app"
+echo   6. Select the .msix file from:
+echo      bin\%~1Xbox\net6.0-windows10.0.19041.0\win10-x64\publish\
+echo   7. Click "Install"
+echo.
+exit /b 0
 
 :end
 echo.

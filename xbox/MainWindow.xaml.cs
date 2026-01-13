@@ -7,11 +7,15 @@ using System.Threading.Tasks;
 using Windows.Gaming.Input;
 using Windows.Storage;
 using Windows.System;
+#if DESKTOP_MODE
+using Nedflix.Xbox.Services;
+#endif
 
 namespace Nedflix.Xbox
 {
     /// <summary>
     /// Main window hosting the Nedflix WebView2 content
+    /// Supports both Client mode (remote server) and Desktop mode (embedded server)
     /// Optimized for Xbox Series S/X with gamepad navigation
     /// </summary>
     public sealed partial class MainWindow : Window
@@ -24,6 +28,13 @@ namespace Nedflix.Xbox
         private DispatcherTimer gamepadTimer;
         private Gamepad currentGamepad;
 
+#if DESKTOP_MODE
+        private EmbeddedServer embeddedServer;
+        private const bool IsDesktopMode = true;
+#else
+        private const bool IsDesktopMode = false;
+#endif
+
         public MainWindow()
         {
             this.InitializeComponent();
@@ -31,11 +42,8 @@ namespace Nedflix.Xbox
             // Detect Xbox device
             isXbox = DetectXbox();
 
-            // Load saved settings
-            LoadSettings();
-
-            // Initialize WebView2
-            InitializeWebViewAsync();
+            // Load saved settings (Client mode) or start embedded server (Desktop mode)
+            InitializeMode();
 
             // Setup gamepad monitoring for Xbox
             if (isXbox)
@@ -46,6 +54,49 @@ namespace Nedflix.Xbox
 
             // Handle keyboard for PC testing
             this.Content.KeyDown += MainWindow_KeyDown;
+        }
+
+        /// <summary>
+        /// Initializes the appropriate mode (Client or Desktop)
+        /// </summary>
+        private async void InitializeMode()
+        {
+#if DESKTOP_MODE
+            // Desktop mode: Start embedded server
+            LoadingText.Text = "Starting local server...";
+            try
+            {
+                embeddedServer = new EmbeddedServer(3000);
+                _ = embeddedServer.StartAsync();
+
+                // Wait a moment for server to start
+                await Task.Delay(500);
+
+                serverUrl = embeddedServer.BaseUrl;
+
+                // Update UI to show Desktop mode
+                UpdateModeIndicator("Desktop Mode (Local)");
+            }
+            catch (Exception ex)
+            {
+                ShowError($"Failed to start local server: {ex.Message}");
+                return;
+            }
+#else
+            // Client mode: Load saved server URL
+            LoadSettings();
+#endif
+            // Initialize WebView2
+            InitializeWebViewAsync();
+        }
+
+        /// <summary>
+        /// Updates the mode indicator in the UI
+        /// </summary>
+        private void UpdateModeIndicator(string mode)
+        {
+            // The UI will show the mode in the title or status bar
+            this.Title = $"Nedflix - {mode}";
         }
 
         /// <summary>
@@ -65,10 +116,11 @@ namespace Nedflix.Xbox
         }
 
         /// <summary>
-        /// Loads saved application settings
+        /// Loads saved application settings (Client mode only)
         /// </summary>
         private void LoadSettings()
         {
+#if CLIENT_MODE
             try
             {
                 var localSettings = ApplicationData.Current.LocalSettings;
@@ -79,13 +131,16 @@ namespace Nedflix.Xbox
             {
                 serverUrl = DEFAULT_SERVER_URL;
             }
+            UpdateModeIndicator("Client Mode");
+#endif
         }
 
         /// <summary>
-        /// Saves application settings
+        /// Saves application settings (Client mode only)
         /// </summary>
         private void SaveSettings()
         {
+#if CLIENT_MODE
             try
             {
                 var localSettings = ApplicationData.Current.LocalSettings;
@@ -95,6 +150,7 @@ namespace Nedflix.Xbox
             {
                 // Settings save failed, continue anyway
             }
+#endif
         }
 
         /// <summary>
@@ -131,7 +187,7 @@ namespace Nedflix.Xbox
                 await InjectXboxScripts();
 
                 // Navigate to Nedflix server
-                LoadingText.Text = "Connecting to server...";
+                LoadingText.Text = IsDesktopMode ? "Loading local content..." : "Connecting to server...";
                 NedflixWebView.CoreWebView2.Navigate(serverUrl);
             }
             catch (Exception ex)
@@ -145,65 +201,74 @@ namespace Nedflix.Xbox
         /// </summary>
         private async Task InjectXboxScripts()
         {
-            string xboxScript = @"
+            string modeInfo = IsDesktopMode ? "desktop" : "client";
+            string xboxScript = $@"
                 // Xbox-specific enhancements for Nedflix
                 window.isXboxApp = true;
+                window.nedflixMode = '{modeInfo}';
+                window.isDesktopMode = {(IsDesktopMode ? "true" : "false")};
 
                 // Enhanced focus management for gamepad navigation
-                document.addEventListener('DOMContentLoaded', function() {
+                document.addEventListener('DOMContentLoaded', function() {{
                     // Add xbox-app class for CSS targeting
                     document.body.classList.add('xbox-app');
+                    if (window.isDesktopMode) {{
+                        document.body.classList.add('desktop-mode');
+                    }}
 
                     // Ensure focusable elements are properly marked
-                    const focusableSelectors = 'a, button, input, select, [tabindex]:not([tabindex=\"-1\"]), .media-card, .library-item';
-                    document.querySelectorAll(focusableSelectors).forEach(el => {
-                        if (!el.hasAttribute('tabindex')) {
+                    const focusableSelectors = 'a, button, input, select, [tabindex]:not([tabindex=""-1""]), .media-card, .library-item';
+                    document.querySelectorAll(focusableSelectors).forEach(el => {{
+                        if (!el.hasAttribute('tabindex')) {{
                             el.setAttribute('tabindex', '0');
-                        }
-                    });
-                });
+                        }}
+                    }});
+                }});
 
                 // Expose method to receive messages from C# host
-                window.xboxBridge = {
-                    navigate: function(direction) {
-                        const event = new KeyboardEvent('keydown', {
+                window.xboxBridge = {{
+                    navigate: function(direction) {{
+                        const event = new KeyboardEvent('keydown', {{
                             key: direction === 'up' ? 'ArrowUp' :
                                  direction === 'down' ? 'ArrowDown' :
                                  direction === 'left' ? 'ArrowLeft' : 'ArrowRight',
                             bubbles: true
-                        });
+                        }});
                         document.activeElement.dispatchEvent(event);
-                    },
-                    select: function() {
-                        if (document.activeElement) {
+                    }},
+                    select: function() {{
+                        if (document.activeElement) {{
                             document.activeElement.click();
-                        }
-                    },
-                    back: function() {
+                        }}
+                    }},
+                    back: function() {{
                         window.history.back();
-                    },
-                    togglePlayPause: function() {
+                    }},
+                    togglePlayPause: function() {{
                         const video = document.querySelector('video');
-                        if (video) {
+                        if (video) {{
                             if (video.paused) video.play();
                             else video.pause();
-                        }
-                    },
-                    seek: function(seconds) {
+                        }}
+                    }},
+                    seek: function(seconds) {{
                         const video = document.querySelector('video');
-                        if (video) {
+                        if (video) {{
                             video.currentTime += seconds;
-                        }
-                    },
-                    adjustVolume: function(delta) {
+                        }}
+                    }},
+                    adjustVolume: function(delta) {{
                         const video = document.querySelector('video');
-                        if (video) {
+                        if (video) {{
                             video.volume = Math.max(0, Math.min(1, video.volume + delta));
-                        }
-                    }
-                };
+                        }}
+                    }},
+                    getMode: function() {{
+                        return window.nedflixMode;
+                    }}
+                }};
 
-                console.log('Xbox bridge initialized');
+                console.log('Xbox bridge initialized - Mode: ' + window.nedflixMode);
             ";
 
             await NedflixWebView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(xboxScript);
@@ -257,6 +322,12 @@ namespace Nedflix.Xbox
             NedflixWebView.Visibility = Visibility.Collapsed;
             ErrorMessage.Text = message;
             ErrorPanel.Visibility = Visibility.Visible;
+
+#if DESKTOP_MODE
+            // In Desktop mode, hide the server configuration button
+            // since we use the embedded server
+            SettingsButton.Content = "Retry";
+#endif
         }
 
         /// <summary>
@@ -452,10 +523,17 @@ namespace Nedflix.Xbox
         /// </summary>
         private void ShowSettingsPanel()
         {
+#if DESKTOP_MODE
+            // In Desktop mode, settings panel shows media path configuration
+            // For now, just reload the page
+            NedflixWebView.CoreWebView2?.Navigate(serverUrl);
+#else
+            // In Client mode, show server URL configuration
             NedflixWebView.Visibility = Visibility.Collapsed;
             ErrorPanel.Visibility = Visibility.Collapsed;
             SettingsPanel.Visibility = Visibility.Visible;
             ServerUrlInput.Focus(FocusState.Programmatic);
+#endif
         }
 
         // Button click handlers
@@ -468,11 +546,17 @@ namespace Nedflix.Xbox
 
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
+#if DESKTOP_MODE
+            // In Desktop mode, just retry
+            RetryButton_Click(sender, e);
+#else
             ShowSettingsPanel();
+#endif
         }
 
         private void ConnectButton_Click(object sender, RoutedEventArgs e)
         {
+#if CLIENT_MODE
             serverUrl = ServerUrlInput.Text.Trim();
 
             if (string.IsNullOrEmpty(serverUrl))
@@ -494,6 +578,7 @@ namespace Nedflix.Xbox
             SettingsPanel.Visibility = Visibility.Collapsed;
             LoadingOverlay.Visibility = Visibility.Visible;
             NedflixWebView.CoreWebView2?.Navigate(serverUrl);
+#endif
         }
 
         private void CancelSettingsButton_Click(object sender, RoutedEventArgs e)
@@ -508,6 +593,17 @@ namespace Nedflix.Xbox
             {
                 ErrorPanel.Visibility = Visibility.Visible;
             }
+        }
+
+        /// <summary>
+        /// Clean up resources when window closes
+        /// </summary>
+        private void MainWindow_Closed(object sender, WindowEventArgs args)
+        {
+#if DESKTOP_MODE
+            embeddedServer?.Dispose();
+#endif
+            gamepadTimer?.Stop();
         }
     }
 }

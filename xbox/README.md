@@ -1,16 +1,32 @@
-# Nedflix Xbox Series S/X Client
+# Nedflix Xbox Series S/X
 
-A UWP (Universal Windows Platform) application for streaming your Nedflix media library on Xbox Series S/X consoles.
+UWP (Universal Windows Platform) applications for streaming video on Xbox Series S/X consoles. Available in two versions to suit different use cases.
 
-## Features
+## Two Versions Available
 
-- **Full Gamepad Support**: Navigate with D-pad, analog sticks, and standard Xbox controller buttons
-- **WebView2 Integration**: Renders the Nedflix web UI natively
-- **Xbox Optimized**: Runs in fullscreen with TV-safe zones
-- **Server Configuration**: Connect to your Nedflix server on your local network
-- **Controller Hints**: On-screen button prompts for easy navigation
+### Client Version
+Connect to your Nedflix server running on your network.
+
+| Feature | Description |
+|---------|-------------|
+| **Server Connection** | Connects to remote Nedflix server |
+| **Authentication** | Uses server's auth (OAuth, local) |
+| **Media Source** | Server's configured media libraries |
+| **Best For** | Accessing your home server remotely |
+
+### Desktop Version
+Standalone app with embedded server - no external server needed.
+
+| Feature | Description |
+|---------|-------------|
+| **Server** | Embedded (runs locally on Xbox) |
+| **Authentication** | None required |
+| **Media Source** | Xbox storage, USB drives |
+| **Best For** | Local playback, offline use |
 
 ## Controller Mapping
+
+Both versions share the same gamepad controls:
 
 | Button | Action |
 |--------|--------|
@@ -24,211 +40,230 @@ A UWP (Universal Windows Platform) application for streaming your Nedflix media 
 | **RT** | Volume Up |
 | **D-Pad** | Navigate |
 | **Left Stick** | Navigate |
-| **Menu** | Settings |
+| **Menu** | Settings / Refresh |
 
 ## Requirements
 
 ### Development Machine (Windows)
 - Windows 10/11 (64-bit)
 - [.NET 6.0 SDK](https://dotnet.microsoft.com/download/dotnet/6.0) or later
-- [Windows 10 SDK](https://developer.microsoft.com/windows/downloads/windows-sdk/) (10.0.19041.0 or later)
-- Visual Studio 2022 (optional, for IDE support)
+- [Windows 10 SDK](https://developer.microsoft.com/windows/downloads/windows-sdk/) (10.0.19041.0+)
+- Visual Studio 2022 (optional)
 
 ### Xbox Console
 - Xbox Series S or Xbox Series X
 - [Xbox Dev Mode](https://docs.microsoft.com/gaming/xbox-live/get-started/setup-ide/managed-partners/vstudio-xbox/live-where-to-get-xdk) enabled
-- Network connection to your Nedflix server
+- Network connection (Client version) or local media (Desktop version)
 
-## Building
+## Quick Start
 
-### Using build.bat (Interactive)
+### Build Client Version (for remote server access)
 ```cmd
 cd xbox
 build.bat
+:: Select option 3 - Package Client for Xbox
 ```
-Then select an option from the menu:
-1. Build Debug (x64) - For PC testing
-2. Build Release (x64) - For Xbox sideload
-3. Build Xbox Configuration (x64)
-4. Create MSIX Package (for sideload)
-5. Build All Configurations
-6. Clean Build Output
-7. Open in Visual Studio
 
-### Using PowerShell (Command Line)
+### Build Desktop Version (standalone, no server)
+```cmd
+cd xbox
+build.bat
+:: Select option 6 - Package Desktop for Xbox
+```
+
+### Build Both Versions
+```cmd
+cd xbox
+build.bat
+:: Select option 7 - Package Both for Xbox
+```
+
+## Building with PowerShell
+
 ```powershell
 cd xbox
 
-# Build release
-.\build.ps1 build -Configuration Release
+# Build Client for Xbox
+.\build.ps1 publish -Version Client
 
-# Create MSIX package
-.\build.ps1 publish
+# Build Desktop for Xbox
+.\build.ps1 publish -Version Desktop
 
-# Deploy to Xbox
-.\build.ps1 deploy -XboxIP 192.168.1.100
-
-# Show help
+# Show all options
 .\build.ps1 help
 ```
 
-### Using dotnet CLI
-```cmd
+## Building with npm
+
+```bash
 cd xbox
-dotnet restore
-dotnet build -c Release -p:Platform=x64
-dotnet publish -c Release -p:Platform=x64 -p:AppxPackageSigningEnabled=false
+
+# Build Client
+npm run publish:client
+
+# Build Desktop
+npm run publish:desktop
+
+# Build both
+npm run publish:all
 ```
+
+## Build Configurations
+
+| Configuration | Version | Purpose |
+|---------------|---------|---------|
+| `Debug` | Client | Development/testing on PC |
+| `Client` | Client | Release build for PC testing |
+| `ClientXbox` | Client | Xbox deployment package |
+| `Desktop` | Desktop | Release build for PC testing |
+| `DesktopXbox` | Desktop | Xbox deployment package |
 
 ## Xbox Dev Mode Setup
 
 ### Enabling Dev Mode
 
-1. On your Xbox, go to **Settings** > **System** > **Console info**
-2. Note your console's **Xbox Live device ID** (needed for registration)
-3. Open the **Microsoft Store** and search for "**Xbox Dev Mode Activation**"
-4. Install and launch the app
-5. Follow the on-screen instructions to link your console to a Microsoft Partner Center account
-6. Restart your Xbox when prompted
+1. Go to **Settings** > **System** > **Console info**
+2. Note your console's **Xbox Live device ID**
+3. Open **Microsoft Store** and install "**Xbox Dev Mode Activation**"
+4. Launch the app and follow instructions
+5. Restart Xbox when prompted
 
 ### Switching to Dev Mode
 
-1. After restart, your Xbox will show a choice between **Retail** and **Developer** mode
-2. Select **Developer Mode**
-3. The **Dev Home** app will launch automatically
-4. Note your Xbox's **IP address** displayed in Dev Home
+1. After restart, select **Developer Mode**
+2. **Dev Home** app launches automatically
+3. Note your Xbox's **IP address**
 
 ### Enabling Device Portal
 
 1. In Dev Home, go to **Remote Access Settings**
 2. Enable **Xbox Device Portal**
-3. Set a **Username** and **Password** for portal access
-4. Note the portal URL (typically `https://<xbox-ip>:11443`)
+3. Set **Username** and **Password**
+4. Note portal URL: `https://<xbox-ip>:11443`
 
 ## Installing on Xbox
 
-### Method 1: Device Portal (Recommended)
+### Via Device Portal (Recommended)
 
-1. Build the MSIX package:
-   ```cmd
-   build.bat
-   :: Select option 4
-   ```
+1. Build the MSIX package (Client or Desktop)
+2. Open browser: `https://<xbox-ip>:11443`
+3. Accept certificate warning
+4. Log in with Device Portal credentials
+5. Navigate to **Apps** > **Install app**
+6. Click **Add** and select the `.msix` file:
+   - Client: `bin\ClientXbox\...\publish\*.msix`
+   - Desktop: `bin\DesktopXbox\...\publish\*.msix`
+7. Click **Install**
 
-2. Open a web browser and navigate to:
-   ```
-   https://<your-xbox-ip>:11443
-   ```
+### Via USB Drive
 
-3. Accept the certificate warning (self-signed cert is normal)
+1. Copy `.msix` file to USB drive
+2. Insert USB into Xbox
+3. In Dev Home, browse to USB and install
 
-4. Log in with your Device Portal credentials
+## First Launch
 
-5. Navigate to **Apps** in the left sidebar
+### Client Version
+1. Launch **Nedflix** from apps
+2. Enter your Nedflix server URL (e.g., `http://192.168.1.100:3000`)
+3. Check "**Remember this server**"
+4. Press **Connect**
 
-6. Under **Install app**, click **Add**
-
-7. Browse to the MSIX file:
-   ```
-   xbox\bin\Release\net6.0-windows10.0.19041.0\win10-x64\publish\Nedflix.Xbox_1.0.0.0_x64.msix
-   ```
-
-8. Click **Next**, then **Install**
-
-9. The app will appear in your Xbox's app list
-
-### Method 2: USB Drive
-
-1. Build the MSIX package
-
-2. Copy the `.msix` file to a USB drive
-
-3. Insert the USB drive into your Xbox
-
-4. In Dev Home, go to **My games & apps**
-
-5. Navigate to the USB drive and select the package to install
-
-## Running the App
-
-1. Switch your Xbox to **Developer Mode** (or stay in Dev Mode if already there)
-
-2. Launch **Nedflix** from your apps list
-
-3. On first launch, enter your Nedflix server URL:
-   ```
-   http://192.168.1.100:3000
-   ```
-   (Replace with your actual server IP and port)
-
-4. Check "**Remember this server**" to save the setting
-
-5. Press **Connect** to start streaming
+### Desktop Version
+1. Launch **Nedflix** from apps
+2. App starts immediately with embedded server
+3. Configure media paths in settings (Menu button)
+4. Browse media from Xbox storage or USB
 
 ## Troubleshooting
 
-### "Connection Error" on launch
-- Ensure your Nedflix server is running
-- Verify the server URL is correct
-- Check that Xbox can reach your server (same network)
-- Try `http://` instead of `https://` for local servers
+### Client Version Issues
 
-### App won't install
-- Ensure Dev Mode is properly activated
-- Check that the package is not signed (use `AppxPackageSigningEnabled=false`)
-- Verify Windows SDK version compatibility
+**"Connection Error"**
+- Verify server is running and accessible
+- Check server URL format (include `http://`)
+- Ensure Xbox and server are on same network
 
-### Controller not responding
-- Press any button to wake the controller
-- Check controller is connected to Xbox (not PC)
-- Restart the app if issues persist
+**Video won't stream**
+- Check network bandwidth
+- Verify server supports the video format
+- Try lower quality settings
 
-### Video won't play
-- Check your server supports the video format
-- Ensure network bandwidth is sufficient
-- Try a lower quality setting in Nedflix
+### Desktop Version Issues
 
-### Build errors
-- Run `dotnet restore` to fix package issues
-- Ensure Windows 10 SDK 10.0.19041.0+ is installed
-- Install the "Universal Windows Platform development" workload in Visual Studio
+**No media found**
+- Configure media paths in settings
+- Ensure media is on Xbox storage or USB
+- Check file format compatibility
+
+**Embedded server won't start**
+- Restart the app
+- Check Xbox storage space
+- Verify app has storage permissions
+
+### General Issues
+
+**App won't install**
+- Ensure Dev Mode is active
+- Use unsigned packages (`AppxPackageSigningEnabled=false`)
+- Check Windows SDK compatibility
+
+**Controller not responding**
+- Press any button to wake controller
+- Ensure controller is paired with Xbox
+- Restart app if needed
 
 ## Project Structure
 
 ```
 xbox/
-├── App.xaml              # Application resources and theme
-├── App.xaml.cs           # Application entry point
-├── MainWindow.xaml       # Main UI layout
-├── MainWindow.xaml.cs    # WebView2 host and gamepad logic
-├── Nedflix.Xbox.csproj   # Project file
-├── Package.appxmanifest  # UWP manifest (capabilities, icons)
-├── app.manifest          # Windows app manifest
-├── build.bat             # Interactive build script
-├── build.ps1             # PowerShell build/deploy script
-├── package.json          # npm scripts wrapper
-├── Assets/               # App icons and tiles
-│   ├── StoreLogo.png
-│   ├── Square44x44Logo.png
-│   ├── Square150x150Logo.png
-│   └── ...
-└── README.md             # This file
+├── App.xaml(.cs)           # Application entry point
+├── MainWindow.xaml(.cs)    # WebView2 host + gamepad logic
+├── Services/
+│   └── EmbeddedServer.cs   # Embedded HTTP server (Desktop mode)
+├── Nedflix.Xbox.csproj     # Project file with configurations
+├── Package.appxmanifest    # UWP manifest
+├── build.bat               # Interactive Windows build script
+├── build.ps1               # PowerShell build script
+├── package.json            # npm scripts
+├── WebUI/                  # Web UI files (Desktop mode, auto-copied)
+├── Assets/                 # App icons and tiles
+└── README.md
 ```
 
-## Network Requirements
+## Version Comparison
 
-The Xbox app connects to your Nedflix server over HTTP/HTTPS. Ensure:
+| Feature | Client | Desktop |
+|---------|--------|---------|
+| Requires server | Yes | No |
+| Authentication | Server-based | None |
+| Media location | Server libraries | Xbox/USB |
+| Offline support | No | Yes |
+| Multi-user | Yes (via server) | Single user |
+| IPTV support | Yes (via server) | No |
+| ErsatzTV | Yes (via server) | No |
+| Network required | Yes | No |
 
-- Xbox and server are on the same network (or server is accessible)
-- Firewall allows connections on port 3000 (or your configured port)
-- For HTTPS, the certificate must be valid or Xbox must trust it
+## Choosing the Right Version
+
+**Choose Client if you:**
+- Have a Nedflix server running at home
+- Want to access your full media library
+- Need multi-user support
+- Use IPTV or ErsatzTV features
+
+**Choose Desktop if you:**
+- Want to play local files on Xbox
+- Don't have a server set up
+- Need offline playback
+- Have media on USB drives
 
 ## Limitations
 
-- **No Offline Mode**: Requires network connection to Nedflix server
-- **Dev Mode Only**: App runs only in Xbox Developer Mode (not Retail)
-- **No Store Distribution**: Sideload only (not available on Xbox Store)
+- **Dev Mode Only**: Apps run only in Xbox Developer Mode
+- **No Store Distribution**: Sideload only (not on Xbox Store)
 - **x64 Only**: ARM builds not supported on Xbox
+- **Desktop version**: No IPTV/ErsatzTV, limited to local media
 
 ## License
 

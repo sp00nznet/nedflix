@@ -1,17 +1,26 @@
 {
   "name": "nedflix-xbox",
   "version": "1.0.0",
-  "description": "Nedflix Xbox Series S/X Client",
+  "description": "Nedflix Xbox Series S/X Client - Available in Client and Desktop versions",
   "author": "Nedflix",
   "license": "MIT",
   "scripts": {
     "prebuild": "echo Nedflix Xbox requires Windows with .NET SDK and Windows SDK",
-    "build": "dotnet build -c Release -p:Platform=x64",
-    "build:debug": "dotnet build -c Debug -p:Platform=x64",
-    "build:xbox": "dotnet build -c Xbox -p:Platform=x64",
-    "publish": "dotnet publish -c Release -p:Platform=x64 -p:AppxPackageSigningEnabled=false",
-    "clean": "dotnet clean && rimraf bin obj",
+
+    "build": "dotnet build -c Client -p:Platform=x64",
+    "build:client": "dotnet build -c Client -p:Platform=x64",
+    "build:client:debug": "dotnet build -c Debug -p:Platform=x64",
+    "build:desktop": "npm run copy-webui && dotnet build -c Desktop -p:Platform=x64",
+
+    "publish:client": "dotnet publish -c ClientXbox -p:Platform=x64 -p:AppxPackageSigningEnabled=false",
+    "publish:desktop": "npm run copy-webui && dotnet publish -c DesktopXbox -p:Platform=x64 -p:AppxPackageSigningEnabled=false",
+    "publish:all": "npm run publish:client && npm run publish:desktop",
+
+    "copy-webui": "node -e \"const fs=require('fs');const path=require('path');const src='../desktop/public';const dst='./WebUI';if(!fs.existsSync(dst))fs.mkdirSync(dst,{recursive:true});if(fs.existsSync(src)){const copyDir=(s,d)=>{fs.mkdirSync(d,{recursive:true});fs.readdirSync(s).forEach(f=>{const sp=path.join(s,f),dp=path.join(d,f);fs.statSync(sp).isDirectory()?copyDir(sp,dp):fs.copyFileSync(sp,dp)})};copyDir(src,dst);console.log('WebUI copied')}else{console.log('Warning: desktop/public not found')}\"",
+
+    "clean": "dotnet clean && rimraf bin obj WebUI",
     "restore": "dotnet restore",
+
     "help": "echo Use build.bat (Windows) or build.ps1 (PowerShell) for full build options"
   },
   "keywords": [
@@ -21,7 +30,9 @@
     "series-s",
     "uwp",
     "streaming",
-    "video"
+    "video",
+    "client",
+    "desktop"
   ],
   "engines": {
     "node": ">=14.0.0"
@@ -38,14 +49,22 @@
     "directory": "xbox"
   },
   "xbox": {
+    "versions": {
+      "client": {
+        "description": "Connect to remote Nedflix server",
+        "configuration": "ClientXbox",
+        "requiresServer": true
+      },
+      "desktop": {
+        "description": "Standalone with embedded server (no auth)",
+        "configuration": "DesktopXbox",
+        "requiresServer": false
+      }
+    },
     "requirements": {
       "dotnet": ">=6.0",
       "windowsSDK": ">=10.0.19041.0",
       "devMode": true
-    },
-    "deployment": {
-      "method": "sideload",
-      "portal": "https://<xbox-ip>:11443"
     }
   }
 }
