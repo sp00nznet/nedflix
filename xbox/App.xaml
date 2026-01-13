@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Application
+    x:Class="Nedflix.Xbox.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Nedflix.Xbox">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Nedflix Theme Colors -->
+            <Color x:Key="NedflixPrimary">#e94560</Color>
+            <Color x:Key="NedflixBackground">#1a1a2e</Color>
+            <Color x:Key="NedflixSurface">#16213e</Color>
+            <Color x:Key="NedflixText">#ffffff</Color>
+
+            <SolidColorBrush x:Key="NedflixPrimaryBrush" Color="{StaticResource NedflixPrimary}" />
+            <SolidColorBrush x:Key="NedflixBackgroundBrush" Color="{StaticResource NedflixBackground}" />
+            <SolidColorBrush x:Key="NedflixSurfaceBrush" Color="{StaticResource NedflixSurface}" />
+            <SolidColorBrush x:Key="NedflixTextBrush" Color="{StaticResource NedflixText}" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

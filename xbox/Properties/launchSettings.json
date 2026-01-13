@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "Nedflix.Xbox (Package)": {
+      "commandName": "MsixPackage",
+      "nativeDebugging": false
+    },
+    "Nedflix.Xbox (Unpackaged)": {
+      "commandName": "Project",
+      "nativeDebugging": false
+    }
+  }
+}

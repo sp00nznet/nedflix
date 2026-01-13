@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net6.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>Nedflix.Xbox</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>x86;x64;ARM64</Platforms>
+    <RuntimeIdentifiers>win10-x86;win10-x64;win10-arm64</RuntimeIdentifiers>
+    <PublishProfile>win10-$(Platform).pubxml</PublishProfile>
+    <UseWinUI>true</UseWinUI>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <WindowsPackageType>MSIX</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
+    <ApplicationIcon>Assets\nedflix.ico</ApplicationIcon>
+    <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
+    <AppxAutoIncrementPackageRevision>True</AppxAutoIncrementPackageRevision>
+    <AppxSymbolPackageEnabled>False</AppxSymbolPackageEnabled>
+    <GenerateTestArtifacts>True</GenerateTestArtifacts>
+    <AppxBundle>Never</AppxBundle>
+    <DefaultLanguage>en-US</DefaultLanguage>
+  </PropertyGroup>
+
+  <!-- Assets -->
+  <ItemGroup>
+    <Content Include="Assets\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Web UI files for Desktop mode -->
+  <ItemGroup Condition="'$(Configuration)' == 'Desktop' Or '$(Configuration)' == 'DesktopXbox'">
+    <Content Include="WebUI\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Core dependencies -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2210.55" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.22621.756" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.4.231219000" />
+    <Manifest Include="$(ApplicationManifest)" />
+  </ItemGroup>
+
+  <!-- Embedded web server for Desktop mode -->
+  <ItemGroup Condition="'$(Configuration)' == 'Desktop' Or '$(Configuration)' == 'DesktopXbox'">
+    <PackageReference Include="EmbedIO" Version="3.5.2" />
+  </ItemGroup>
+
+  <!-- ========== CLIENT MODE CONFIGURATIONS ========== -->
+  <!-- Client mode: Connects to remote Nedflix server -->
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <DefineConstants>DEBUG;TRACE;CLIENT_MODE</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <DefineConstants>TRACE;CLIENT_MODE</DefineConstants>
+    <Optimize>True</Optimize>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Client|x64'">
+    <DefineConstants>TRACE;CLIENT_MODE</DefineConstants>
+    <Optimize>True</Optimize>
+    <AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ClientXbox|x64'">
+    <DefineConstants>XBOX;TRACE;CLIENT_MODE</DefineConstants>
+    <Optimize>True</Optimize>
+    <AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>
+  </PropertyGroup>
+
+  <!-- ========== DESKTOP MODE CONFIGURATIONS ========== -->
+  <!-- Desktop mode: Standalone with embedded server, no auth required -->
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Desktop|x64'">
+    <DefineConstants>TRACE;DESKTOP_MODE</DefineConstants>
+    <Optimize>True</Optimize>
+    <AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DesktopXbox|x64'">
+    <DefineConstants>XBOX;TRACE;DESKTOP_MODE</DefineConstants>
+    <Optimize>True</Optimize>
+    <AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>
+  </PropertyGroup>
+
+  <!-- Legacy Xbox configuration (defaults to Client mode) -->
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Xbox|x64'">
+    <DefineConstants>XBOX;TRACE;CLIENT_MODE</DefineConstants>
+    <Optimize>True</Optimize>
+    <AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>
+  </PropertyGroup>
+</Project>

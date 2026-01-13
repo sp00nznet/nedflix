@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:xbox="http://schemas.microsoft.com/appx/manifest/xbox/windows10"
+  IgnorableNamespaces="uap uap3 uap10 mp rescap xbox">
+
+  <Identity
+    Name="Nedflix.Xbox"
+    Publisher="CN=Nedflix"
+    Version="1.0.0.0"
+    ProcessorArchitecture="x64" />
+
+  <mp:PhoneIdentity PhoneProductId="9d8b5b2e-0c3a-4f5d-8e7a-1234567890ab" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
+
+  <Properties>
+    <DisplayName>Nedflix</DisplayName>
+    <PublisherDisplayName>Nedflix</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>Personal Video Streaming Platform for Xbox</Description>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.17763.0" MaxVersionTested="10.0.22621.0" />
+    <TargetDeviceFamily Name="Windows.Xbox" MinVersion="10.0.19041.0" MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="x-generate"/>
+  </Resources>
+
+  <Applications>
+    <Application Id="App"
+      Executable="$targetnametoken$.exe"
+      EntryPoint="$targetentrypoint$">
+
+      <uap:VisualElements
+        DisplayName="Nedflix"
+        Description="Personal Video Streaming Platform"
+        BackgroundColor="#1a1a2e"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" Square71x71Logo="Assets\SmallTile.png" Square310x310Logo="Assets\LargeTile.png">
+          <uap:ShowNameOnTiles>
+            <uap:ShowOn Tile="square150x150Logo"/>
+            <uap:ShowOn Tile="wide310x150Logo"/>
+            <uap:ShowOn Tile="square310x310Logo"/>
+          </uap:ShowNameOnTiles>
+        </uap:DefaultTile>
+        <uap:SplashScreen Image="Assets\SplashScreen.png" BackgroundColor="#1a1a2e"/>
+      </uap:VisualElements>
+
+      <!-- Xbox-specific extensions -->
+      <Extensions>
+        <uap:Extension Category="windows.protocol">
+          <uap:Protocol Name="nedflix">
+            <uap:DisplayName>Nedflix Protocol</uap:DisplayName>
+          </uap:Protocol>
+        </uap:Extension>
+
+        <!-- Enable gamepad input -->
+        <uap3:Extension Category="windows.appExtension">
+          <uap3:AppExtension Name="com.nedflix.gamepad" Id="GamepadSupport" DisplayName="Gamepad Support" Description="Xbox Controller Support" PublicFolder="Public">
+          </uap3:AppExtension>
+        </uap3:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- Required for WebView2 and network access -->
+    <Capability Name="internetClient" />
+    <Capability Name="internetClientServer" />
+    <Capability Name="privateNetworkClientServer" />
+
+    <!-- Media capabilities -->
+    <uap:Capability Name="videosLibrary" />
+    <uap:Capability Name="musicLibrary" />
+
+    <!-- Xbox-specific capabilities -->
+    <rescap:Capability Name="broadFileSystemAccess" />
+
+    <!-- Gamepad input -->
+    <DeviceCapability Name="humaninterfacedevice"/>
+  </Capabilities>
+
+  <!-- Xbox-specific configuration -->
+  <xbox:XboxLiveServer Enabled="false"/>
+</Package>
