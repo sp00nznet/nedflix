@@ -2,6 +2,17 @@
 
 Build scripts for compiling Nedflix for the original Xbox console (2001).
 
+## ⚠️ Novelty Build - Experimental
+
+**IMPORTANT:** This is an experimental "for fun" build targeting 23-year-old hardware. While the Original Xbox is more capable than the Dreamcast, it still has significant limitations (64MB RAM, 733MHz CPU, DirectX 8.1) that make full modern Nedflix functionality very challenging. This build is provided for:
+
+- **Retro gaming enthusiasts** and Xbox homebrew fans
+- **Educational purposes** (embedded development, DirectX 8 programming)
+- **Nostalgia projects** and preservation
+- **Technical challenge** / "because we can" projects
+
+**Realistic expectations:** Basic media playback might work with heavily optimized content, but don't expect HD streaming or modern codec support!
+
 ## Overview
 
 The original Xbox was a gaming console released by Microsoft in 2001. It featured:

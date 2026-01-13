@@ -8,18 +8,50 @@ All Nedflix build scripts now automatically install required dependencies withou
 
 ## Build Scripts Summary
 
-| Platform | Script | Auto-Installs | OS Support |
-|----------|--------|---------------|------------|
-| **Desktop (Electron)** | `desktop/build.sh` | Node.js 20 LTS | Linux (apt, dnf, pacman, zypper) |
-| **Desktop (Electron)** | `desktop/build.bat` | Node.js 20 LTS | Windows |
-| **Xbox Series X/S** | `xbox/build.ps1` | .NET SDK 8.0 | Windows (winget, choco, direct download) |
-| **Xbox Series X/S** | `xbox/build.bat` | .NET SDK 8.0 | Windows (winget, choco, direct download) |
-| **Original Xbox** | `xbox-original/build-client.sh` | nxdk + system deps | Linux (apt, dnf, pacman), macOS (Homebrew) |
-| **Original Xbox** | `xbox-original/build-desktop.sh` | nxdk + system deps | Linux (apt, dnf, pacman), macOS (Homebrew) |
-| **Apple TV** | `appletv/build-client.sh` | Xcode CLI, Homebrew, CocoaPods | macOS only |
-| **Apple TV** | `appletv/build-desktop.sh` | Xcode CLI, Homebrew, CocoaPods | macOS only |
-| **Android TV** | `androidtv/build-client.sh` | JDK 17, Android SDK, Gradle | Linux (apt, dnf, pacman), macOS (Homebrew) |
-| **Android TV** | `androidtv/build-desktop.sh` | JDK 17, Android SDK, Gradle | Linux (apt, dnf, pacman), macOS (Homebrew) |
+| Platform | Script | Auto-Installs | OS Support | Status |
+|----------|--------|---------------|------------|--------|
+| **Desktop (Electron)** | `desktop/build.sh` | Node.js 20 LTS | Linux (apt, dnf, pacman, zypper) | ✅ Production |
+| **Desktop (Electron)** | `desktop/build.bat` | Node.js 20 LTS | Windows | ✅ Production |
+| **Xbox Series X/S** | `xbox/build.ps1` | .NET SDK 8.0 | Windows (winget, choco, direct download) | ✅ Production |
+| **Xbox Series X/S** | `xbox/build.bat` | .NET SDK 8.0 | Windows (winget, choco, direct download) | ✅ Production |
+| **Original Xbox** | `xbox-original/build-client.sh` | nxdk + system deps | Linux (apt, dnf, pacman), macOS (Homebrew) | ⚠️ Novelty |
+| **Original Xbox** | `xbox-original/build-desktop.sh` | nxdk + system deps | Linux (apt, dnf, pacman), macOS (Homebrew) | ⚠️ Novelty |
+| **Dreamcast** | `dreamcast/build-client.sh` | KallistiOS + system deps | Linux (apt, dnf, pacman), macOS (Homebrew) | ⚠️ Novelty |
+| **Dreamcast** | `dreamcast/build-desktop.sh` | KallistiOS + system deps | Linux (apt, dnf, pacman), macOS (Homebrew) | ⚠️ Novelty |
+| **Apple TV** | `appletv/build-client.sh` | Xcode CLI, Homebrew, CocoaPods | macOS only | ✅ Production |
+| **Apple TV** | `appletv/build-desktop.sh` | Xcode CLI, Homebrew, CocoaPods | macOS only | ✅ Production |
+| **Android TV** | `androidtv/build-client.sh` | JDK 17, Android SDK, Gradle | Linux (apt, dnf, pacman), macOS (Homebrew) | ✅ Production |
+| **Android TV** | `androidtv/build-desktop.sh` | JDK 17, Android SDK, Gradle | Linux (apt, dnf, pacman), macOS (Homebrew) | ✅ Production |
+
+### Build Status Legend
+- **✅ Production**: Fully functional, intended for real-world use
+- **⚠️ Novelty**: Experimental/nostalgic builds with severe hardware limitations, provided "for fun"
+
+---
+
+## ⚠️ Novelty Builds Disclaimer
+
+The **Original Xbox (2001)** and **Dreamcast (1998)** builds are provided as **novelty/educational projects** and should be considered **experimental**. These vintage consoles have severe hardware limitations that make full Nedflix functionality impractical or impossible:
+
+### Original Xbox (2001)
+- **Hardware**: 733 MHz CPU, 64 MB RAM
+- **Viability**: Challenging but theoretically possible
+- **Reality**: Basic playback might work, modern features won't
+- **Status**: Fun retro project, not production-ready
+
+### Dreamcast (1998)
+- **Hardware**: 200 MHz CPU, 16 MB RAM
+- **Viability**: Essentially impossible for full functionality
+- **Reality**: Audio streaming might work, video playback will struggle
+- **Status**: "Because we can" technical curiosity
+
+These builds are for:
+- Retro gaming enthusiasts
+- Homebrew developers learning embedded systems
+- Nostalgia projects
+- Technical demonstrations
+
+**Do not expect production-quality software on 20-26 year old hardware!**
 
 ---
 
@@ -294,6 +326,78 @@ cd appletv && ./build-client.sh
 unset ANDROID_HOME
 cd androidtv && ./build-client.sh
 ```
+
+---
+
+### 8. Dreamcast (⚠️ Novelty Build)
+
+**Scripts**: `dreamcast/build-client.sh`, `dreamcast/build-desktop.sh`
+
+**⚠️ IMPORTANT**: This is an experimental/educational build. The Dreamcast (1998) has extreme hardware limitations that make full Nedflix functionality essentially impossible.
+
+**What it installs**:
+1. **KallistiOS (KOS)** - Dreamcast homebrew SDK
+2. **SH-4 toolchain** - Cross-compiler for Hitachi SuperH-4
+3. **System dependencies** - build tools, libraries
+
+**Installation methods**:
+- **Linux**: apt (Debian/Ubuntu), dnf (Fedora), pacman (Arch)
+- **macOS**: Homebrew
+- **KOS**: Git clone from https://github.com/KallistiOS/KallistiOS
+
+**How it works**:
+
+**System Dependencies Installation**:
+1. Detects package manager
+2. Installs build essentials:
+   - Linux (apt): `git build-essential texinfo libjpeg-dev libpng-dev patch wget libelf-dev gawk bison flex python3 gmp mpfr libmpc isl`
+   - Linux (dnf): Similar packages for Fedora
+   - macOS: `brew install git wget python3 jpeg libpng gmp mpfr libmpc isl`
+
+**KallistiOS Installation**:
+1. Checks if `$KOS_BASE` environment variable is set
+2. Checks default location: `$HOME/kos`
+3. If not found, clones KallistiOS repository
+4. Builds toolchain (20-30 minutes):
+   ```bash
+   cd $KOS_BASE/utils/dc-chain
+   ./download.sh  # Download toolchain sources
+   ./unpack.sh    # Extract sources
+   make           # Build SH-4 cross-compiler
+   ```
+5. Builds KOS itself:
+   ```bash
+   cd $KOS_BASE
+   cp doc/environ.sh.sample environ.sh
+   source environ.sh
+   make
+   ```
+6. Exports environment variables:
+   ```bash
+   export KOS_BASE=$HOME/kos
+   source $KOS_BASE/environ.sh
+   ```
+
+**Desktop version differences**:
+- Creates minimal text-only Web UI (images won't fit in 16MB RAM!)
+- Would use KOS httpd for embedded server (theoretical)
+- Extremely limited functionality due to RAM constraints
+
+**Hardware Limitations**:
+- **CPU**: 200 MHz SH-4 (cannot decode modern codecs)
+- **RAM**: 16 MB total (8MB main + 8MB video)
+- **Realistic use**: Audio streaming only
+- **Video**: MPEG-1 at 240p maximum
+- **Network**: Broadband Adapter (10Mbps) or Modem (56K)
+
+**Testing**: To test:
+```bash
+unset KOS_BASE
+cd dreamcast && ./build-client.sh
+```
+
+**Reality Check**:
+This build is a technical curiosity and learning project. The Dreamcast simply doesn't have the resources for modern media streaming. Consider it a nostalgic "what if" rather than a practical application.
 
 ---
 
