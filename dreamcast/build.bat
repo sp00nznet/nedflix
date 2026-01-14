@@ -412,14 +412,16 @@ echo Running KallistiOS installation in MSYS2...
 echo This will open a new window. Please wait for it to complete.
 echo.
 
-"%MSYS2_PATH%\msys2_shell.cmd" -mingw64 -defterm -no-start -c "bash '%KOS_INSTALL_SCRIPT%'"
+:: Use call to ensure proper return to this script
+call "%MSYS2_PATH%\msys2_shell.cmd" -mingw64 -defterm -no-start -c "bash '%KOS_INSTALL_SCRIPT%'"
+set "MSYS_RESULT=!errorlevel!"
 
 del "%KOS_INSTALL_SCRIPT%" 2>nul
 
 set "KOS_PATH=%MSYS2_PATH%\home\%USERNAME%\kos"
 echo.
 echo KallistiOS installed at: %KOS_PATH%
-exit /b 0
+exit /b %MSYS_RESULT%
 
 :: ========================================
 :: Function to run build via MSYS2
@@ -464,8 +466,9 @@ if /i "%BUILD_TYPE%"=="client" (
 
 echo echo "Build complete!" >> "%BUILD_SCRIPT%"
 
-"%MSYS2_PATH%\msys2_shell.cmd" -mingw64 -defterm -no-start -c "bash '%BUILD_SCRIPT%'"
-set BUILD_RESULT=%errorlevel%
+:: Use call to ensure proper return to this script
+call "%MSYS2_PATH%\msys2_shell.cmd" -mingw64 -defterm -no-start -c "bash '%BUILD_SCRIPT%'"
+set "BUILD_RESULT=!errorlevel!"
 
 del "%BUILD_SCRIPT%" 2>nul
 exit /b %BUILD_RESULT%
