@@ -185,6 +185,10 @@ goto build_done
 echo.
 echo Cleaning build output...
 if exist "build" rmdir /s /q build
+if exist "src\bin" rmdir /s /q src\bin
+if exist "src\*.o" del /q src\*.o 2>nul
+if exist "src\*.obj" del /q src\*.obj 2>nul
+if exist "src\default.xbe" del /q src\default.xbe 2>nul
 echo Clean complete.
 goto end
 
