@@ -463,7 +463,8 @@ if !errorlevel! neq 0 (
 echo.
 
 echo [Step 2g] Setting up KOS environment...
-call "%MSYS2_PATH%\msys2_shell.cmd" -mingw64 -defterm -no-start -c "cd ~/kos && cp -f doc/environ.sh.sample environ.sh"
+:: Configure environ.sh with correct paths for MSYS2 installation
+call "%MSYS2_PATH%\msys2_shell.cmd" -mingw64 -defterm -no-start -c "cd ~/kos && cp -f doc/environ.sh.sample environ.sh && sed -i 's|^export KOS_BASE=.*|export KOS_BASE=\"$HOME/kos\"|' environ.sh && sed -i 's|^export KOS_CC_BASE=.*|export KOS_CC_BASE=\"/opt/toolchains/dc\"|' environ.sh"
 if !errorlevel! neq 0 (
     echo [DEBUG] Step 2g failed with errorlevel !errorlevel!
 )
@@ -476,11 +477,26 @@ if !errorlevel! neq 0 (
 )
 echo.
 
-:: Verify installation regardless of exit code (MSYS2 sometimes returns non-zero)
-if exist "%KOS_PATH%\environ.sh" (
+:: Verify installation by checking for actual toolchain binaries
+set "TOOLCHAIN_BIN=%MSYS2_PATH%\opt\toolchains\dc\sh-elf\bin\sh-elf-gcc.exe"
+if exist "!TOOLCHAIN_BIN!" (
     echo.
-    echo KallistiOS installed successfully at: %KOS_PATH%
+    echo KallistiOS toolchain installed successfully!
+    echo   Toolchain: !TOOLCHAIN_BIN!
+    echo   KOS path: %KOS_PATH%
     exit /b 0
+) else if exist "%KOS_PATH%\environ.sh" (
+    echo.
+    echo WARNING: KOS source is present but toolchain build failed.
+    echo   The toolchain at /opt/toolchains/dc/sh-elf was not created.
+    echo.
+    echo   Common fixes:
+    echo   1. Check build output above for specific errors
+    echo   2. Try running in MSYS2 shell manually:
+    echo      cd ~/kos/utils/dc-chain
+    echo      make build 2^>^&1 ^| tee build.log
+    echo   3. Check dc-chain documentation for MSYS2 requirements
+    exit /b 1
 ) else (
     echo.
     echo KallistiOS installation may have failed or been interrupted.
