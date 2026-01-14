@@ -412,8 +412,9 @@ echo Step 2: Installing KallistiOS dependencies and toolchain...
 echo This will take 20-30 minutes to compile.
 echo.
 
-:: Create install script for MSYS2
-set "KOS_INSTALL_SCRIPT=%TEMP%\install_kos.sh"
+:: Create install script in MSYS2's tmp directory (more reliable path handling)
+if not exist "%MSYS2_PATH%\tmp" mkdir "%MSYS2_PATH%\tmp"
+set "KOS_INSTALL_SCRIPT=%MSYS2_PATH%\tmp\install_kos.sh"
 
 (
     echo #!/bin/bash
@@ -486,7 +487,8 @@ echo Running KallistiOS installation in MSYS2...
 echo.
 
 :: Use MSYS shell (not mingw64) for building the cross-compiler toolchain
-call "%MSYS2_PATH%\msys2_shell.cmd" -msys -defterm -no-start -c "bash '%KOS_INSTALL_SCRIPT%'"
+:: Use Unix-style path /tmp/install_kos.sh since script is in MSYS2's tmp dir
+call "%MSYS2_PATH%\msys2_shell.cmd" -msys -defterm -no-start -c "bash /tmp/install_kos.sh"
 set "MSYS_RESULT=!errorlevel!"
 
 del "%KOS_INSTALL_SCRIPT%" 2>nul
