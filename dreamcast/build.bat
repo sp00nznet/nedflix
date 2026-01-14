@@ -485,10 +485,13 @@ set "KOS_INSTALL_SCRIPT=%MSYS2_PATH%\tmp\install_kos.sh"
 
 echo Running KallistiOS installation in MSYS2...
 echo.
+echo Please wait - a new terminal window will open for the installation.
+echo The installation will take 20-30 minutes.
+echo.
 
-:: Use MSYS shell (not mingw64) for building the cross-compiler toolchain
-:: Use Unix-style path /tmp/install_kos.sh since script is in MSYS2's tmp dir
-call "%MSYS2_PATH%\msys2_shell.cmd" -msys -defterm -no-start -c "bash /tmp/install_kos.sh"
+:: Launch MSYS2 in a new window and run the install script
+:: Using 'start /wait' to ensure we wait for completion
+start /wait "" "%MSYS2_PATH%\usr\bin\bash.exe" --login -c "/tmp/install_kos.sh"
 set "MSYS_RESULT=!errorlevel!"
 
 del "%KOS_INSTALL_SCRIPT%" 2>nul
