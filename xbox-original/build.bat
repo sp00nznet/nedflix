@@ -184,12 +184,57 @@ goto build_done
 :clean
 echo.
 echo Cleaning build output...
+
+:: Clean standard output directories
 if exist "build" rmdir /s /q build
 if exist "src\bin" rmdir /s /q src\bin
+
+:: Clean object files and XBE
 if exist "src\*.o" del /q src\*.o 2>nul
 if exist "src\*.obj" del /q src\*.obj 2>nul
 if exist "src\default.xbe" del /q src\default.xbe 2>nul
+
+:: Clean nxdk intermediate files
+if exist "src\*.d" del /q src\*.d 2>nul
+if exist "src\*.lib" del /q src\*.lib 2>nul
+if exist "src\.last_build_type" del /q src\.last_build_type 2>nul
+
+:: Run nxdk's make clean to catch any other files
+set "MSYS2_PATH="
+if exist "C:\msys64" set "MSYS2_PATH=C:\msys64"
+if exist "C:\msys32" if "!MSYS2_PATH!"=="" set "MSYS2_PATH=C:\msys32"
+
+if not "!MSYS2_PATH!"=="" (
+    echo Running nxdk make clean...
+
+    :: Get NXDK_DIR
+    if not defined NXDK_DIR (
+        if exist "%USERPROFILE%\nxdk" set "NXDK_DIR=%USERPROFILE%\nxdk"
+        if exist "C:\nxdk" if not defined NXDK_DIR set "NXDK_DIR=C:\nxdk"
+    )
+
+    if defined NXDK_DIR (
+        set "SCRIPT_DIR=%cd%"
+        set "SCRIPT_DIR=!SCRIPT_DIR:\=/!"
+        set "SCRIPT_DIR=/!SCRIPT_DIR::=!"
+        set "NXDK_MSYS=!NXDK_DIR:\=/!"
+        set "NXDK_MSYS=/!NXDK_MSYS::=!"
+
+        set "CLEAN_SCRIPT=!MSYS2_PATH!\tmp\xbox_clean.sh"
+        echo #!/bin/bash> "!CLEAN_SCRIPT!"
+        echo export NXDK_DIR="!NXDK_MSYS!">> "!CLEAN_SCRIPT!"
+        echo export PATH="/mingw64/bin:$NXDK_DIR/bin:$PATH">> "!CLEAN_SCRIPT!"
+        echo cd "!SCRIPT_DIR!/src">> "!CLEAN_SCRIPT!"
+        echo make clean 2^>/dev/null ^|^| true>> "!CLEAN_SCRIPT!"
+
+        call "!MSYS2_PATH!\msys2_shell.cmd" -mingw64 -defterm -no-start -c "bash /tmp/xbox_clean.sh"
+        del "!CLEAN_SCRIPT!" 2>nul
+    )
+)
+
 echo Clean complete.
+echo.
+echo All build artifacts removed. Rebuild will recompile all source files.
 goto end
 
 :install_nxdk
@@ -545,6 +590,26 @@ if /i "%BUILD_TYPE%"=="client" (
     if not exist "build\desktop" mkdir "build\desktop"
     set "BUILD_DIR=build\desktop"
     set "OUTPUT_FILE=nedflix-desktop.xbe"
+)
+
+:: Track last build type to force clean when switching
+:: (nxdk/Make doesn't detect CFLAGS changes automatically)
+set "LAST_BUILD_FILE=src\.last_build_type"
+set "LAST_BUILD="
+if exist "!LAST_BUILD_FILE!" (
+    set /p LAST_BUILD=<"!LAST_BUILD_FILE!"
+)
+if not "!LAST_BUILD!"=="%BUILD_TYPE%" (
+    if not "!LAST_BUILD!"=="" (
+        echo Build type changed from !LAST_BUILD! to %BUILD_TYPE%
+        echo Cleaning previous build artifacts to ensure fresh compilation...
+        if exist "src\bin" rmdir /s /q src\bin
+        if exist "src\*.obj" del /q src\*.obj 2>nul
+        if exist "src\*.o" del /q src\*.o 2>nul
+        if exist "src\*.d" del /q src\*.d 2>nul
+        echo.
+    )
+    echo %BUILD_TYPE%>"!LAST_BUILD_FILE!"
 )
 
 :: Simulated build (actual nxdk build would go here)
