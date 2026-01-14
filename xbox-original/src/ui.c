@@ -83,7 +83,7 @@ void ui_begin_frame(void)
     pb_wait_for_vbl();
     pb_target_back_buffer();
     pb_reset();
-    pb_erase_depth_stencil_buffer(0, 0, 0xFFFFFF);
+    pb_erase_depth_stencil_buffer(0, 0, g_fb_width, g_fb_height);
     g_fb = (DWORD *)pb_back_buffer();
 #endif
 }
