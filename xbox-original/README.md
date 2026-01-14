@@ -57,23 +57,39 @@ The original Xbox was a gaming console released by Microsoft in 2001. It feature
 
 ## Building
 
-### Client Version
-```bash
+### Windows (Recommended)
+
+Run the interactive build script:
+```cmd
 cd xbox-original
-chmod +x build-client.sh
-./build-client.sh
+build.bat
 ```
 
-Output: `build/client/nedflix-client.xbe`
+The menu provides options for:
+- Client builds (Debug/Release)
+- Desktop builds (Debug/Release)
+- Creating XBE packages
+- Installing nxdk toolchain
 
-### Desktop Version
+### Linux/macOS
+
+Use the Unix build script:
 ```bash
 cd xbox-original
-chmod +x build-desktop.sh
-./build-desktop.sh
+chmod +x build.sh
+./build.sh
 ```
 
-Output: `build/desktop/nedflix-desktop.xbe`
+Or build directly with make:
+```bash
+export NXDK_DIR=/path/to/nxdk
+cd xbox-original/src
+make CLIENT=1          # Client version
+make CLIENT=0          # Desktop version
+make DEBUG=1 CLIENT=1  # Debug client
+```
+
+Output: `src/default.xbe`
 
 ## Deployment
 
