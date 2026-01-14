@@ -41,7 +41,7 @@ typedef struct {
 /*
  * Set default configuration values
  */
-void config_set_defaults(user_settings_t *settings)
+void config_defaults(user_settings_t *settings)
 {
     if (!settings) return;
 

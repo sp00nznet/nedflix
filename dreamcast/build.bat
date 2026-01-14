@@ -149,8 +149,22 @@ goto build_done
 :clean
 echo.
 echo Cleaning build output...
+
+:: Clean output directories
 if exist "build" rmdir /s /q build
+
+:: Clean object files and binaries
+if exist "src\*.o" del /q src\*.o 2>nul
+if exist "src\nedflix.elf" del /q src\nedflix.elf 2>nul
+if exist "src\nedflix.bin" del /q src\nedflix.bin 2>nul
+if exist "src\nedflix.cdi" del /q src\nedflix.cdi 2>nul
+if exist "src\1ST_READ.BIN" del /q src\1ST_READ.BIN 2>nul
+if exist "src\.last_build_type" del /q src\.last_build_type 2>nul
+if exist "src\.depend" del /q src\.depend 2>nul
+if exist "src\disc" rmdir /s /q src\disc 2>nul
+
 echo Clean complete.
+echo All build artifacts removed. Rebuild will recompile all source files.
 goto end
 
 :open_msys2
@@ -495,9 +509,30 @@ if "%MSYS2_PATH%"=="" set "MSYS2_PATH=C:\msys64"
 if /i "%BUILD_TYPE%"=="client" (
     set "BUILD_DIR=build\client"
     set "OUTPUT_FILE=nedflix-client.cdi"
+    set "CLIENT_FLAG=CLIENT=1"
 ) else (
     set "BUILD_DIR=build\desktop"
     set "OUTPUT_FILE=nedflix-desktop.cdi"
+    set "CLIENT_FLAG=CLIENT=0"
+)
+
+:: Track last build type to force clean when switching
+:: (Make doesn't detect CFLAGS changes automatically)
+set "LAST_BUILD_FILE=src\.last_build_type"
+set "LAST_BUILD="
+if exist "!LAST_BUILD_FILE!" (
+    set /p LAST_BUILD=<"!LAST_BUILD_FILE!"
+)
+if not "!LAST_BUILD!"=="%BUILD_TYPE%" (
+    if not "!LAST_BUILD!"=="" (
+        echo Build type changed from !LAST_BUILD! to %BUILD_TYPE%
+        echo Cleaning previous build artifacts to ensure fresh compilation...
+        if exist "src\*.o" del /q src\*.o 2>nul
+        if exist "src\nedflix.elf" del /q src\nedflix.elf 2>nul
+        if exist "src\nedflix.bin" del /q src\nedflix.bin 2>nul
+        echo.
+    )
+    echo %BUILD_TYPE%>"!LAST_BUILD_FILE!"
 )
 
 :: Check if actual source code exists
@@ -554,15 +589,16 @@ if exist "src\main.c" (
         echo cd "!SCRIPT_DIR!/src"
         echo echo "Building in: $^(pwd^)"
         echo echo "Build mode: !BUILD_MODE!"
+        echo echo "Client flag: !CLIENT_FLAG!"
         echo.
         echo make clean
         if /i "!BUILD_MODE!"=="debug" (
-            echo make debug
+            echo make debug !CLIENT_FLAG!
         ) else (
-            echo make release
+            echo make release !CLIENT_FLAG!
         )
         if /i "!BUILD_MODE!"=="cdi" (
-            echo make cdi
+            echo make cdi !CLIENT_FLAG!
         )
         echo.
         echo echo "Build complete!"

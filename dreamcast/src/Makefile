@@ -2,6 +2,11 @@
 # Nedflix for Sega Dreamcast
 # KallistiOS Makefile
 #
+# Build with: make
+# Build client mode: make CLIENT=1
+# Build desktop mode: make CLIENT=0
+# Debug build: make debug
+#
 
 # KallistiOS environment
 # This expects KOS_BASE to be set in environment
@@ -11,6 +16,9 @@ endif
 
 # Include KOS rules
 include $(KOS_BASE)/Makefile.rules
+
+# Build mode (1 = client mode, 0 = desktop mode)
+CLIENT ?= 1
 
 # Target name
 TARGET = nedflix.elf
@@ -26,6 +34,13 @@ OBJS = $(SRCS:.c=.o)
 # Compiler flags
 KOS_CFLAGS += -Wall -Wextra -O2 -fno-strict-aliasing
 KOS_CFLAGS += -DDREAMCAST
+
+# Client/Desktop mode
+ifeq ($(CLIENT),1)
+KOS_CFLAGS += -DNEDFLIX_CLIENT_MODE=1
+else
+KOS_CFLAGS += -DNEDFLIX_CLIENT_MODE=0
+endif
 
 # Include paths
 KOS_CFLAGS += -I.
@@ -125,4 +140,27 @@ debug: clean all
 release: KOS_CFLAGS += -O3 -DNDEBUG
 release: clean all
 
-.PHONY: all clean rm-elf cdi scramble install depend run debug release
+# Client build
+client:
+	$(MAKE) CLIENT=1
+
+# Desktop build
+desktop:
+	$(MAKE) CLIENT=0
+
+# Build info
+info:
+	@echo "Nedflix for Sega Dreamcast"
+	@echo "=========================="
+	@echo "Build mode: $(if $(filter 1,$(CLIENT)),CLIENT (connects to server),DESKTOP (local media))"
+	@echo ""
+	@echo "Available targets:"
+	@echo "  make          - Build current mode (CLIENT=$(CLIENT))"
+	@echo "  make client   - Build client mode"
+	@echo "  make desktop  - Build desktop mode"
+	@echo "  make debug    - Build with debug symbols"
+	@echo "  make release  - Build optimized release"
+	@echo "  make cdi      - Create CDI disc image"
+	@echo "  make clean    - Clean build artifacts"
+
+.PHONY: all clean rm-elf cdi scramble install depend run debug release client desktop info
