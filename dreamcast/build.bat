@@ -409,109 +409,72 @@ if exist "%KOS_PATH%\environ.sh" (
 :: Step 2: Install dependencies and KOS
 echo.
 echo Step 2: Installing KallistiOS dependencies and toolchain...
-echo This will take 20-30 minutes to compile.
 echo.
 
-:: Create install script in MSYS2's tmp directory (more reliable path handling)
-if not exist "%MSYS2_PATH%\tmp" mkdir "%MSYS2_PATH%\tmp"
-set "KOS_INSTALL_SCRIPT=%MSYS2_PATH%\tmp\install_kos.sh"
-
-(
-    echo #!/bin/bash
-    echo set -e
-    echo echo "Installing KallistiOS dependencies..."
-    echo echo "This requires packages from multiple MSYS2 repositories..."
-    echo.
-    echo # Install base development tools
-    echo pacman -S --noconfirm --needed base-devel
-    echo.
-    echo # Install required tools ^(MSYS2 base packages^)
-    echo pacman -S --noconfirm --needed git make gcc texinfo patch wget gawk bison flex
-    echo.
-    echo # Install MinGW packages for image libraries ^(used by KOS tools^)
-    echo pacman -S --noconfirm --needed mingw-w64-x86_64-libjpeg-turbo mingw-w64-x86_64-libpng
-    echo.
-    echo # Python for build scripts
-    echo pacman -S --noconfirm --needed python
-    echo.
-    echo echo "Cloning KallistiOS..."
-    echo cd ~
-    echo if [ -d "kos" ]; then
-    echo     echo "Updating existing KOS installation..."
-    echo     cd kos ^&^& git pull
-    echo else
-    echo     git clone --recursive https://github.com/KallistiOS/KallistiOS.git kos
-    echo fi
-    echo.
-    echo echo ""
-    echo echo "=========================================="
-    echo echo "Building KOS toolchain [20-30 minutes]..."
-    echo echo "=========================================="
-    echo echo ""
-    echo cd ~/kos/utils/dc-chain
-    echo.
-    echo # Copy Dreamcast config template to Makefile.cfg
-    echo echo "Setting up dc-chain configuration..."
-    echo cp -f Makefile.dreamcast.cfg Makefile.cfg
-    echo echo "Makefile.cfg created from Makefile.dreamcast.cfg"
-    echo.
-    echo # Download toolchain sources
-    echo echo "Downloading toolchain sources..."
-    echo make fetch
-    echo.
-    echo # Build the cross-compiler
-    echo echo "Building toolchain - this takes 20-30 minutes..."
-    echo make build
-    echo.
-    echo echo "Building KOS library..."
-    echo cd ~/kos
-    echo.
-    echo # Create environ.sh from sample
-    echo echo "Setting up KOS environment..."
-    echo cp -f doc/environ.sh.sample environ.sh
-    echo.
-    echo # Update environ.sh with the toolchain path
-    echo sed -i 's|export KOS_CC_BASE=.*|export KOS_CC_BASE=/opt/toolchains/dc|' environ.sh
-    echo.
-    echo source environ.sh
-    echo echo "Building KOS libraries..."
-    echo make
-    echo.
-    echo echo ""
-    echo echo "=========================================="
-    echo echo "KallistiOS installation complete!"
-    echo echo "=========================================="
-) > "%KOS_INSTALL_SCRIPT%"
-
-echo Running KallistiOS installation in MSYS2...
-echo.
-echo Please wait - this will take 20-30 minutes to compile the toolchain.
+:: DEBUG: Show environment info
+echo [DEBUG] MSYS2_PATH = %MSYS2_PATH%
+echo [DEBUG] KOS_PATH = %KOS_PATH%
+echo [DEBUG] USERNAME = %USERNAME%
 echo.
 
-:: Debug: Show the MSYS2 path being used
-echo Using MSYS2 at: %MSYS2_PATH%
+:: Run installation steps directly via msys2_shell.cmd
+:: Breaking into separate calls to isolate where failure occurs
 
-:: Verify bash.exe exists
-if not exist "%MSYS2_PATH%\usr\bin\bash.exe" (
-    echo ERROR: bash.exe not found at %MSYS2_PATH%\usr\bin\bash.exe
-    echo Please verify MSYS2 is installed correctly.
-    exit /b 1
+echo [Step 2a] Installing base packages...
+call "%MSYS2_PATH%\msys2_shell.cmd" -mingw64 -defterm -no-start -c "pacman -S --noconfirm --needed base-devel git make gcc texinfo patch wget gawk bison flex python"
+if !errorlevel! neq 0 (
+    echo [DEBUG] Step 2a failed with errorlevel !errorlevel!
 )
-
-:: Convert CRLF to LF in the script (bash requires Unix line endings)
-:: Use PowerShell to rewrite the file with Unix line endings
-powershell -Command "(Get-Content '%KOS_INSTALL_SCRIPT%') -join \"`n\" | Set-Content -NoNewline '%KOS_INSTALL_SCRIPT%'"
-
-:: Launch via msys2_shell.cmd which properly sets up the environment
-:: Using -defterm -no-start runs it in the current terminal instead of a new window
 echo.
-echo Starting MSYS2 bash to run installation script...
-echo.
-call "%MSYS2_PATH%\msys2_shell.cmd" -mingw64 -defterm -no-start -c "bash /tmp/install_kos.sh"
-set "MSYS_RESULT=!errorlevel!"
 
-:: Clean up install script
-del "%KOS_INSTALL_SCRIPT%" 2>nul
+echo [Step 2b] Installing MinGW packages...
+call "%MSYS2_PATH%\msys2_shell.cmd" -mingw64 -defterm -no-start -c "pacman -S --noconfirm --needed mingw-w64-x86_64-libjpeg-turbo mingw-w64-x86_64-libpng"
+if !errorlevel! neq 0 (
+    echo [DEBUG] Step 2b failed with errorlevel !errorlevel!
+)
+echo.
+
+echo [Step 2c] Cloning/updating KallistiOS...
+call "%MSYS2_PATH%\msys2_shell.cmd" -mingw64 -defterm -no-start -c "cd ~ && if [ -d kos ]; then cd kos && git pull; else git clone --recursive https://github.com/KallistiOS/KallistiOS.git kos; fi"
+if !errorlevel! neq 0 (
+    echo [DEBUG] Step 2c failed with errorlevel !errorlevel!
+)
+echo.
+
+echo [Step 2d] Setting up dc-chain config...
+call "%MSYS2_PATH%\msys2_shell.cmd" -mingw64 -defterm -no-start -c "cd ~/kos/utils/dc-chain && cp -f Makefile.dreamcast.cfg Makefile.cfg && echo 'Config created'"
+if !errorlevel! neq 0 (
+    echo [DEBUG] Step 2d failed with errorlevel !errorlevel!
+)
+echo.
+
+echo [Step 2e] Downloading toolchain sources (this may take a few minutes)...
+call "%MSYS2_PATH%\msys2_shell.cmd" -mingw64 -defterm -no-start -c "cd ~/kos/utils/dc-chain && make fetch"
+if !errorlevel! neq 0 (
+    echo [DEBUG] Step 2e failed with errorlevel !errorlevel!
+)
+echo.
+
+echo [Step 2f] Building toolchain (this takes 20-30 minutes)...
+call "%MSYS2_PATH%\msys2_shell.cmd" -mingw64 -defterm -no-start -c "cd ~/kos/utils/dc-chain && make build"
+if !errorlevel! neq 0 (
+    echo [DEBUG] Step 2f failed with errorlevel !errorlevel!
+)
+echo.
+
+echo [Step 2g] Setting up KOS environment...
+call "%MSYS2_PATH%\msys2_shell.cmd" -mingw64 -defterm -no-start -c "cd ~/kos && cp -f doc/environ.sh.sample environ.sh"
+if !errorlevel! neq 0 (
+    echo [DEBUG] Step 2g failed with errorlevel !errorlevel!
+)
+echo.
+
+echo [Step 2h] Building KOS libraries...
+call "%MSYS2_PATH%\msys2_shell.cmd" -mingw64 -defterm -no-start -c "cd ~/kos && source environ.sh && make"
+if !errorlevel! neq 0 (
+    echo [DEBUG] Step 2h failed with errorlevel !errorlevel!
+)
+echo.
 
 :: Verify installation regardless of exit code (MSYS2 sometimes returns non-zero)
 if exist "%KOS_PATH%\environ.sh" (
