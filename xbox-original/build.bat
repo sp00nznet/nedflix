@@ -874,34 +874,38 @@ set "ISO_DIR_MSYS=!ISO_DIR:\=/!"
 set "OUTPUT_MSYS=iso/!XISO_OUTPUT!"
 set "OUTPUT_MSYS=!OUTPUT_MSYS:\=/!"
 
-:: Create XISO build script
-set "XISO_SCRIPT=!MSYS2_PATH!\tmp\create_xiso.sh"
+:: Check for or download genisoimage
+set "TOOLS_DIR=%~dp0tools"
+set "GENISOIMAGE=!TOOLS_DIR!\genisoimage.exe"
 
-echo #!/bin/bash> "!XISO_SCRIPT!"
-echo.>> "!XISO_SCRIPT!"
-echo export PATH="/usr/bin:/mingw64/bin:$PATH">> "!XISO_SCRIPT!"
-echo cd "%cd:\=/%">> "!XISO_SCRIPT!"
-echo.>> "!XISO_SCRIPT!"
-echo # Update package database and install genisoimage>> "!XISO_SCRIPT!"
-echo echo "Installing genisoimage...">> "!XISO_SCRIPT!"
-echo pacman -Sy --noconfirm>> "!XISO_SCRIPT!"
-echo pacman -S --noconfirm --needed genisoimage 2^>/dev/null ^|^| true>> "!XISO_SCRIPT!"
-echo.>> "!XISO_SCRIPT!"
-echo # Create ISO>> "!XISO_SCRIPT!"
-echo echo "Creating ISO: !OUTPUT_MSYS!">> "!XISO_SCRIPT!"
-echo genisoimage -o "!OUTPUT_MSYS!" -R -J -joliet-long "!ISO_DIR_MSYS!">> "!XISO_SCRIPT!"
-echo.>> "!XISO_SCRIPT!"
-echo if [ -f "!OUTPUT_MSYS!" ]; then>> "!XISO_SCRIPT!"
-echo     echo "Success!" ^&^& ls -la "!OUTPUT_MSYS!">> "!XISO_SCRIPT!"
-echo else>> "!XISO_SCRIPT!"
-echo     echo "Failed to create ISO">> "!XISO_SCRIPT!"
-echo     exit 1>> "!XISO_SCRIPT!"
-echo fi>> "!XISO_SCRIPT!"
+if not exist "!TOOLS_DIR!" mkdir "!TOOLS_DIR!"
 
-echo Creating XISO via MSYS2...
-call "!MSYS2_PATH!\msys2_shell.cmd" -msys -defterm -no-start -c "bash /tmp/create_xiso.sh"
+if not exist "!GENISOIMAGE!" (
+    echo Downloading genisoimage for Windows...
+
+    :: Try PowerShell to download cdrkit-genisoimage
+    powershell -Command "& { $ProgressPreference = 'SilentlyContinue'; try { Invoke-WebRequest -Uri 'https://github.com/AstroGD/genisoimage-win64/releases/download/1.1.11/genisoimage-1.1.11-win64.exe' -OutFile '!GENISOIMAGE!' } catch { Write-Host 'Download failed' } }"
+
+    if not exist "!GENISOIMAGE!" (
+        echo ERROR: Could not download genisoimage.
+        echo.
+        echo Please download manually:
+        echo   1. Download genisoimage for Windows
+        echo   2. Place it in: !TOOLS_DIR!\genisoimage.exe
+        echo.
+        echo Or install cdrkit in WSL/Linux and use that.
+        exit /b 1
+    )
+    echo Downloaded genisoimage successfully!
+)
+
+:: Create the ISO
+echo Creating ISO with genisoimage...
+echo   Source: !ISO_DIR!
+echo   Output: iso\!XISO_OUTPUT!
+
+"!GENISOIMAGE!" -o "iso\!XISO_OUTPUT!" -R -J -joliet-long "!ISO_DIR!"
 set "XISO_RESULT=!errorlevel!"
-del "!XISO_SCRIPT!" 2>nul
 
 :: Clean up staging directory
 rmdir /s /q "!ISO_DIR!"
