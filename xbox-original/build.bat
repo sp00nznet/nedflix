@@ -606,7 +606,7 @@ if exist "src\main.c" (
             echo.>> "!BUILD_SCRIPT!"
             echo # Always try to install clang - pacman --needed will skip if present>> "!BUILD_SCRIPT!"
             echo echo "Ensuring LLVM/Clang is installed...">> "!BUILD_SCRIPT!"
-            echo pacman -S --noconfirm --needed mingw-w64-x86_64-clang mingw-w64-x86_64-lld>> "!BUILD_SCRIPT!"
+            echo pacman -S --noconfirm --needed mingw-w64-x86_64-clang mingw-w64-x86_64-lld mingw-w64-x86_64-llvm>> "!BUILD_SCRIPT!"
             echo.>> "!BUILD_SCRIPT!"
             echo export NXDK_DIR="!NXDK_MSYS!">> "!BUILD_SCRIPT!"
             echo export PATH="/mingw64/bin:$NXDK_DIR/bin:$PATH">> "!BUILD_SCRIPT!"
