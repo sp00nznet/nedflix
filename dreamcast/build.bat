@@ -439,34 +439,26 @@ echo export KOS_BASE=~/kos >> "%BUILD_SCRIPT%"
 echo source $KOS_BASE/environ.sh >> "%BUILD_SCRIPT%"
 echo cd "%cd:\=/%" >> "%BUILD_SCRIPT%"
 
-if "%BUILD_TYPE%"=="client" (
+if /i "%BUILD_TYPE%"=="client" (
     echo echo "Building Nedflix Client for Dreamcast..." >> "%BUILD_SCRIPT%"
     echo mkdir -p build/client >> "%BUILD_SCRIPT%"
     echo cd build/client >> "%BUILD_SCRIPT%"
-    if "%BUILD_MODE%"=="debug" (
-        echo echo "Debug build..." >> "%BUILD_SCRIPT%"
-        echo # kos-cc -g -O0 -o nedflix-client.elf ../../src/*.c -lkosutils >> "%BUILD_SCRIPT%"
-    ) else if "%BUILD_MODE%"=="release" (
-        echo echo "Release build..." >> "%BUILD_SCRIPT%"
-        echo # kos-cc -O2 -o nedflix-client.elf ../../src/*.c -lkosutils >> "%BUILD_SCRIPT%"
-    ) else if "%BUILD_MODE%"=="cdi" (
-        echo echo "Creating CDI image..." >> "%BUILD_SCRIPT%"
-        echo # kos-cc -O2 -o nedflix-client.elf ../../src/*.c -lkosutils >> "%BUILD_SCRIPT%"
-        echo # sh-elf-objcopy -O binary nedflix-client.elf nedflix-client.bin >> "%BUILD_SCRIPT%"
-        echo # cdi4dc nedflix-client.iso nedflix-client.cdi >> "%BUILD_SCRIPT%"
-    )
+    if /i "!BUILD_MODE!"=="debug" echo echo "Debug build..." >> "%BUILD_SCRIPT%"
+    if /i "!BUILD_MODE!"=="debug" echo # kos-cc -g -O0 -o nedflix-client.elf ../../src/*.c -lkosutils >> "%BUILD_SCRIPT%"
+    if /i "!BUILD_MODE!"=="release" echo echo "Release build..." >> "%BUILD_SCRIPT%"
+    if /i "!BUILD_MODE!"=="release" echo # kos-cc -O2 -o nedflix-client.elf ../../src/*.c -lkosutils >> "%BUILD_SCRIPT%"
+    if /i "!BUILD_MODE!"=="cdi" echo echo "Creating CDI image..." >> "%BUILD_SCRIPT%"
+    if /i "!BUILD_MODE!"=="cdi" echo # kos-cc -O2 -o nedflix-client.elf ../../src/*.c -lkosutils >> "%BUILD_SCRIPT%"
+    if /i "!BUILD_MODE!"=="cdi" echo # sh-elf-objcopy -O binary nedflix-client.elf nedflix-client.bin >> "%BUILD_SCRIPT%"
+    if /i "!BUILD_MODE!"=="cdi" echo # cdi4dc nedflix-client.iso nedflix-client.cdi >> "%BUILD_SCRIPT%"
     echo echo "Client build simulated successfully!" >> "%BUILD_SCRIPT%"
 ) else (
     echo echo "Building Nedflix Desktop for Dreamcast..." >> "%BUILD_SCRIPT%"
     echo mkdir -p build/desktop >> "%BUILD_SCRIPT%"
     echo cd build/desktop >> "%BUILD_SCRIPT%"
-    if "%BUILD_MODE%"=="debug" (
-        echo echo "Debug build..." >> "%BUILD_SCRIPT%"
-    ) else if "%BUILD_MODE%"=="release" (
-        echo echo "Release build..." >> "%BUILD_SCRIPT%"
-    ) else if "%BUILD_MODE%"=="cdi" (
-        echo echo "Creating CDI image..." >> "%BUILD_SCRIPT%"
-    )
+    if /i "!BUILD_MODE!"=="debug" echo echo "Debug build..." >> "%BUILD_SCRIPT%"
+    if /i "!BUILD_MODE!"=="release" echo echo "Release build..." >> "%BUILD_SCRIPT%"
+    if /i "!BUILD_MODE!"=="cdi" echo echo "Creating CDI image..." >> "%BUILD_SCRIPT%"
     echo echo "Desktop build simulated successfully!" >> "%BUILD_SCRIPT%"
 )
 
