@@ -449,49 +449,31 @@ set "KOS_INSTALL_SCRIPT=%TEMP%\install_kos.sh"
     echo echo ""
     echo cd ~/kos/utils/dc-chain
     echo.
-    echo # Create configuration file from sample
-    echo if [ ! -f "Makefile.cfg" ]; then
-    echo     echo "Creating dc-chain configuration..."
-    echo     if [ -f "config/config.mk.stable.sample" ]; then
-    echo         cp config/config.mk.stable.sample Makefile.cfg
-    echo     elif [ -f "config.mk.stable.sample" ]; then
-    echo         cp config.mk.stable.sample Makefile.cfg
-    echo     elif [ -f "Makefile.default.cfg" ]; then
-    echo         cp Makefile.default.cfg Makefile.cfg
-    echo     else
-    echo         # Generate a minimal config for stable toolchain
-    echo         echo "# KOS dc-chain configuration" ^> Makefile.cfg
-    echo         echo "toolchains_base=/opt/toolchains/dc" ^>^> Makefile.cfg
-    echo         echo "download_protocol=https" ^>^> Makefile.cfg
-    echo         echo "verbose=1" ^>^> Makefile.cfg
-    echo     fi
-    echo fi
+    echo # Copy Dreamcast config template to Makefile.cfg
+    echo echo "Setting up dc-chain configuration..."
+    echo cp -f Makefile.dreamcast.cfg Makefile.cfg
+    echo echo "Makefile.cfg created from Makefile.dreamcast.cfg"
     echo.
-    echo # Download toolchain sources if needed
-    echo if [ ! -f ".download.stamp" ]; then
-    echo     echo "Downloading toolchain sources..."
-    echo     make fetch
-    echo     touch .download.stamp
-    echo fi
+    echo # Download toolchain sources
+    echo echo "Downloading toolchain sources..."
+    echo make fetch
     echo.
     echo # Build the cross-compiler
-    echo echo "Building toolchain ^(this takes 20-30 minutes^)..."
+    echo echo "Building toolchain - this takes 20-30 minutes..."
     echo make build
     echo.
     echo echo "Building KOS library..."
     echo cd ~/kos
     echo.
-    echo # Create environ.sh with correct paths
-    echo if [ -f "doc/environ.sh.sample" ]; then
-    echo     cp doc/environ.sh.sample environ.sh
-    echo elif [ -f "environ.sh.sample" ]; then
-    echo     cp environ.sh.sample environ.sh
-    echo fi
+    echo # Create environ.sh from sample
+    echo echo "Setting up KOS environment..."
+    echo cp -f doc/environ.sh.sample environ.sh
     echo.
     echo # Update environ.sh with the toolchain path
-    echo sed -i "s|^export KOS_CC_BASE=.*|export KOS_CC_BASE=/opt/toolchains/dc|" environ.sh
+    echo sed -i 's|export KOS_CC_BASE=.*|export KOS_CC_BASE=/opt/toolchains/dc|' environ.sh
     echo.
     echo source environ.sh
+    echo echo "Building KOS libraries..."
     echo make
     echo.
     echo echo ""
