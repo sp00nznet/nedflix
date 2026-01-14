@@ -457,8 +457,15 @@ exit /b 0
 echo Copying Web UI files for Desktop mode...
 if not exist "WebUI" mkdir WebUI
 if exist "..\desktop\public" (
-    xcopy /s /y /q "..\desktop\public\*" "WebUI\" >nul
-    echo Web UI files copied successfully!
+    :: Try robocopy first (available on all modern Windows)
+    robocopy "..\desktop\public" "WebUI" /E /NFL /NDL /NJH /NJS /NC /NS >nul 2>nul
+    if !errorlevel! leq 7 (
+        echo Web UI files copied successfully!
+    ) else (
+        :: Fallback to copy
+        copy /Y "..\desktop\public\*.*" "WebUI\" >nul 2>nul
+        echo Web UI files copied.
+    )
 ) else (
     echo WARNING: Desktop public folder not found at ..\desktop\public
     echo Desktop mode requires the Web UI files.
@@ -478,8 +485,8 @@ echo   Type: %BUILD_TYPE%
 echo   Mode: %BUILD_MODE%
 echo.
 
-:: Create build directory
-if "%BUILD_TYPE%"=="client" (
+:: Create build directory and set output file
+if /i "%BUILD_TYPE%"=="client" (
     if not exist "build\client" mkdir "build\client"
     set "BUILD_DIR=build\client"
     set "OUTPUT_FILE=nedflix-client.xbe"
@@ -496,57 +503,70 @@ echo   - RAM: 64 MB
 echo   - Graphics: DirectX 8.1 (nVidia NV2A)
 echo   - SDK: nxdk
 
-if "%BUILD_MODE%"=="debug" (
-    echo   - Optimization: Disabled (-O0)
-    echo   - Debug symbols: Enabled
-) else if "%BUILD_MODE%"=="release" (
-    echo   - Optimization: Full (-O2)
-    echo   - Debug symbols: Stripped
-) else if "%BUILD_MODE%"=="package" (
-    echo   - Optimization: Full (-O2)
-    echo   - Creating XBE package...
-)
+:: Show build mode info (using goto for reliable branching)
+if /i "%BUILD_MODE%"=="debug" goto :show_debug
+if /i "%BUILD_MODE%"=="release" goto :show_release
+if /i "%BUILD_MODE%"=="package" goto :show_package
+goto :after_mode_info
+
+:show_debug
+echo   - Optimization: Disabled (-O0)
+echo   - Debug symbols: Enabled
+goto :after_mode_info
+
+:show_release
+echo   - Optimization: Full (-O2)
+echo   - Debug symbols: Stripped
+goto :after_mode_info
+
+:show_package
+echo   - Optimization: Full (-O2)
+echo   - Creating XBE package...
+goto :after_mode_info
+
+:after_mode_info
 
 :: In a real implementation:
 :: cd %BUILD_DIR%
 :: make -f Makefile.%BUILD_TYPE% NXDK_DIR=%NXDK_DIR% CONFIG=%BUILD_MODE%
 
-:: Create build log
-echo Nedflix Original Xbox %BUILD_TYPE% Build > "%BUILD_DIR%\build.log"
-echo ==================================== >> "%BUILD_DIR%\build.log"
-echo Date: %date% %time% >> "%BUILD_DIR%\build.log"
-echo Toolchain: nxdk >> "%BUILD_DIR%\build.log"
-echo Target: Original Xbox (2001) >> "%BUILD_DIR%\build.log"
-echo Architecture: i686 (Pentium III) >> "%BUILD_DIR%\build.log"
-echo. >> "%BUILD_DIR%\build.log"
-
-if "%BUILD_TYPE%"=="client" (
-    echo Mode: CLIENT >> "%BUILD_DIR%\build.log"
-    echo Features: >> "%BUILD_DIR%\build.log"
-    echo   - Network streaming from Nedflix server >> "%BUILD_DIR%\build.log"
-    echo   - OAuth authentication support >> "%BUILD_DIR%\build.log"
-    echo   - Server library browsing >> "%BUILD_DIR%\build.log"
-    echo   - Xbox controller navigation >> "%BUILD_DIR%\build.log"
-    echo   - 480i/480p/720p/1080i output >> "%BUILD_DIR%\build.log"
-    echo   - Dolby Digital 5.1 audio >> "%BUILD_DIR%\build.log"
-) else (
-    echo Mode: DESKTOP >> "%BUILD_DIR%\build.log"
-    echo Features: >> "%BUILD_DIR%\build.log"
-    echo   - Embedded HTTP server (port 3000) >> "%BUILD_DIR%\build.log"
-    echo   - Local media playback (E:\ F:\ drives) >> "%BUILD_DIR%\build.log"
-    echo   - No authentication required >> "%BUILD_DIR%\build.log"
-    echo   - Web UI bundled >> "%BUILD_DIR%\build.log"
-    echo   - USB drive support >> "%BUILD_DIR%\build.log"
-    echo   - Offline mode (no network required) >> "%BUILD_DIR%\build.log"
-)
-
-echo. >> "%BUILD_DIR%\build.log"
-echo Build completed successfully! >> "%BUILD_DIR%\build.log"
-echo Output: %OUTPUT_FILE% >> "%BUILD_DIR%\build.log"
+:: Create build log (using single write block to avoid file lock issues)
+set "LOG_FILE=!BUILD_DIR!\build.log"
+(
+    echo Nedflix Original Xbox %BUILD_TYPE% Build
+    echo ====================================
+    echo Date: %date% %time%
+    echo Toolchain: nxdk
+    echo Target: Original Xbox ^(2001^)
+    echo Architecture: i686 ^(Pentium III^)
+    echo.
+    if /i "%BUILD_TYPE%"=="client" (
+        echo Mode: CLIENT
+        echo Features:
+        echo   - Network streaming from Nedflix server
+        echo   - OAuth authentication support
+        echo   - Server library browsing
+        echo   - Xbox controller navigation
+        echo   - 480i/480p/720p/1080i output
+        echo   - Dolby Digital 5.1 audio
+    ) else (
+        echo Mode: DESKTOP
+        echo Features:
+        echo   - Embedded HTTP server ^(port 3000^)
+        echo   - Local media playback ^(E:\ F:\ drives^)
+        echo   - No authentication required
+        echo   - Web UI bundled
+        echo   - USB drive support
+        echo   - Offline mode ^(no network required^)
+    )
+    echo.
+    echo Build completed successfully!
+    echo Output: !OUTPUT_FILE!
+) > "!LOG_FILE!" 2>nul
 
 echo.
 echo Build simulation complete!
-echo Output would be: %BUILD_DIR%\%OUTPUT_FILE%
+echo Output would be: !BUILD_DIR!\!OUTPUT_FILE!
 exit /b 0
 
 :end
