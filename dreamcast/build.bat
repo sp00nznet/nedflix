@@ -449,23 +449,26 @@ set "KOS_INSTALL_SCRIPT=%TEMP%\install_kos.sh"
     echo echo ""
     echo cd ~/kos/utils/dc-chain
     echo.
-    echo # Create configuration file from sample
+    echo # Create configuration file from platform template
     echo if [ ! -f "Makefile.cfg" ]; then
     echo     echo "Creating dc-chain configuration..."
-    echo     if [ -f "config/config.mk.stable.sample" ]; then
-    echo         cp config/config.mk.stable.sample Makefile.cfg
-    echo     elif [ -f "config.mk.stable.sample" ]; then
-    echo         cp config.mk.stable.sample Makefile.cfg
+    echo     if [ -f "Makefile.dreamcast.cfg" ]; then
+    echo         echo "Using Makefile.dreamcast.cfg template"
+    echo         cp Makefile.dreamcast.cfg Makefile.cfg
     echo     elif [ -f "Makefile.default.cfg" ]; then
     echo         cp Makefile.default.cfg Makefile.cfg
     echo     else
-    echo         # Generate a minimal config for stable toolchain
-    echo         echo "# KOS dc-chain configuration" ^> Makefile.cfg
-    echo         echo "toolchains_base=/opt/toolchains/dc" ^>^> Makefile.cfg
-    echo         echo "download_protocol=https" ^>^> Makefile.cfg
-    echo         echo "verbose=1" ^>^> Makefile.cfg
+    echo         echo "WARNING: No template found, creating minimal config"
+    echo         cat ^> Makefile.cfg ^<^< 'EOFCFG'
+    echo toolchains_base = /opt/toolchains/dc
+    echo download_protocol = https
+    echo verbose = 1
+    echo makejobs = -j2
+    echo EOFCFG
     echo     fi
+    echo     echo "Makefile.cfg created"
     echo fi
+    echo ls -la Makefile.cfg
     echo.
     echo # Download toolchain sources if needed
     echo if [ ! -f ".download.stamp" ]; then
