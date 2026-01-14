@@ -652,8 +652,21 @@ if exist "src\main.c" (
 
     :check_build_result
     if !MAKE_RESULT! equ 0 (
-        :: Check if XBE was created
-        if exist "src\default.xbe" (
+        :: Check if XBE was created (nxdk outputs to bin/ subdirectory)
+        if exist "src\bin\default.xbe" (
+            echo.
+            echo ========================================
+            echo Build completed successfully!
+            echo ========================================
+            echo.
+            echo Output: src\bin\default.xbe
+            echo.
+            echo To deploy:
+            echo   1. FTP the .xbe file to your Xbox
+            echo   2. Place in E:\Apps\Nedflix\
+            echo   3. Launch from dashboard
+            exit /b 0
+        ) else if exist "src\default.xbe" (
             echo.
             echo ========================================
             echo Build completed successfully!
