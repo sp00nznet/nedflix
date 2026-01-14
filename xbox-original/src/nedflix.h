@@ -19,6 +19,31 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdarg.h>
+
+/*
+ * nxdk compatibility: snprintf is not available in nxdk's C library.
+ * Provide a simple implementation using vsprintf.
+ * Note: This is not buffer-overflow safe like real snprintf,
+ * but works for our controlled use cases.
+ */
+#ifdef NXDK
+static inline int nxdk_snprintf(char *buf, size_t size, const char *fmt, ...) {
+    va_list args;
+    int ret;
+    va_start(args, fmt);
+    ret = vsprintf(buf, fmt, args);
+    va_end(args);
+    /* Ensure null termination */
+    if (size > 0) {
+        buf[size - 1] = '\0';
+    }
+    return ret;
+}
+#define snprintf nxdk_snprintf
+#endif
 
 /* Version info */
 #define NEDFLIX_VERSION_MAJOR 1
