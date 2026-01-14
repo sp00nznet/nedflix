@@ -485,15 +485,32 @@ set "KOS_INSTALL_SCRIPT=%MSYS2_PATH%\tmp\install_kos.sh"
 
 echo Running KallistiOS installation in MSYS2...
 echo.
-echo Please wait - a new terminal window will open for the installation.
-echo The installation will take 20-30 minutes.
+echo Please wait - this will take 20-30 minutes to compile the toolchain.
 echo.
 
-:: Launch MSYS2 in a new window and run the install script
-:: Using 'start /wait' to ensure we wait for completion
-start /wait "" "%MSYS2_PATH%\usr\bin\bash.exe" --login -c "/tmp/install_kos.sh"
+:: Debug: Show the MSYS2 path being used
+echo Using MSYS2 at: %MSYS2_PATH%
+
+:: Verify bash.exe exists
+if not exist "%MSYS2_PATH%\usr\bin\bash.exe" (
+    echo ERROR: bash.exe not found at %MSYS2_PATH%\usr\bin\bash.exe
+    echo Please verify MSYS2 is installed correctly.
+    exit /b 1
+)
+
+:: Convert CRLF to LF in the script (bash requires Unix line endings)
+:: Use PowerShell to rewrite the file with Unix line endings
+powershell -Command "(Get-Content '%KOS_INSTALL_SCRIPT%') -join \"`n\" | Set-Content -NoNewline '%KOS_INSTALL_SCRIPT%'"
+
+:: Launch via msys2_shell.cmd which properly sets up the environment
+:: Using -defterm -no-start runs it in the current terminal instead of a new window
+echo.
+echo Starting MSYS2 bash to run installation script...
+echo.
+call "%MSYS2_PATH%\msys2_shell.cmd" -mingw64 -defterm -no-start -c "bash /tmp/install_kos.sh"
 set "MSYS_RESULT=!errorlevel!"
 
+:: Clean up install script
 del "%KOS_INSTALL_SCRIPT%" 2>nul
 
 :: Verify installation regardless of exit code (MSYS2 sometimes returns non-zero)
