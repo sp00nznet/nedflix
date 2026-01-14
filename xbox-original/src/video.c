@@ -1,14 +1,10 @@
 /*
  * Nedflix for Original Xbox
- * Video/Audio playback
+ * Video/Audio playback using SDL2
  *
- * Note: Full video playback on Original Xbox requires either:
- * - Using Xbox Media Center (XBMC) as a backend
- * - Implementing DirectShow/WMV decoder
- * - Using FFmpeg compiled for Xbox
- *
- * This implementation provides the framework and would need
- * a proper decoder library for actual playback.
+ * Note: Full video playback on Original Xbox is challenging due to
+ * hardware limitations. This implementation provides the framework
+ * using SDL2 audio and would need a decoder library for actual playback.
  */
 
 #include "nedflix.h"
@@ -16,9 +12,8 @@
 #include <stdlib.h>
 
 #ifdef NXDK
-#include <windows.h>
-#include <dsound.h>
-/* DirectShow headers would go here for video decoding */
+#include <SDL.h>
+#include <hal/fileio.h>
 #endif
 
 /* Playback state */
@@ -36,12 +31,24 @@ static struct {
     size_t stream_buffer_size;
     size_t stream_position;
 
-    /* Audio state */
+    /* SDL Audio state */
 #ifdef NXDK
-    LPDIRECTSOUND8 ds;
-    LPDIRECTSOUNDBUFFER dsb;
+    SDL_AudioDeviceID audio_device;
+    SDL_AudioSpec audio_spec;
 #endif
 } g_video;
+
+/*
+ * SDL audio callback (for streaming audio)
+ */
+#ifdef NXDK
+static void audio_callback(void *userdata, Uint8 *stream, int len)
+{
+    (void)userdata;
+    /* Fill with silence for now - real implementation would decode audio */
+    SDL_memset(stream, 0, len);
+}
+#endif
 
 /*
  * Initialize video/audio subsystem
@@ -54,13 +61,28 @@ int video_init(void)
     g_video.volume = 100;
 
 #ifdef NXDK
-    /* Initialize DirectSound for audio */
-    HRESULT hr = DirectSoundCreate(NULL, &g_video.ds, NULL);
-    if (FAILED(hr)) {
-        LOG_ERROR("Failed to initialize DirectSound: 0x%08X", hr);
+    /* Initialize SDL audio subsystem */
+    if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0) {
+        LOG_ERROR("Failed to initialize SDL audio: %s", SDL_GetError());
         /* Non-fatal - continue without audio */
     } else {
-        LOG("DirectSound initialized");
+        /* Set up audio spec */
+        SDL_AudioSpec want;
+        SDL_memset(&want, 0, sizeof(want));
+        want.freq = 44100;
+        want.format = AUDIO_S16LSB;
+        want.channels = 2;
+        want.samples = 4096;
+        want.callback = audio_callback;
+        want.userdata = NULL;
+
+        g_video.audio_device = SDL_OpenAudioDevice(NULL, 0, &want, &g_video.audio_spec, 0);
+        if (g_video.audio_device == 0) {
+            LOG_ERROR("Failed to open audio device: %s", SDL_GetError());
+        } else {
+            LOG("SDL audio initialized: %d Hz, %d channels",
+                g_video.audio_spec.freq, g_video.audio_spec.channels);
+        }
     }
 #endif
 
@@ -87,14 +109,11 @@ void video_shutdown(void)
     video_stop();
 
 #ifdef NXDK
-    if (g_video.dsb) {
-        IDirectSoundBuffer_Release(g_video.dsb);
-        g_video.dsb = NULL;
+    if (g_video.audio_device != 0) {
+        SDL_CloseAudioDevice(g_video.audio_device);
+        g_video.audio_device = 0;
     }
-    if (g_video.ds) {
-        IDirectSound_Release(g_video.ds);
-        g_video.ds = NULL;
-    }
+    SDL_QuitSubSystem(SDL_INIT_AUDIO);
 #endif
 
     if (g_video.stream_buffer) {
@@ -134,7 +153,7 @@ int video_play(const char *url)
      * 3. Decode video frames (need codec library)
      * 4. Decode audio samples
      * 5. Render video to framebuffer
-     * 6. Output audio to DirectSound
+     * 6. Output audio to SDL
      *
      * For local files (E:\ F:\):
      * 1. Open file handle
@@ -142,41 +161,28 @@ int video_play(const char *url)
      * 3. Decode and render
      *
      * Due to Xbox hardware limitations:
-     * - MPEG-2 can be hardware accelerated
-     * - WMV9 has some hardware support
+     * - MPEG-2 can be software decoded at low resolutions
+     * - WMV9 has some optimization potential
      * - H.264 requires software decoding (very slow)
-     *
-     * Recommended approach for real implementation:
-     * - Use pre-transcoded content (MPEG-2 or WMV)
-     * - Or implement WMV decoder using Xbox GPU
-     * - Or port minimal FFmpeg with MPEG-2 support
      */
 
 #ifdef NXDK
     /* Check if it's a local file */
-    if (url[0] == 'E' || url[0] == 'F' || url[0] == 'e' || url[0] == 'f') {
-        /* Local file playback */
-        HANDLE hFile = CreateFile(url, GENERIC_READ, FILE_SHARE_READ,
-                                   NULL, OPEN_EXISTING, 0, NULL);
-        if (hFile == INVALID_HANDLE_VALUE) {
-            LOG_ERROR("Failed to open file: %s", url);
-            g_video.playing = false;
-            return -1;
-        }
-
-        /* Get file size for duration estimation */
-        DWORD fileSize = GetFileSize(hFile, NULL);
-        /* Rough estimate: assume 1MB = 8 seconds of video */
-        g_video.duration = (double)fileSize / (1024.0 * 1024.0) * 8.0;
-
-        CloseHandle(hFile);
-
-        LOG("Local file opened, estimated duration: %.1f seconds", g_video.duration);
+    if (url[0] == 'E' || url[0] == 'F' || url[0] == 'e' || url[0] == 'f' ||
+        url[1] == ':') {
+        /* Local file playback - try to get file size */
+        /* For now, set a reasonable duration estimate */
+        g_video.duration = 300.0;  /* 5 minutes default */
+        LOG("Local file, estimated duration: %.1f seconds", g_video.duration);
     } else if (strncmp(url, "http://", 7) == 0) {
-        /* Network streaming - would need HTTP range requests */
-        LOG("Network streaming not fully implemented");
-        /* For now, set a dummy duration */
+        /* Network streaming */
+        LOG("Network streaming mode");
         g_video.duration = 3600.0;  /* Assume 1 hour */
+    }
+
+    /* Start audio playback */
+    if (g_video.audio_device != 0) {
+        SDL_PauseAudioDevice(g_video.audio_device, 0);
     }
 #else
     /* Non-Xbox: simulate playback */
@@ -196,8 +202,8 @@ void video_stop(void)
     LOG("Stopping playback");
 
 #ifdef NXDK
-    if (g_video.dsb) {
-        IDirectSoundBuffer_Stop(g_video.dsb);
+    if (g_video.audio_device != 0) {
+        SDL_PauseAudioDevice(g_video.audio_device, 1);
     }
 #endif
 
@@ -217,8 +223,8 @@ void video_pause(void)
     LOG("Pausing playback");
 
 #ifdef NXDK
-    if (g_video.dsb) {
-        IDirectSoundBuffer_Stop(g_video.dsb);
+    if (g_video.audio_device != 0) {
+        SDL_PauseAudioDevice(g_video.audio_device, 1);
     }
 #endif
 
@@ -235,8 +241,8 @@ void video_resume(void)
     LOG("Resuming playback");
 
 #ifdef NXDK
-    if (g_video.dsb) {
-        IDirectSoundBuffer_Play(g_video.dsb, 0, 0, DSBPLAY_LOOPING);
+    if (g_video.audio_device != 0) {
+        SDL_PauseAudioDevice(g_video.audio_device, 0);
     }
 #endif
 
@@ -276,21 +282,9 @@ void video_set_volume(int volume)
 {
     g_video.volume = CLAMP(volume, 0, 100);
 
-#ifdef NXDK
-    if (g_video.dsb) {
-        /* Convert 0-100 to DirectSound dB scale (-10000 to 0) */
-        LONG db;
-        if (volume <= 0) {
-            db = DSBVOLUME_MIN;
-        } else if (volume >= 100) {
-            db = DSBVOLUME_MAX;
-        } else {
-            /* Logarithmic scale */
-            db = (LONG)(2000.0 * log10((double)volume / 100.0));
-        }
-        IDirectSoundBuffer_SetVolume(g_video.dsb, db);
-    }
-#endif
+    /* SDL doesn't have per-device volume control in the same way,
+     * so volume would need to be applied during audio mixing */
+    LOG("Volume set to %d%%", g_video.volume);
 }
 
 /*
