@@ -478,31 +478,72 @@ if exist "src\main.c" (
     :: Create build script for real compilation
     set "BUILD_SCRIPT=%TEMP%\dc_build.sh"
 
+    :: Convert Windows path to MSYS2 path
+    set "SCRIPT_DIR=%cd%"
+    set "SCRIPT_DIR=!SCRIPT_DIR:\=/!"
+    set "SCRIPT_DIR=/!SCRIPT_DIR::=!"
+
     (
         echo #!/bin/bash
         echo set -e
-        echo export KOS_BASE=~/kos
+        echo.
+        echo # Find KallistiOS
+        echo if [ -f ~/kos/environ.sh ]; then
+        echo     export KOS_BASE=~/kos
+        echo elif [ -f /opt/toolchains/dc/kos/environ.sh ]; then
+        echo     export KOS_BASE=/opt/toolchains/dc/kos
+        echo else
+        echo     echo "ERROR: KallistiOS not found"
+        echo     exit 1
+        echo fi
+        echo.
+        echo echo "Using KOS_BASE: $KOS_BASE"
         echo source $KOS_BASE/environ.sh
-        echo cd "%cd:\=/%"
-        echo mkdir -p !BUILD_DIR!
-        echo cd !BUILD_DIR!
-        echo echo "Compiling..."
-        echo make -f ../../Makefile.%BUILD_TYPE% CONFIG=%BUILD_MODE%
+        echo.
+        echo cd "!SCRIPT_DIR!/src"
+        echo echo "Building in: $(pwd^)"
+        echo.
+        if /i "!BUILD_MODE!"=="cdi" (
+            echo echo "Building CDI image..."
+            echo make clean
+            echo make release
+            echo make cdi
+        ) else if /i "!BUILD_MODE!"=="debug" (
+            echo echo "Building debug..."
+            echo make clean
+            echo make debug
+        ) else (
+            echo echo "Building release..."
+            echo make clean
+            echo make release
+        )
+        echo.
+        echo echo "Build complete!"
     ) > "%BUILD_SCRIPT%"
 
     call "%MSYS2_PATH%\msys2_shell.cmd" -mingw64 -defterm -no-start -c "bash '%BUILD_SCRIPT%'"
     set "BUILD_RESULT=!errorlevel!"
     del "%BUILD_SCRIPT%" 2>nul
 
-    if !BUILD_RESULT! equ 0 (
+    :: Check for output binary
+    if exist "src\nedflix.elf" (
         echo.
+        echo ========================================
         echo Build completed successfully!
-        echo Output: !BUILD_DIR!\!OUTPUT_FILE!
+        echo ========================================
+        echo.
+        echo Output files:
+        if exist "src\nedflix.elf" echo   - src\nedflix.elf (ELF executable)
+        if exist "src\nedflix.bin" echo   - src\nedflix.bin (Raw binary)
+        if exist "src\nedflix.cdi" echo   - src\nedflix.cdi (CD Image)
+        echo.
+        exit /b 0
     ) else (
         echo.
-        echo Build failed with error code !BUILD_RESULT!
+        echo Build may have failed - nedflix.elf not found
+        echo Check build output above for errors.
+        exit /b 1
     )
-    exit /b !BUILD_RESULT!
 ) else (
     :: No source code - create placeholder
     echo.
@@ -514,49 +555,7 @@ if exist "src\main.c" (
     echo This build script is ready, but actual Dreamcast
     echo source code needs to be implemented.
     echo.
-
-    :: Create build directory
-    if not exist "!BUILD_DIR!" mkdir "!BUILD_DIR!"
-
-    :: Create placeholder files
-    (
-        echo Nedflix Dreamcast %BUILD_TYPE% Build
-        echo ====================================
-        echo Date: %date% %time%
-        echo Status: PLACEHOLDER ^(no source code^)
-        echo Toolchain: KallistiOS
-        echo Target: Sega Dreamcast ^(1998^)
-        echo Architecture: SH-4 ^(SuperH-4^)
-        echo.
-        echo NOTE: This is a NOVELTY build with severe limitations!
-        echo Dreamcast has only 16MB RAM and 200MHz CPU.
-        echo.
-        echo To build a real CDI:
-        echo   1. Create src\main.c with Dreamcast application code
-        echo   2. Create Makefile.%BUILD_TYPE% for KallistiOS
-        echo   3. Run this build script again
-    ) > "!BUILD_DIR!\build.log" 2>nul
-
-    (
-        echo This directory would contain: !OUTPUT_FILE!
-        echo.
-        echo To generate a real CDI image:
-        echo   1. Implement Dreamcast source code in src\
-        echo   2. Create KallistiOS Makefile
-        echo   3. Install KallistiOS toolchain
-        echo   4. Run build.bat again
-        echo.
-        echo Remember: Dreamcast has only 16MB RAM!
-    ) > "!BUILD_DIR!\README.txt" 2>nul
-
-    echo Placeholder files created in: !BUILD_DIR!\
-    echo.
-    echo To create a real build:
-    echo   1. Add source code to src\main.c
-    echo   2. Create Makefile.client and Makefile.desktop
-    echo   3. Run this script again
-    echo.
-    exit /b 0
+    exit /b 1
 )
 
 :end
