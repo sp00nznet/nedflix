@@ -1,19 +1,18 @@
 /*
  * Nedflix for Original Xbox
- * Controller input handling
+ * Controller input handling using SDL2
  */
 
 #include "nedflix.h"
 #include <string.h>
 
 #ifdef NXDK
-#include <hal/input.h>
-#include <xboxkrnl/xboxkrnl.h>
+#include <SDL.h>
+#include <hal/debug.h>
 
-/* Xbox input state */
-static XPAD_INPUT g_pad_state;
-static XPAD_INPUT g_pad_prev;
-static bool g_pad_connected = false;
+/* SDL gamepad state */
+static SDL_GameController *g_controller = NULL;
+static bool g_sdl_initialized = false;
 
 #else
 /* Stub for non-Xbox builds */
@@ -33,21 +32,31 @@ int input_init(void)
     LOG("Initializing input...");
 
 #ifdef NXDK
-    /* Initialize Xbox input system */
-    XInputInit();
+    /* Initialize SDL subsystems if not already done */
+    if (!g_sdl_initialized) {
+        if (SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) < 0) {
+            LOG_ERROR("SDL_InitSubSystem failed: %s", SDL_GetError());
+            return -1;
+        }
+        g_sdl_initialized = true;
+    }
 
-    /* Clear state */
-    memset(&g_pad_state, 0, sizeof(g_pad_state));
-    memset(&g_pad_prev, 0, sizeof(g_pad_prev));
+    /* Open the first available game controller */
+    int num_joysticks = SDL_NumJoysticks();
+    LOG("Found %d joystick(s)", num_joysticks);
 
-    /* Check for controller */
-    DWORD devices = XInputGetState(0, &g_pad_state);
-    g_pad_connected = (devices != 0);
+    for (int i = 0; i < num_joysticks; i++) {
+        if (SDL_IsGameController(i)) {
+            g_controller = SDL_GameControllerOpen(i);
+            if (g_controller) {
+                LOG("Controller connected: %s", SDL_GameControllerName(g_controller));
+                break;
+            }
+        }
+    }
 
-    if (g_pad_connected) {
-        LOG("Controller connected");
-    } else {
-        LOG("No controller found");
+    if (!g_controller) {
+        LOG("No controller found - keyboard input only");
     }
 #endif
 
@@ -60,7 +69,14 @@ int input_init(void)
 void input_shutdown(void)
 {
 #ifdef NXDK
-    /* Nothing to cleanup */
+    if (g_controller) {
+        SDL_GameControllerClose(g_controller);
+        g_controller = NULL;
+    }
+    if (g_sdl_initialized) {
+        SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
+        g_sdl_initialized = false;
+    }
 #endif
     LOG("Input shutdown");
 }
@@ -71,39 +87,64 @@ void input_shutdown(void)
 void input_update(void)
 {
 #ifdef NXDK
-    /* Save previous state */
-    memcpy(&g_pad_prev, &g_pad_state, sizeof(g_pad_state));
+    /* Pump SDL events */
+    SDL_PumpEvents();
 
-    /* Get new state */
-    DWORD devices = XInputGetState(0, &g_pad_state);
-    g_pad_connected = (devices != 0);
-
-    /* Update global app state */
     uint16_t buttons = 0;
 
-    if (g_pad_state.AnalogButtons[XPAD_A] > TRIGGER_THRESHOLD) buttons |= BTN_A;
-    if (g_pad_state.AnalogButtons[XPAD_B] > TRIGGER_THRESHOLD) buttons |= BTN_B;
-    if (g_pad_state.AnalogButtons[XPAD_X] > TRIGGER_THRESHOLD) buttons |= BTN_X;
-    if (g_pad_state.AnalogButtons[XPAD_Y] > TRIGGER_THRESHOLD) buttons |= BTN_Y;
-    if (g_pad_state.AnalogButtons[XPAD_BLACK] > TRIGGER_THRESHOLD) buttons |= BTN_BLACK;
-    if (g_pad_state.AnalogButtons[XPAD_WHITE] > TRIGGER_THRESHOLD) buttons |= BTN_WHITE;
-    if (g_pad_state.AnalogButtons[XPAD_LEFT_TRIGGER] > TRIGGER_THRESHOLD) buttons |= BTN_LEFT_TRIGGER;
-    if (g_pad_state.AnalogButtons[XPAD_RIGHT_TRIGGER] > TRIGGER_THRESHOLD) buttons |= BTN_RIGHT_TRIGGER;
+    if (g_controller) {
+        /* Face buttons */
+        if (SDL_GameControllerGetButton(g_controller, SDL_CONTROLLER_BUTTON_A))
+            buttons |= BTN_A;
+        if (SDL_GameControllerGetButton(g_controller, SDL_CONTROLLER_BUTTON_B))
+            buttons |= BTN_B;
+        if (SDL_GameControllerGetButton(g_controller, SDL_CONTROLLER_BUTTON_X))
+            buttons |= BTN_X;
+        if (SDL_GameControllerGetButton(g_controller, SDL_CONTROLLER_BUTTON_Y))
+            buttons |= BTN_Y;
 
-    if (g_pad_state.wButtons & XINPUT_GAMEPAD_DPAD_UP) buttons |= BTN_DPAD_UP;
-    if (g_pad_state.wButtons & XINPUT_GAMEPAD_DPAD_DOWN) buttons |= BTN_DPAD_DOWN;
-    if (g_pad_state.wButtons & XINPUT_GAMEPAD_DPAD_LEFT) buttons |= BTN_DPAD_LEFT;
-    if (g_pad_state.wButtons & XINPUT_GAMEPAD_DPAD_RIGHT) buttons |= BTN_DPAD_RIGHT;
-    if (g_pad_state.wButtons & XINPUT_GAMEPAD_START) buttons |= BTN_START;
-    if (g_pad_state.wButtons & XINPUT_GAMEPAD_BACK) buttons |= BTN_BACK;
-    if (g_pad_state.wButtons & XINPUT_GAMEPAD_LEFT_THUMB) buttons |= BTN_LEFT_THUMB;
-    if (g_pad_state.wButtons & XINPUT_GAMEPAD_RIGHT_THUMB) buttons |= BTN_RIGHT_THUMB;
+        /* Shoulder buttons (Xbox Black/White) */
+        if (SDL_GameControllerGetButton(g_controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER))
+            buttons |= BTN_WHITE;
+        if (SDL_GameControllerGetButton(g_controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER))
+            buttons |= BTN_BLACK;
 
-    /* Also map left stick to D-pad for navigation convenience */
-    if (g_pad_state.sThumbLY > STICK_DEADZONE) buttons |= BTN_DPAD_UP;
-    if (g_pad_state.sThumbLY < -STICK_DEADZONE) buttons |= BTN_DPAD_DOWN;
-    if (g_pad_state.sThumbLX < -STICK_DEADZONE) buttons |= BTN_DPAD_LEFT;
-    if (g_pad_state.sThumbLX > STICK_DEADZONE) buttons |= BTN_DPAD_RIGHT;
+        /* D-pad */
+        if (SDL_GameControllerGetButton(g_controller, SDL_CONTROLLER_BUTTON_DPAD_UP))
+            buttons |= BTN_DPAD_UP;
+        if (SDL_GameControllerGetButton(g_controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN))
+            buttons |= BTN_DPAD_DOWN;
+        if (SDL_GameControllerGetButton(g_controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT))
+            buttons |= BTN_DPAD_LEFT;
+        if (SDL_GameControllerGetButton(g_controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT))
+            buttons |= BTN_DPAD_RIGHT;
+
+        /* Start/Back */
+        if (SDL_GameControllerGetButton(g_controller, SDL_CONTROLLER_BUTTON_START))
+            buttons |= BTN_START;
+        if (SDL_GameControllerGetButton(g_controller, SDL_CONTROLLER_BUTTON_BACK))
+            buttons |= BTN_BACK;
+
+        /* Thumbstick clicks */
+        if (SDL_GameControllerGetButton(g_controller, SDL_CONTROLLER_BUTTON_LEFTSTICK))
+            buttons |= BTN_LEFT_THUMB;
+        if (SDL_GameControllerGetButton(g_controller, SDL_CONTROLLER_BUTTON_RIGHTSTICK))
+            buttons |= BTN_RIGHT_THUMB;
+
+        /* Triggers (analog, but treat as digital) */
+        int left_trigger = SDL_GameControllerGetAxis(g_controller, SDL_CONTROLLER_AXIS_TRIGGERLEFT);
+        int right_trigger = SDL_GameControllerGetAxis(g_controller, SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+        if (left_trigger > 8000) buttons |= BTN_LEFT_TRIGGER;
+        if (right_trigger > 8000) buttons |= BTN_RIGHT_TRIGGER;
+
+        /* Map left stick to D-pad for navigation convenience */
+        int stick_x = SDL_GameControllerGetAxis(g_controller, SDL_CONTROLLER_AXIS_LEFTX);
+        int stick_y = SDL_GameControllerGetAxis(g_controller, SDL_CONTROLLER_AXIS_LEFTY);
+        if (stick_y < -STICK_DEADZONE) buttons |= BTN_DPAD_UP;
+        if (stick_y > STICK_DEADZONE) buttons |= BTN_DPAD_DOWN;
+        if (stick_x < -STICK_DEADZONE) buttons |= BTN_DPAD_LEFT;
+        if (stick_x > STICK_DEADZONE) buttons |= BTN_DPAD_RIGHT;
+    }
 
     /* Calculate just-pressed buttons */
     uint16_t prev_buttons = g_app.buttons_pressed;
@@ -112,7 +153,7 @@ void input_update(void)
 
     /* Update last input time */
     if (buttons != 0) {
-        g_app.last_input_time = GetTickCount();
+        g_app.last_input_time = SDL_GetTicks();
     }
 
 #else
@@ -147,7 +188,8 @@ bool input_button_just_pressed(button_mask_t button)
 int input_get_left_stick_x(void)
 {
 #ifdef NXDK
-    int value = g_pad_state.sThumbLX;
+    if (!g_controller) return 0;
+    int value = SDL_GameControllerGetAxis(g_controller, SDL_CONTROLLER_AXIS_LEFTX);
     if (abs(value) < STICK_DEADZONE) return 0;
     return value;
 #else
@@ -161,7 +203,8 @@ int input_get_left_stick_x(void)
 int input_get_left_stick_y(void)
 {
 #ifdef NXDK
-    int value = g_pad_state.sThumbLY;
+    if (!g_controller) return 0;
+    int value = SDL_GameControllerGetAxis(g_controller, SDL_CONTROLLER_AXIS_LEFTY);
     if (abs(value) < STICK_DEADZONE) return 0;
     return value;
 #else
@@ -175,7 +218,8 @@ int input_get_left_stick_y(void)
 int input_get_right_stick_x(void)
 {
 #ifdef NXDK
-    int value = g_pad_state.sThumbRX;
+    if (!g_controller) return 0;
+    int value = SDL_GameControllerGetAxis(g_controller, SDL_CONTROLLER_AXIS_RIGHTX);
     if (abs(value) < STICK_DEADZONE) return 0;
     return value;
 #else
@@ -189,7 +233,8 @@ int input_get_right_stick_x(void)
 int input_get_right_stick_y(void)
 {
 #ifdef NXDK
-    int value = g_pad_state.sThumbRY;
+    if (!g_controller) return 0;
+    int value = SDL_GameControllerGetAxis(g_controller, SDL_CONTROLLER_AXIS_RIGHTY);
     if (abs(value) < STICK_DEADZONE) return 0;
     return value;
 #else
@@ -198,24 +243,26 @@ int input_get_right_stick_y(void)
 }
 
 /*
- * Get left trigger value (0-255)
+ * Get left trigger value (0-32767)
  */
 int input_get_left_trigger(void)
 {
 #ifdef NXDK
-    return g_pad_state.AnalogButtons[XPAD_LEFT_TRIGGER];
+    if (!g_controller) return 0;
+    return SDL_GameControllerGetAxis(g_controller, SDL_CONTROLLER_AXIS_TRIGGERLEFT);
 #else
     return 0;
 #endif
 }
 
 /*
- * Get right trigger value (0-255)
+ * Get right trigger value (0-32767)
  */
 int input_get_right_trigger(void)
 {
 #ifdef NXDK
-    return g_pad_state.AnalogButtons[XPAD_RIGHT_TRIGGER];
+    if (!g_controller) return 0;
+    return SDL_GameControllerGetAxis(g_controller, SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
 #else
     return 0;
 #endif
