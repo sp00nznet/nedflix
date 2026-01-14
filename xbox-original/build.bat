@@ -40,6 +40,11 @@ echo.
 echo  BOTH VERSIONS:
 echo   7. Create Both XBE Packages
 echo.
+echo  XISO FOR EMULATOR (xemu):
+echo  11. Create Client XISO (for xemu)
+echo  12. Create Desktop XISO (for xemu)
+echo  13. Create Both XISOs
+echo.
 echo  UTILITIES:
 echo   8. Clean Build Output
 echo   9. Install/Update nxdk
@@ -47,7 +52,7 @@ echo  10. Open Command Prompt with nxdk
 echo   0. Exit
 echo.
 
-set /p choice="Enter your choice (0-10): "
+set /p choice="Enter your choice (0-13): "
 
 if "%choice%"=="1" goto build_client_debug
 if "%choice%"=="2" goto build_client_release
@@ -59,6 +64,9 @@ if "%choice%"=="7" goto package_both
 if "%choice%"=="8" goto clean
 if "%choice%"=="9" goto install_nxdk
 if "%choice%"=="10" goto open_nxdk_shell
+if "%choice%"=="11" goto xiso_client
+if "%choice%"=="12" goto xiso_desktop
+if "%choice%"=="13" goto xiso_both
 if "%choice%"=="0" exit /b 0
 
 echo Invalid choice. Please run the script again.
@@ -131,6 +139,45 @@ echo.
 echo Desktop version: Standalone local playback
 echo   - No authentication required
 echo   - Access media from Xbox HDD
+echo ========================================
+goto build_done
+
+:xiso_client
+echo.
+echo Creating Client XISO for xemu...
+call :run_nxdk_build "client" "release"
+if !errorlevel! neq 0 goto build_done
+call :create_xiso "client" "nedflix-client.iso"
+goto build_done
+
+:xiso_desktop
+echo.
+echo Creating Desktop XISO for xemu...
+call :ensure_webui
+call :run_nxdk_build "desktop" "release"
+if !errorlevel! neq 0 goto build_done
+call :create_xiso "desktop" "nedflix-desktop.iso"
+goto build_done
+
+:xiso_both
+echo.
+echo Creating both Client and Desktop XISOs...
+echo.
+echo [1/2] Building Client XISO...
+call :run_nxdk_build "client" "release"
+call :create_xiso "client" "nedflix-client.iso"
+echo.
+echo [2/2] Building Desktop XISO...
+call :ensure_webui
+call :run_nxdk_build "desktop" "release"
+call :create_xiso "desktop" "nedflix-desktop.iso"
+echo.
+echo ========================================
+echo Both XISO images created!
+echo   - nedflix-client.iso
+echo   - nedflix-desktop.iso
+echo.
+echo Load in xemu: Machine ^> Load Disc...
 echo ========================================
 goto build_done
 
@@ -764,6 +811,136 @@ if exist "src\main.c" (
     echo.
 )
 exit /b 0
+
+:: ========================================
+:: Function to create XISO image
+:: ========================================
+:create_xiso
+set "XISO_TYPE=%~1"
+set "XISO_OUTPUT=%~2"
+
+echo.
+echo ========================================
+echo Creating XISO: %XISO_OUTPUT%
+echo ========================================
+echo.
+
+:: Find the XBE file
+set "XBE_PATH="
+if exist "src\bin\default.xbe" set "XBE_PATH=src\bin\default.xbe"
+if "!XBE_PATH!"=="" if exist "src\default.xbe" set "XBE_PATH=src\default.xbe"
+
+if "!XBE_PATH!"=="" (
+    echo ERROR: No XBE file found. Build the project first.
+    exit /b 1
+)
+
+echo Found XBE: !XBE_PATH!
+
+:: Create ISO staging directory
+set "ISO_DIR=iso_staging"
+if exist "!ISO_DIR!" rmdir /s /q "!ISO_DIR!"
+mkdir "!ISO_DIR!"
+
+:: Copy XBE as default.xbe (required name for Xbox boot)
+copy "!XBE_PATH!" "!ISO_DIR!\default.xbe" >nul
+
+:: Create a simple xbe.cfg for title info (optional but nice)
+(
+    echo [XBE Info]
+    echo Title=Nedflix %XISO_TYPE%
+    echo Version=1.0.0
+) > "!ISO_DIR!\xbe.cfg" 2>nul
+
+echo ISO staging directory created.
+
+:: Check for extract-xiso in MSYS2
+set "MSYS2_PATH="
+if exist "C:\msys64" set "MSYS2_PATH=C:\msys64"
+if exist "C:\msys32" if "!MSYS2_PATH!"=="" set "MSYS2_PATH=C:\msys32"
+
+if "!MSYS2_PATH!"=="" (
+    echo ERROR: MSYS2 not found. Cannot create XISO.
+    echo Please install MSYS2 from https://www.msys2.org/
+    rmdir /s /q "!ISO_DIR!"
+    exit /b 1
+)
+
+:: Create output directory
+if not exist "iso" mkdir "iso"
+
+:: Convert paths for MSYS2
+set "ISO_DIR_MSYS=!ISO_DIR:\=/!"
+set "OUTPUT_MSYS=iso/!XISO_OUTPUT!"
+set "OUTPUT_MSYS=!OUTPUT_MSYS:\=/!"
+
+:: Create XISO build script
+set "XISO_SCRIPT=!MSYS2_PATH!\tmp\create_xiso.sh"
+
+echo #!/bin/bash> "!XISO_SCRIPT!"
+echo.>> "!XISO_SCRIPT!"
+echo # Install extract-xiso if needed>> "!XISO_SCRIPT!"
+echo if ! command -v extract-xiso ^&^> /dev/null; then>> "!XISO_SCRIPT!"
+echo     echo "Installing extract-xiso...">> "!XISO_SCRIPT!"
+echo     pacman -S --noconfirm --needed mingw-w64-x86_64-extract-xiso 2^>/dev/null ^|^| true>> "!XISO_SCRIPT!"
+echo fi>> "!XISO_SCRIPT!"
+echo.>> "!XISO_SCRIPT!"
+echo # Check if extract-xiso is available>> "!XISO_SCRIPT!"
+echo if command -v extract-xiso ^&^> /dev/null; then>> "!XISO_SCRIPT!"
+echo     echo "Creating XISO with extract-xiso...">> "!XISO_SCRIPT!"
+echo     cd "%cd:\=/%">> "!XISO_SCRIPT!"
+echo     extract-xiso -c "!ISO_DIR_MSYS!" "!OUTPUT_MSYS!">> "!XISO_SCRIPT!"
+echo else>> "!XISO_SCRIPT!"
+echo     echo "extract-xiso not available, using manual method...">> "!XISO_SCRIPT!"
+echo     # Fallback: create a raw image that xemu can still use>> "!XISO_SCRIPT!"
+echo     cd "%cd:\=/%">> "!XISO_SCRIPT!"
+echo     # Create simple ISO structure using genisoimage if available>> "!XISO_SCRIPT!"
+echo     if command -v genisoimage ^&^> /dev/null; then>> "!XISO_SCRIPT!"
+echo         genisoimage -o "!OUTPUT_MSYS!" -R -J "!ISO_DIR_MSYS!">> "!XISO_SCRIPT!"
+echo     elif command -v mkisofs ^&^> /dev/null; then>> "!XISO_SCRIPT!"
+echo         mkisofs -o "!OUTPUT_MSYS!" -R -J "!ISO_DIR_MSYS!">> "!XISO_SCRIPT!"
+echo     else>> "!XISO_SCRIPT!"
+echo         echo "ERROR: No ISO creation tool found">> "!XISO_SCRIPT!"
+echo         exit 1>> "!XISO_SCRIPT!"
+echo     fi>> "!XISO_SCRIPT!"
+echo fi>> "!XISO_SCRIPT!"
+
+echo Creating XISO via MSYS2...
+call "!MSYS2_PATH!\msys2_shell.cmd" -mingw64 -defterm -no-start -c "bash /tmp/create_xiso.sh"
+set "XISO_RESULT=!errorlevel!"
+del "!XISO_SCRIPT!" 2>nul
+
+:: Clean up staging directory
+rmdir /s /q "!ISO_DIR!"
+
+:: Check result
+if exist "iso\!XISO_OUTPUT!" (
+    echo.
+    echo ========================================
+    echo XISO created successfully!
+    echo ========================================
+    echo.
+    echo Output: iso\!XISO_OUTPUT!
+    echo.
+    echo To use with xemu:
+    echo   1. Open xemu
+    echo   2. Go to Machine ^> Load Disc...
+    echo   3. Select iso\!XISO_OUTPUT!
+    echo   4. The game will boot automatically
+    echo.
+    exit /b 0
+) else (
+    echo.
+    echo ========================================
+    echo XISO creation may have failed.
+    echo ========================================
+    echo.
+    echo Alternative: Load XBE directly in xemu
+    echo   1. In xemu, go to Machine ^> Load HDD...
+    echo   2. Add !XBE_PATH! to the virtual HDD
+    echo.
+    exit /b 1
+)
 
 :end
 echo.
