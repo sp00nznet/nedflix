@@ -597,27 +597,32 @@ if exist "src\main.c" (
             set "NXDK_MSYS=!NXDK_DIR:\=/!"
             set "NXDK_MSYS=/!NXDK_MSYS::=!"
 
-            :: Create build script for MSYS2
-            set "BUILD_SCRIPT=%TEMP%\xbox_build.sh"
-            (
-                echo #!/bin/bash
-                echo set -e
-                echo.
-                echo # Ensure clang is available ^(nxdk requires LLVM^)
-                echo if ! command -v clang ^&^> /dev/null; then
-                echo     echo "Installing LLVM/Clang for nxdk..."
-                echo     pacman -S --noconfirm --needed mingw-w64-x86_64-clang mingw-w64-x86_64-lld
-                echo fi
-                echo.
-                echo export NXDK_DIR="!NXDK_MSYS!"
-                echo export PATH="$NXDK_DIR/bin:/mingw64/bin:$PATH"
-                echo cd "!SCRIPT_DIR!/src"
-                echo echo "Building in: $(pwd)"
-                echo echo "Using clang: $(which clang 2^>/dev/null ^|^| echo 'not found'^)"
-                echo make !CLIENT_FLAG! !DEBUG_FLAG!
-            ) > "!BUILD_SCRIPT!"
+            :: Create build script in MSYS2 tmp to avoid path issues
+            set "BUILD_SCRIPT=!MSYS2_PATH!\tmp\xbox_build.sh"
+            if not exist "!MSYS2_PATH!\tmp" mkdir "!MSYS2_PATH!\tmp"
 
-            call "!MSYS2_PATH!\msys2_shell.cmd" -mingw64 -defterm -no-start -c "bash '!BUILD_SCRIPT!'"
+            :: Write build script line by line to avoid escaping issues
+            echo #!/bin/bash> "!BUILD_SCRIPT!"
+            echo set -e>> "!BUILD_SCRIPT!"
+            echo.>> "!BUILD_SCRIPT!"
+            echo # Ensure clang is installed>> "!BUILD_SCRIPT!"
+            echo if [ ! -f /mingw64/bin/clang.exe ]; then>> "!BUILD_SCRIPT!"
+            echo     echo "Installing LLVM/Clang for nxdk...">> "!BUILD_SCRIPT!"
+            echo     pacman -S --noconfirm --needed mingw-w64-x86_64-clang mingw-w64-x86_64-lld>> "!BUILD_SCRIPT!"
+            echo fi>> "!BUILD_SCRIPT!"
+            echo.>> "!BUILD_SCRIPT!"
+            echo export NXDK_DIR="!NXDK_MSYS!">> "!BUILD_SCRIPT!"
+            echo export PATH="/mingw64/bin:$NXDK_DIR/bin:$PATH">> "!BUILD_SCRIPT!"
+            echo.>> "!BUILD_SCRIPT!"
+            echo echo "Checking clang...">> "!BUILD_SCRIPT!"
+            echo which clang>> "!BUILD_SCRIPT!"
+            echo.>> "!BUILD_SCRIPT!"
+            echo cd "!SCRIPT_DIR!/src">> "!BUILD_SCRIPT!"
+            echo echo "Building in: $(pwd)">> "!BUILD_SCRIPT!"
+            echo make !CLIENT_FLAG! !DEBUG_FLAG!>> "!BUILD_SCRIPT!"
+
+            echo Running build script...
+            call "!MSYS2_PATH!\msys2_shell.cmd" -mingw64 -defterm -no-start -c "bash /tmp/xbox_build.sh"
             set "MAKE_RESULT=!errorlevel!"
             del "!BUILD_SCRIPT!" 2>nul
 
