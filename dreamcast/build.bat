@@ -405,36 +405,67 @@ set "KOS_INSTALL_SCRIPT=%TEMP%\install_kos.sh"
     echo #!/bin/bash
     echo set -e
     echo echo "Installing KallistiOS dependencies..."
-    echo pacman -S --noconfirm --needed git make gcc texinfo libjpeg-turbo libpng patch wget gawk bison flex python
+    echo echo "This requires packages from multiple MSYS2 repositories..."
+    echo.
+    echo # Install base development tools
+    echo pacman -S --noconfirm --needed base-devel
+    echo.
+    echo # Install required tools ^(MSYS2 base packages^)
+    echo pacman -S --noconfirm --needed git make gcc texinfo patch wget gawk bison flex
+    echo.
+    echo # Install MinGW packages for image libraries ^(used by KOS tools^)
+    echo pacman -S --noconfirm --needed mingw-w64-x86_64-libjpeg-turbo mingw-w64-x86_64-libpng
+    echo.
+    echo # Python for build scripts
+    echo pacman -S --noconfirm --needed python
     echo.
     echo echo "Cloning KallistiOS..."
     echo cd ~
     echo if [ -d "kos" ]; then
+    echo     echo "Updating existing KOS installation..."
     echo     cd kos ^&^& git pull
     echo else
     echo     git clone --recursive https://github.com/KallistiOS/KallistiOS.git kos
     echo fi
     echo.
-    echo echo "Building KOS toolchain [this takes a while]..."
+    echo echo ""
+    echo echo "=========================================="
+    echo echo "Building KOS toolchain [20-30 minutes]..."
+    echo echo "=========================================="
+    echo echo ""
     echo cd ~/kos/utils/dc-chain
-    echo ./download.sh
-    echo ./unpack.sh
+    echo.
+    echo # Download and unpack toolchain sources
+    echo if [ ! -f "download.stamp" ]; then
+    echo     ./download.sh
+    echo     touch download.stamp
+    echo fi
+    echo.
+    echo if [ ! -f "unpack.stamp" ]; then
+    echo     ./unpack.sh
+    echo     touch unpack.stamp
+    echo fi
+    echo.
+    echo # Build the cross-compiler
     echo make
     echo.
-    echo echo "Building KOS..."
+    echo echo "Building KOS library..."
     echo cd ~/kos
     echo cp doc/environ.sh.sample environ.sh
     echo source environ.sh
     echo make
     echo.
+    echo echo ""
+    echo echo "=========================================="
     echo echo "KallistiOS installation complete!"
+    echo echo "=========================================="
 ) > "%KOS_INSTALL_SCRIPT%"
 
 echo Running KallistiOS installation in MSYS2...
 echo.
 
-:: Use call to ensure proper return to this script
-call "%MSYS2_PATH%\msys2_shell.cmd" -mingw64 -defterm -no-start -c "bash '%KOS_INSTALL_SCRIPT%'"
+:: Use MSYS shell (not mingw64) for building the cross-compiler toolchain
+call "%MSYS2_PATH%\msys2_shell.cmd" -msys -defterm -no-start -c "bash '%KOS_INSTALL_SCRIPT%'"
 set "MSYS_RESULT=!errorlevel!"
 
 del "%KOS_INSTALL_SCRIPT%" 2>nul
