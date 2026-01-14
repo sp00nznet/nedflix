@@ -172,7 +172,7 @@ static double parse_number(parser_t *p)
     strncpy(buf, p->text + start, len);
     buf[len] = '\0';
 
-    return atof(buf);
+    return strtod(buf, NULL);
 }
 
 /*
