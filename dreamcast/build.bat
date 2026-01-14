@@ -377,39 +377,60 @@ if "%MSYS2_PATH%"=="" (
     )
 )
 
+:: Step 1: Update MSYS2 first (may require restart)
+echo Step 1: Updating MSYS2 packages...
+echo NOTE: If MSYS2 needs to close for updates, run this script again after.
+echo.
+
+call "%MSYS2_PATH%\msys2_shell.cmd" -mingw64 -defterm -no-start -c "pacman -Syu --noconfirm"
+
+:: Check if KOS directory already exists (in case we're resuming after MSYS2 update)
+set "KOS_PATH=%MSYS2_PATH%\home\%USERNAME%\kos"
+if exist "%KOS_PATH%\environ.sh" (
+    echo.
+    echo KallistiOS already installed at: %KOS_PATH%
+    exit /b 0
+)
+
+:: Step 2: Install dependencies and KOS
+echo.
+echo Step 2: Installing KallistiOS dependencies and toolchain...
+echo This will take 20-30 minutes to compile.
+echo.
+
 :: Create install script for MSYS2
 set "KOS_INSTALL_SCRIPT=%TEMP%\install_kos.sh"
 
-echo #!/bin/bash > "%KOS_INSTALL_SCRIPT%"
-echo set -e >> "%KOS_INSTALL_SCRIPT%"
-echo echo "Installing KallistiOS dependencies..." >> "%KOS_INSTALL_SCRIPT%"
-echo pacman -Syu --noconfirm >> "%KOS_INSTALL_SCRIPT%"
-echo pacman -S --noconfirm git make gcc texinfo libjpeg-turbo libpng patch wget gawk bison flex python >> "%KOS_INSTALL_SCRIPT%"
-echo. >> "%KOS_INSTALL_SCRIPT%"
-echo echo "Cloning KallistiOS..." >> "%KOS_INSTALL_SCRIPT%"
-echo cd ~ >> "%KOS_INSTALL_SCRIPT%"
-echo if [ -d "kos" ]; then >> "%KOS_INSTALL_SCRIPT%"
-echo     cd kos ^&^& git pull >> "%KOS_INSTALL_SCRIPT%"
-echo else >> "%KOS_INSTALL_SCRIPT%"
-echo     git clone --recursive https://github.com/KallistiOS/KallistiOS.git kos >> "%KOS_INSTALL_SCRIPT%"
-echo fi >> "%KOS_INSTALL_SCRIPT%"
-echo. >> "%KOS_INSTALL_SCRIPT%"
-echo echo "Building KOS toolchain (this takes a while)..." >> "%KOS_INSTALL_SCRIPT%"
-echo cd ~/kos/utils/dc-chain >> "%KOS_INSTALL_SCRIPT%"
-echo ./download.sh >> "%KOS_INSTALL_SCRIPT%"
-echo ./unpack.sh >> "%KOS_INSTALL_SCRIPT%"
-echo make >> "%KOS_INSTALL_SCRIPT%"
-echo. >> "%KOS_INSTALL_SCRIPT%"
-echo echo "Building KOS..." >> "%KOS_INSTALL_SCRIPT%"
-echo cd ~/kos >> "%KOS_INSTALL_SCRIPT%"
-echo cp doc/environ.sh.sample environ.sh >> "%KOS_INSTALL_SCRIPT%"
-echo source environ.sh >> "%KOS_INSTALL_SCRIPT%"
-echo make >> "%KOS_INSTALL_SCRIPT%"
-echo. >> "%KOS_INSTALL_SCRIPT%"
-echo echo "KallistiOS installation complete!" >> "%KOS_INSTALL_SCRIPT%"
+(
+    echo #!/bin/bash
+    echo set -e
+    echo echo "Installing KallistiOS dependencies..."
+    echo pacman -S --noconfirm --needed git make gcc texinfo libjpeg-turbo libpng patch wget gawk bison flex python
+    echo.
+    echo echo "Cloning KallistiOS..."
+    echo cd ~
+    echo if [ -d "kos" ]; then
+    echo     cd kos ^&^& git pull
+    echo else
+    echo     git clone --recursive https://github.com/KallistiOS/KallistiOS.git kos
+    echo fi
+    echo.
+    echo echo "Building KOS toolchain [this takes a while]..."
+    echo cd ~/kos/utils/dc-chain
+    echo ./download.sh
+    echo ./unpack.sh
+    echo make
+    echo.
+    echo echo "Building KOS..."
+    echo cd ~/kos
+    echo cp doc/environ.sh.sample environ.sh
+    echo source environ.sh
+    echo make
+    echo.
+    echo echo "KallistiOS installation complete!"
+) > "%KOS_INSTALL_SCRIPT%"
 
 echo Running KallistiOS installation in MSYS2...
-echo This will open a new window. Please wait for it to complete.
 echo.
 
 :: Use call to ensure proper return to this script
@@ -418,10 +439,17 @@ set "MSYS_RESULT=!errorlevel!"
 
 del "%KOS_INSTALL_SCRIPT%" 2>nul
 
-set "KOS_PATH=%MSYS2_PATH%\home\%USERNAME%\kos"
-echo.
-echo KallistiOS installed at: %KOS_PATH%
-exit /b %MSYS_RESULT%
+:: Verify installation regardless of exit code (MSYS2 sometimes returns non-zero)
+if exist "%KOS_PATH%\environ.sh" (
+    echo.
+    echo KallistiOS installed successfully at: %KOS_PATH%
+    exit /b 0
+) else (
+    echo.
+    echo KallistiOS installation may have failed or been interrupted.
+    echo If MSYS2 was updated, please run this script again to continue.
+    exit /b 1
+)
 
 :: ========================================
 :: Function to run build via MSYS2
@@ -432,46 +460,104 @@ set "BUILD_MODE=%~2"
 
 if "%MSYS2_PATH%"=="" set "MSYS2_PATH=C:\msys64"
 
-:: Create build script
-set "BUILD_SCRIPT=%TEMP%\dc_build.sh"
-
-echo #!/bin/bash > "%BUILD_SCRIPT%"
-echo set -e >> "%BUILD_SCRIPT%"
-echo export KOS_BASE=~/kos >> "%BUILD_SCRIPT%"
-echo source $KOS_BASE/environ.sh >> "%BUILD_SCRIPT%"
-echo cd "%cd:\=/%" >> "%BUILD_SCRIPT%"
-
+:: Set output directory and file
 if /i "%BUILD_TYPE%"=="client" (
-    echo echo "Building Nedflix Client for Dreamcast..." >> "%BUILD_SCRIPT%"
-    echo mkdir -p build/client >> "%BUILD_SCRIPT%"
-    echo cd build/client >> "%BUILD_SCRIPT%"
-    if /i "!BUILD_MODE!"=="debug" echo echo "Debug build..." >> "%BUILD_SCRIPT%"
-    if /i "!BUILD_MODE!"=="debug" echo # kos-cc -g -O0 -o nedflix-client.elf ../../src/*.c -lkosutils >> "%BUILD_SCRIPT%"
-    if /i "!BUILD_MODE!"=="release" echo echo "Release build..." >> "%BUILD_SCRIPT%"
-    if /i "!BUILD_MODE!"=="release" echo # kos-cc -O2 -o nedflix-client.elf ../../src/*.c -lkosutils >> "%BUILD_SCRIPT%"
-    if /i "!BUILD_MODE!"=="cdi" echo echo "Creating CDI image..." >> "%BUILD_SCRIPT%"
-    if /i "!BUILD_MODE!"=="cdi" echo # kos-cc -O2 -o nedflix-client.elf ../../src/*.c -lkosutils >> "%BUILD_SCRIPT%"
-    if /i "!BUILD_MODE!"=="cdi" echo # sh-elf-objcopy -O binary nedflix-client.elf nedflix-client.bin >> "%BUILD_SCRIPT%"
-    if /i "!BUILD_MODE!"=="cdi" echo # cdi4dc nedflix-client.iso nedflix-client.cdi >> "%BUILD_SCRIPT%"
-    echo echo "Client build simulated successfully!" >> "%BUILD_SCRIPT%"
+    set "BUILD_DIR=build\client"
+    set "OUTPUT_FILE=nedflix-client.cdi"
 ) else (
-    echo echo "Building Nedflix Desktop for Dreamcast..." >> "%BUILD_SCRIPT%"
-    echo mkdir -p build/desktop >> "%BUILD_SCRIPT%"
-    echo cd build/desktop >> "%BUILD_SCRIPT%"
-    if /i "!BUILD_MODE!"=="debug" echo echo "Debug build..." >> "%BUILD_SCRIPT%"
-    if /i "!BUILD_MODE!"=="release" echo echo "Release build..." >> "%BUILD_SCRIPT%"
-    if /i "!BUILD_MODE!"=="cdi" echo echo "Creating CDI image..." >> "%BUILD_SCRIPT%"
-    echo echo "Desktop build simulated successfully!" >> "%BUILD_SCRIPT%"
+    set "BUILD_DIR=build\desktop"
+    set "OUTPUT_FILE=nedflix-desktop.cdi"
 )
 
-echo echo "Build complete!" >> "%BUILD_SCRIPT%"
+:: Check if actual source code exists
+if exist "src\main.c" (
+    :: Real build with KallistiOS
+    echo.
+    echo Building with KallistiOS toolchain...
 
-:: Use call to ensure proper return to this script
-call "%MSYS2_PATH%\msys2_shell.cmd" -mingw64 -defterm -no-start -c "bash '%BUILD_SCRIPT%'"
-set "BUILD_RESULT=!errorlevel!"
+    :: Create build script for real compilation
+    set "BUILD_SCRIPT=%TEMP%\dc_build.sh"
 
-del "%BUILD_SCRIPT%" 2>nul
-exit /b %BUILD_RESULT%
+    (
+        echo #!/bin/bash
+        echo set -e
+        echo export KOS_BASE=~/kos
+        echo source $KOS_BASE/environ.sh
+        echo cd "%cd:\=/%"
+        echo mkdir -p !BUILD_DIR!
+        echo cd !BUILD_DIR!
+        echo echo "Compiling..."
+        echo make -f ../../Makefile.%BUILD_TYPE% CONFIG=%BUILD_MODE%
+    ) > "%BUILD_SCRIPT%"
+
+    call "%MSYS2_PATH%\msys2_shell.cmd" -mingw64 -defterm -no-start -c "bash '%BUILD_SCRIPT%'"
+    set "BUILD_RESULT=!errorlevel!"
+    del "%BUILD_SCRIPT%" 2>nul
+
+    if !BUILD_RESULT! equ 0 (
+        echo.
+        echo Build completed successfully!
+        echo Output: !BUILD_DIR!\!OUTPUT_FILE!
+    ) else (
+        echo.
+        echo Build failed with error code !BUILD_RESULT!
+    )
+    exit /b !BUILD_RESULT!
+) else (
+    :: No source code - create placeholder
+    echo.
+    echo ========================================
+    echo   PLACEHOLDER BUILD - No source code
+    echo ========================================
+    echo.
+    echo Source code not found at src\main.c
+    echo This build script is ready, but actual Dreamcast
+    echo source code needs to be implemented.
+    echo.
+
+    :: Create build directory
+    if not exist "!BUILD_DIR!" mkdir "!BUILD_DIR!"
+
+    :: Create placeholder files
+    (
+        echo Nedflix Dreamcast %BUILD_TYPE% Build
+        echo ====================================
+        echo Date: %date% %time%
+        echo Status: PLACEHOLDER ^(no source code^)
+        echo Toolchain: KallistiOS
+        echo Target: Sega Dreamcast ^(1998^)
+        echo Architecture: SH-4 ^(SuperH-4^)
+        echo.
+        echo NOTE: This is a NOVELTY build with severe limitations!
+        echo Dreamcast has only 16MB RAM and 200MHz CPU.
+        echo.
+        echo To build a real CDI:
+        echo   1. Create src\main.c with Dreamcast application code
+        echo   2. Create Makefile.%BUILD_TYPE% for KallistiOS
+        echo   3. Run this build script again
+    ) > "!BUILD_DIR!\build.log" 2>nul
+
+    (
+        echo This directory would contain: !OUTPUT_FILE!
+        echo.
+        echo To generate a real CDI image:
+        echo   1. Implement Dreamcast source code in src\
+        echo   2. Create KallistiOS Makefile
+        echo   3. Install KallistiOS toolchain
+        echo   4. Run build.bat again
+        echo.
+        echo Remember: Dreamcast has only 16MB RAM!
+    ) > "!BUILD_DIR!\README.txt" 2>nul
+
+    echo Placeholder files created in: !BUILD_DIR!\
+    echo.
+    echo To create a real build:
+    echo   1. Add source code to src\main.c
+    echo   2. Create Makefile.client and Makefile.desktop
+    echo   3. Run this script again
+    echo.
+    exit /b 0
+)
 
 :end
 echo.
