@@ -530,25 +530,69 @@ goto :after_mode_info
 if exist "src\main.c" (
     :: Real build with nxdk
     echo.
-    echo Compiling with nxdk...
-    if defined NXDK_DIR (
-        pushd "!BUILD_DIR!"
-        make -f ..\..\Makefile.%BUILD_TYPE% NXDK_DIR="%NXDK_DIR%" CONFIG=%BUILD_MODE%
-        set "MAKE_RESULT=!errorlevel!"
-        popd
-        if !MAKE_RESULT! equ 0 (
-            echo.
-            echo Build completed successfully!
-            echo Output: !BUILD_DIR!\!OUTPUT_FILE!
-            exit /b 0
-        ) else (
-            echo.
-            echo Build failed with error code !MAKE_RESULT!
-            exit /b !MAKE_RESULT!
-        )
+    echo Compiling with nxdk toolchain...
+
+    :: Set CLIENT flag based on build type
+    if /i "%BUILD_TYPE%"=="client" (
+        set "CLIENT_FLAG=CLIENT=1"
     ) else (
-        echo ERROR: NXDK_DIR not set. Please install nxdk first ^(option 9^).
+        set "CLIENT_FLAG=CLIENT=0"
+    )
+
+    :: Set DEBUG flag if debug mode
+    if /i "%BUILD_MODE%"=="debug" (
+        set "DEBUG_FLAG=DEBUG=1"
+    ) else (
+        set "DEBUG_FLAG="
+    )
+
+    :: Check for make command
+    where make >nul 2>nul
+    if !errorlevel! neq 0 (
+        echo ERROR: 'make' not found in PATH
+        echo Please install MinGW or add nxdk tools to PATH
         exit /b 1
+    )
+
+    :: Check for NXDK_DIR
+    if not defined NXDK_DIR (
+        if exist "%USERPROFILE%\nxdk" (
+            set "NXDK_DIR=%USERPROFILE%\nxdk"
+        ) else if exist "C:\nxdk" (
+            set "NXDK_DIR=C:\nxdk"
+        ) else (
+            echo ERROR: NXDK_DIR not set. Please install nxdk first ^(option 9^).
+            exit /b 1
+        )
+    )
+
+    echo   NXDK_DIR: !NXDK_DIR!
+    echo   Mode: !CLIENT_FLAG!
+    echo.
+
+    :: Run make
+    make -f Makefile !CLIENT_FLAG! !DEBUG_FLAG! NXDK_DIR="!NXDK_DIR!"
+    set "MAKE_RESULT=!errorlevel!"
+
+    if !MAKE_RESULT! equ 0 (
+        echo.
+        echo ========================================
+        echo Build completed successfully!
+        echo ========================================
+        echo.
+        echo Output: !BUILD_DIR!\default.xbe
+        echo.
+        echo To deploy:
+        echo   1. FTP the .xbe file to your Xbox
+        echo   2. Place in E:\Apps\Nedflix\
+        echo   3. Launch from dashboard
+        exit /b 0
+    ) else (
+        echo.
+        echo ========================================
+        echo Build failed with error code !MAKE_RESULT!
+        echo ========================================
+        exit /b !MAKE_RESULT!
     )
 ) else (
     :: No source code - create placeholder to show what would be built
