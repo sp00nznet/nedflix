@@ -12,7 +12,9 @@
 #include <lwip/sockets.h>
 #include <lwip/netdb.h>
 #include <lwip/dns.h>
+#include <lwip/netif.h>
 #include <nxdk/net.h>
+#include <hal/xbox.h>
 #else
 /* POSIX sockets for non-Xbox builds */
 #include <sys/socket.h>
@@ -49,29 +51,20 @@ int http_init(void)
     }
 
 #ifdef NXDK
-    /* Initialize Xbox network */
+    /* Initialize Xbox network - blocks until DHCP completes or timeout */
+    LOG("Initializing network (DHCP)...");
     if (!nxNetInit(NULL)) {
         LOG_ERROR("Failed to initialize network");
         return -1;
     }
 
-    /* Wait for DHCP */
-    LOG("Waiting for network...");
-    int timeout = 10;  /* 10 seconds */
-    while (!nxNetIsInitialized() && timeout > 0) {
-        Sleep(1000);
-        timeout--;
+    /* Log IP address using lwIP netif */
+    struct netif *netif = netif_default;
+    if (netif != NULL && netif_is_up(netif)) {
+        LOG("Network initialized, IP: %s", ip4addr_ntoa(netif_ip4_addr(netif)));
+    } else {
+        LOG("Network initialized");
     }
-
-    if (!nxNetIsInitialized()) {
-        LOG_ERROR("Network initialization timeout");
-        return -1;
-    }
-
-    /* Log IP address */
-    struct in_addr addr;
-    nxNetGetIp(&addr);
-    LOG("Network initialized, IP: %s", inet_ntoa(addr));
 #endif
 
     g_http_initialized = true;
@@ -232,7 +225,6 @@ static int http_request(const char *method, const char *url, const char *auth_to
     char path[512] = {0};
     int port = 80;
     int sock = -1;
-    int result = -1;
 
     /* Parse URL */
     if (parse_url(url, host, &port, path) != 0) {

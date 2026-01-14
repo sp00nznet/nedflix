@@ -294,12 +294,10 @@ static void handle_state_login(void)
     if (input_button_just_pressed(BTN_A)) {
         switch (selected) {
             case 0:  /* Login with saved */
-                if (strlen(g_app.settings.username) > 0) {
-                    char token[256] = {0};
-                    /* In reality, we'd need password - for now try token */
-                    if (strlen(g_app.settings.auth_token) > 0) {
-                        g_app.state = STATE_BROWSING;
-                    }
+                if (strlen(g_app.settings.username) > 0 &&
+                    strlen(g_app.settings.auth_token) > 0) {
+                    /* Use saved credentials */
+                    g_app.state = STATE_BROWSING;
                 }
                 break;
             case 1:  /* Enter credentials - would show keyboard */

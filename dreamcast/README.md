@@ -67,23 +67,48 @@ The Sega Dreamcast was released in 1998/1999 and was ahead of its time with buil
 
 ## Building
 
-### Client Version
-```bash
+### Windows (MSYS2)
+
+Run the interactive build script:
+```cmd
 cd dreamcast
-chmod +x build-client.sh
-./build-client.sh
+build.bat
 ```
 
-Output: `build/client/nedflix-client.cdi`
+The menu provides options for:
+- Client builds (Debug/Release)
+- Desktop builds (Debug/Release)
+- Creating CDI images
+- Installing KallistiOS toolchain
 
-### Desktop Version
+Requirements: MSYS2 (automatically installed if missing)
+
+### Linux/macOS
+
+Use the Unix build script:
 ```bash
 cd dreamcast
-chmod +x build-desktop.sh
-./build-desktop.sh
+chmod +x build.sh
+./build.sh release    # Build release version
+./build.sh debug      # Build debug version
+./build.sh cdi        # Build and create CDI image
+./build.sh clean      # Clean build artifacts
 ```
 
-Output: `build/desktop/nedflix-desktop.cdi`
+Or build directly with make:
+```bash
+source ~/kos/environ.sh
+cd dreamcast/src
+make                  # Default build
+make debug            # Debug build
+make release          # Release build
+make cdi              # Create CDI image
+```
+
+Output:
+- `src/nedflix.elf` - ELF executable
+- `src/nedflix.bin` - Raw binary
+- `src/nedflix.cdi` - Bootable CD image (with `make cdi`)
 
 ---
 
