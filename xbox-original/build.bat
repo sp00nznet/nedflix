@@ -874,37 +874,72 @@ set "ISO_DIR_MSYS=!ISO_DIR:\=/!"
 set "OUTPUT_MSYS=iso/!XISO_OUTPUT!"
 set "OUTPUT_MSYS=!OUTPUT_MSYS:\=/!"
 
-:: Check for or download genisoimage
+:: Check for or build extract-xiso
 set "TOOLS_DIR=%~dp0tools"
-set "GENISOIMAGE=!TOOLS_DIR!\genisoimage.exe"
+set "EXTRACT_XISO=!TOOLS_DIR!\extract-xiso.exe"
 
 if not exist "!TOOLS_DIR!" mkdir "!TOOLS_DIR!"
 
-if not exist "!GENISOIMAGE!" (
-    echo Downloading genisoimage for Windows...
+if not exist "!EXTRACT_XISO!" (
+    echo Building extract-xiso from source...
+    echo.
 
-    :: Try PowerShell to download cdrkit-genisoimage
-    powershell -Command "& { $ProgressPreference = 'SilentlyContinue'; try { Invoke-WebRequest -Uri 'https://github.com/AstroGD/genisoimage-win64/releases/download/1.1.11/genisoimage-1.1.11-win64.exe' -OutFile '!GENISOIMAGE!' } catch { Write-Host 'Download failed' } }"
+    :: Check for MSYS2
+    set "MSYS2_PATH="
+    if exist "C:\msys64" set "MSYS2_PATH=C:\msys64"
+    if exist "C:\msys32" if "!MSYS2_PATH!"=="" set "MSYS2_PATH=C:\msys32"
 
-    if not exist "!GENISOIMAGE!" (
-        echo ERROR: Could not download genisoimage.
-        echo.
-        echo Please download manually:
-        echo   1. Download genisoimage for Windows
-        echo   2. Place it in: !TOOLS_DIR!\genisoimage.exe
-        echo.
-        echo Or install cdrkit in WSL/Linux and use that.
+    if "!MSYS2_PATH!"=="" (
+        echo ERROR: MSYS2 not found. Cannot build extract-xiso.
         exit /b 1
     )
-    echo Downloaded genisoimage successfully!
+
+    :: Create build script
+    set "BUILD_SCRIPT=!MSYS2_PATH!\tmp\build_extract_xiso.sh"
+
+    echo #!/bin/bash> "!BUILD_SCRIPT!"
+    echo set -e>> "!BUILD_SCRIPT!"
+    echo export PATH="/mingw64/bin:$PATH">> "!BUILD_SCRIPT!"
+    echo.>> "!BUILD_SCRIPT!"
+    echo # Install build dependencies>> "!BUILD_SCRIPT!"
+    echo echo "Installing build tools...">> "!BUILD_SCRIPT!"
+    echo pacman -S --noconfirm --needed mingw-w64-x86_64-cmake mingw-w64-x86_64-gcc make git>> "!BUILD_SCRIPT!"
+    echo.>> "!BUILD_SCRIPT!"
+    echo # Clone and build extract-xiso>> "!BUILD_SCRIPT!"
+    echo WORK_DIR="/tmp/extract-xiso-build">> "!BUILD_SCRIPT!"
+    echo rm -rf "$WORK_DIR">> "!BUILD_SCRIPT!"
+    echo echo "Cloning extract-xiso...">> "!BUILD_SCRIPT!"
+    echo git clone --depth 1 https://github.com/XboxDev/extract-xiso.git "$WORK_DIR">> "!BUILD_SCRIPT!"
+    echo cd "$WORK_DIR">> "!BUILD_SCRIPT!"
+    echo.>> "!BUILD_SCRIPT!"
+    echo echo "Building...">> "!BUILD_SCRIPT!"
+    echo mkdir build ^&^& cd build>> "!BUILD_SCRIPT!"
+    echo cmake .. -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release>> "!BUILD_SCRIPT!"
+    echo mingw32-make>> "!BUILD_SCRIPT!"
+    echo.>> "!BUILD_SCRIPT!"
+    echo # Copy to tools directory>> "!BUILD_SCRIPT!"
+    echo TOOLS_WIN="%TOOLS_DIR:\=/%">> "!BUILD_SCRIPT!"
+    echo TOOLS_WIN="${TOOLS_WIN/C:/\/c}">> "!BUILD_SCRIPT!"
+    echo cp extract-xiso.exe "$TOOLS_WIN/">> "!BUILD_SCRIPT!"
+    echo echo "extract-xiso built successfully!">> "!BUILD_SCRIPT!"
+    echo rm -rf "$WORK_DIR">> "!BUILD_SCRIPT!"
+
+    echo Running build via MSYS2...
+    call "!MSYS2_PATH!\msys2_shell.cmd" -mingw64 -defterm -no-start -c "bash /tmp/build_extract_xiso.sh"
+    del "!BUILD_SCRIPT!" 2>nul
+
+    if not exist "!EXTRACT_XISO!" (
+        echo ERROR: Failed to build extract-xiso.
+        exit /b 1
+    )
 )
 
-:: Create the ISO
-echo Creating ISO with genisoimage...
+:: Create the XISO
+echo Creating XISO with extract-xiso...
 echo   Source: !ISO_DIR!
 echo   Output: iso\!XISO_OUTPUT!
 
-"!GENISOIMAGE!" -o "iso\!XISO_OUTPUT!" -R -J -joliet-long "!ISO_DIR!"
+"!EXTRACT_XISO!" -c "!ISO_DIR!" -d "iso\!XISO_OUTPUT!"
 set "XISO_RESULT=!errorlevel!"
 
 :: Clean up staging directory
