@@ -546,14 +546,6 @@ if exist "src\main.c" (
         set "DEBUG_FLAG="
     )
 
-    :: Check for make command
-    where make >nul 2>nul
-    if !errorlevel! neq 0 (
-        echo ERROR: 'make' not found in PATH
-        echo Please install MinGW or add nxdk tools to PATH
-        exit /b 1
-    )
-
     :: Check for NXDK_DIR
     if not defined NXDK_DIR (
         if exist "%USERPROFILE%\nxdk" (
@@ -570,23 +562,105 @@ if exist "src\main.c" (
     echo   Mode: !CLIENT_FLAG!
     echo.
 
-    :: Run make
-    make -f Makefile !CLIENT_FLAG! !DEBUG_FLAG! NXDK_DIR="!NXDK_DIR!"
-    set "MAKE_RESULT=!errorlevel!"
+    :: Try to find make - check multiple options
+    set "MAKE_CMD="
 
+    :: Option 1: make in PATH
+    where make >nul 2>nul
+    if !errorlevel! equ 0 set "MAKE_CMD=make"
+
+    :: Option 2: mingw32-make in PATH
+    if "!MAKE_CMD!"=="" (
+        where mingw32-make >nul 2>nul
+        if !errorlevel! equ 0 set "MAKE_CMD=mingw32-make"
+    )
+
+    :: Option 3: make in nxdk bin directory
+    if "!MAKE_CMD!"=="" (
+        if exist "!NXDK_DIR!\bin\make.exe" set "MAKE_CMD=!NXDK_DIR!\bin\make.exe"
+    )
+
+    :: Option 4: Use MSYS2 if available
+    if "!MAKE_CMD!"=="" (
+        set "MSYS2_PATH="
+        if exist "C:\msys64" set "MSYS2_PATH=C:\msys64"
+        if exist "C:\msys32" if "!MSYS2_PATH!"=="" set "MSYS2_PATH=C:\msys32"
+
+        if not "!MSYS2_PATH!"=="" (
+            echo Using MSYS2 for build...
+
+            :: Convert paths for MSYS2
+            set "SCRIPT_DIR=%cd%"
+            set "SCRIPT_DIR=!SCRIPT_DIR:\=/!"
+            set "SCRIPT_DIR=/!SCRIPT_DIR::=!"
+
+            set "NXDK_MSYS=!NXDK_DIR:\=/!"
+            set "NXDK_MSYS=/!NXDK_MSYS::=!"
+
+            :: Create build script for MSYS2
+            set "BUILD_SCRIPT=%TEMP%\xbox_build.sh"
+            (
+                echo #!/bin/bash
+                echo set -e
+                echo export NXDK_DIR="!NXDK_MSYS!"
+                echo export PATH="$NXDK_DIR/bin:$PATH"
+                echo cd "!SCRIPT_DIR!/src"
+                echo echo "Building in: $(pwd)"
+                echo make !CLIENT_FLAG! !DEBUG_FLAG!
+            ) > "!BUILD_SCRIPT!"
+
+            call "!MSYS2_PATH!\msys2_shell.cmd" -mingw64 -defterm -no-start -c "bash '!BUILD_SCRIPT!'"
+            set "MAKE_RESULT=!errorlevel!"
+            del "!BUILD_SCRIPT!" 2>nul
+
+            goto :check_build_result
+        )
+    )
+
+    :: If still no make found, error out
+    if "!MAKE_CMD!"=="" (
+        echo ERROR: 'make' not found!
+        echo.
+        echo Please install one of the following:
+        echo   1. MSYS2: https://www.msys2.org/
+        echo      Then: pacman -S make
+        echo.
+        echo   2. MinGW-w64: Add to PATH
+        echo.
+        echo   3. Visual Studio Build Tools with C++ workload
+        echo.
+        exit /b 1
+    )
+
+    :: Run make directly
+    cd /d "%~dp0\src"
+    echo Running: !MAKE_CMD! !CLIENT_FLAG! !DEBUG_FLAG!
+    "!MAKE_CMD!" !CLIENT_FLAG! !DEBUG_FLAG!
+    set "MAKE_RESULT=!errorlevel!"
+    cd /d "%~dp0"
+
+    :check_build_result
     if !MAKE_RESULT! equ 0 (
-        echo.
-        echo ========================================
-        echo Build completed successfully!
-        echo ========================================
-        echo.
-        echo Output: !BUILD_DIR!\default.xbe
-        echo.
-        echo To deploy:
-        echo   1. FTP the .xbe file to your Xbox
-        echo   2. Place in E:\Apps\Nedflix\
-        echo   3. Launch from dashboard
-        exit /b 0
+        :: Check if XBE was created
+        if exist "src\default.xbe" (
+            echo.
+            echo ========================================
+            echo Build completed successfully!
+            echo ========================================
+            echo.
+            echo Output: src\default.xbe
+            echo.
+            echo To deploy:
+            echo   1. FTP the .xbe file to your Xbox
+            echo   2. Place in E:\Apps\Nedflix\
+            echo   3. Launch from dashboard
+            exit /b 0
+        ) else (
+            echo.
+            echo Build finished but default.xbe not found.
+            echo Check build output above for warnings.
+            exit /b 1
+        )
     ) else (
         echo.
         echo ========================================
