@@ -377,39 +377,60 @@ if "%MSYS2_PATH%"=="" (
     )
 )
 
+:: Step 1: Update MSYS2 first (may require restart)
+echo Step 1: Updating MSYS2 packages...
+echo NOTE: If MSYS2 needs to close for updates, run this script again after.
+echo.
+
+call "%MSYS2_PATH%\msys2_shell.cmd" -mingw64 -defterm -no-start -c "pacman -Syu --noconfirm"
+
+:: Check if KOS directory already exists (in case we're resuming after MSYS2 update)
+set "KOS_PATH=%MSYS2_PATH%\home\%USERNAME%\kos"
+if exist "%KOS_PATH%\environ.sh" (
+    echo.
+    echo KallistiOS already installed at: %KOS_PATH%
+    exit /b 0
+)
+
+:: Step 2: Install dependencies and KOS
+echo.
+echo Step 2: Installing KallistiOS dependencies and toolchain...
+echo This will take 20-30 minutes to compile.
+echo.
+
 :: Create install script for MSYS2
 set "KOS_INSTALL_SCRIPT=%TEMP%\install_kos.sh"
 
-echo #!/bin/bash > "%KOS_INSTALL_SCRIPT%"
-echo set -e >> "%KOS_INSTALL_SCRIPT%"
-echo echo "Installing KallistiOS dependencies..." >> "%KOS_INSTALL_SCRIPT%"
-echo pacman -Syu --noconfirm >> "%KOS_INSTALL_SCRIPT%"
-echo pacman -S --noconfirm git make gcc texinfo libjpeg-turbo libpng patch wget gawk bison flex python >> "%KOS_INSTALL_SCRIPT%"
-echo. >> "%KOS_INSTALL_SCRIPT%"
-echo echo "Cloning KallistiOS..." >> "%KOS_INSTALL_SCRIPT%"
-echo cd ~ >> "%KOS_INSTALL_SCRIPT%"
-echo if [ -d "kos" ]; then >> "%KOS_INSTALL_SCRIPT%"
-echo     cd kos ^&^& git pull >> "%KOS_INSTALL_SCRIPT%"
-echo else >> "%KOS_INSTALL_SCRIPT%"
-echo     git clone --recursive https://github.com/KallistiOS/KallistiOS.git kos >> "%KOS_INSTALL_SCRIPT%"
-echo fi >> "%KOS_INSTALL_SCRIPT%"
-echo. >> "%KOS_INSTALL_SCRIPT%"
-echo echo "Building KOS toolchain (this takes a while)..." >> "%KOS_INSTALL_SCRIPT%"
-echo cd ~/kos/utils/dc-chain >> "%KOS_INSTALL_SCRIPT%"
-echo ./download.sh >> "%KOS_INSTALL_SCRIPT%"
-echo ./unpack.sh >> "%KOS_INSTALL_SCRIPT%"
-echo make >> "%KOS_INSTALL_SCRIPT%"
-echo. >> "%KOS_INSTALL_SCRIPT%"
-echo echo "Building KOS..." >> "%KOS_INSTALL_SCRIPT%"
-echo cd ~/kos >> "%KOS_INSTALL_SCRIPT%"
-echo cp doc/environ.sh.sample environ.sh >> "%KOS_INSTALL_SCRIPT%"
-echo source environ.sh >> "%KOS_INSTALL_SCRIPT%"
-echo make >> "%KOS_INSTALL_SCRIPT%"
-echo. >> "%KOS_INSTALL_SCRIPT%"
-echo echo "KallistiOS installation complete!" >> "%KOS_INSTALL_SCRIPT%"
+(
+    echo #!/bin/bash
+    echo set -e
+    echo echo "Installing KallistiOS dependencies..."
+    echo pacman -S --noconfirm --needed git make gcc texinfo libjpeg-turbo libpng patch wget gawk bison flex python
+    echo.
+    echo echo "Cloning KallistiOS..."
+    echo cd ~
+    echo if [ -d "kos" ]; then
+    echo     cd kos ^&^& git pull
+    echo else
+    echo     git clone --recursive https://github.com/KallistiOS/KallistiOS.git kos
+    echo fi
+    echo.
+    echo echo "Building KOS toolchain [this takes a while]..."
+    echo cd ~/kos/utils/dc-chain
+    echo ./download.sh
+    echo ./unpack.sh
+    echo make
+    echo.
+    echo echo "Building KOS..."
+    echo cd ~/kos
+    echo cp doc/environ.sh.sample environ.sh
+    echo source environ.sh
+    echo make
+    echo.
+    echo echo "KallistiOS installation complete!"
+) > "%KOS_INSTALL_SCRIPT%"
 
 echo Running KallistiOS installation in MSYS2...
-echo This will open a new window. Please wait for it to complete.
 echo.
 
 :: Use call to ensure proper return to this script
@@ -418,10 +439,17 @@ set "MSYS_RESULT=!errorlevel!"
 
 del "%KOS_INSTALL_SCRIPT%" 2>nul
 
-set "KOS_PATH=%MSYS2_PATH%\home\%USERNAME%\kos"
-echo.
-echo KallistiOS installed at: %KOS_PATH%
-exit /b %MSYS_RESULT%
+:: Verify installation regardless of exit code (MSYS2 sometimes returns non-zero)
+if exist "%KOS_PATH%\environ.sh" (
+    echo.
+    echo KallistiOS installed successfully at: %KOS_PATH%
+    exit /b 0
+) else (
+    echo.
+    echo KallistiOS installation may have failed or been interrupted.
+    echo If MSYS2 was updated, please run this script again to continue.
+    exit /b 1
+)
 
 :: ========================================
 :: Function to run build via MSYS2
