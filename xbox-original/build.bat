@@ -602,10 +602,18 @@ if exist "src\main.c" (
             (
                 echo #!/bin/bash
                 echo set -e
+                echo.
+                echo # Ensure clang is available ^(nxdk requires LLVM^)
+                echo if ! command -v clang ^&^> /dev/null; then
+                echo     echo "Installing LLVM/Clang for nxdk..."
+                echo     pacman -S --noconfirm --needed mingw-w64-x86_64-clang mingw-w64-x86_64-lld
+                echo fi
+                echo.
                 echo export NXDK_DIR="!NXDK_MSYS!"
-                echo export PATH="$NXDK_DIR/bin:$PATH"
+                echo export PATH="$NXDK_DIR/bin:/mingw64/bin:$PATH"
                 echo cd "!SCRIPT_DIR!/src"
                 echo echo "Building in: $(pwd)"
+                echo echo "Using clang: $(which clang 2^>/dev/null ^|^| echo 'not found'^)"
                 echo make !CLIENT_FLAG! !DEBUG_FLAG!
             ) > "!BUILD_SCRIPT!"
 
