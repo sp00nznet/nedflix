@@ -506,13 +506,32 @@ if exist "src\main.c" (
     echo.
     echo Building with KallistiOS toolchain...
 
-    :: Create build script for real compilation
-    set "BUILD_SCRIPT=%TEMP%\dc_build.sh"
+    :: Ensure MSYS2_PATH is set
+    if "!MSYS2_PATH!"=="" (
+        if exist "C:\msys64" (
+            set "MSYS2_PATH=C:\msys64"
+        ) else if exist "C:\msys32" (
+            set "MSYS2_PATH=C:\msys32"
+        ) else (
+            echo ERROR: MSYS2 not found. Please install MSYS2 first.
+            exit /b 1
+        )
+    )
+
+    :: Create build script in a simple path to avoid escaping issues
+    set "BUILD_SCRIPT=!MSYS2_PATH!\tmp\dc_build.sh"
+    if not exist "!MSYS2_PATH!\tmp" mkdir "!MSYS2_PATH!\tmp"
 
     :: Convert Windows path to MSYS2 path
     set "SCRIPT_DIR=%cd%"
     set "SCRIPT_DIR=!SCRIPT_DIR:\=/!"
     set "SCRIPT_DIR=/!SCRIPT_DIR::=!"
+
+    :: Build mode selection - generate the right commands
+    set "BUILD_CMD=make"
+    if /i "!BUILD_MODE!"=="cdi" set "BUILD_CMD=make clean ^&^& make release ^&^& make cdi"
+    if /i "!BUILD_MODE!"=="debug" set "BUILD_CMD=make clean ^&^& make debug"
+    if /i "!BUILD_MODE!"=="release" set "BUILD_CMD=make clean ^&^& make release"
 
     (
         echo #!/bin/bash
@@ -525,6 +544,7 @@ if exist "src\main.c" (
         echo     export KOS_BASE=/opt/toolchains/dc/kos
         echo else
         echo     echo "ERROR: KallistiOS not found"
+        echo     echo "Please install KallistiOS first using option 10"
         echo     exit 1
         echo fi
         echo.
@@ -532,29 +552,26 @@ if exist "src\main.c" (
         echo source $KOS_BASE/environ.sh
         echo.
         echo cd "!SCRIPT_DIR!/src"
-        echo echo "Building in: $(pwd^)"
+        echo echo "Building in: $^(pwd^)"
+        echo echo "Build mode: !BUILD_MODE!"
         echo.
-        if /i "!BUILD_MODE!"=="cdi" (
-            echo echo "Building CDI image..."
-            echo make clean
-            echo make release
-            echo make cdi
-        ) else if /i "!BUILD_MODE!"=="debug" (
-            echo echo "Building debug..."
-            echo make clean
+        echo make clean
+        if /i "!BUILD_MODE!"=="debug" (
             echo make debug
         ) else (
-            echo echo "Building release..."
-            echo make clean
             echo make release
+        )
+        if /i "!BUILD_MODE!"=="cdi" (
+            echo make cdi
         )
         echo.
         echo echo "Build complete!"
-    ) > "%BUILD_SCRIPT%"
+    ) > "!BUILD_SCRIPT!"
 
-    call "%MSYS2_PATH%\msys2_shell.cmd" -mingw64 -defterm -no-start -c "bash '%BUILD_SCRIPT%'"
+    echo Running build via MSYS2...
+    call "!MSYS2_PATH!\msys2_shell.cmd" -mingw64 -defterm -no-start -c "bash /tmp/dc_build.sh"
     set "BUILD_RESULT=!errorlevel!"
-    del "%BUILD_SCRIPT%" 2>nul
+    del "!BUILD_SCRIPT!" 2>nul
 
     :: Check for output binary
     if exist "src\nedflix.elf" (
