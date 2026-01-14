@@ -48,8 +48,8 @@ NXDK_CFLAGS += -I$(CURDIR)
 # Enable network support (nxdk's lwIP)
 NXDK_NET = y
 
-# Enable SDL for input/graphics (optional, can use pbkit instead)
-# NXDK_SDL = y
+# Enable SDL for input/graphics
+NXDK_SDL = y
 
 # Include nxdk build system
 # This MUST come after all variable definitions
