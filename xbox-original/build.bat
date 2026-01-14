@@ -526,47 +526,101 @@ goto :after_mode_info
 
 :after_mode_info
 
-:: In a real implementation:
-:: cd %BUILD_DIR%
-:: make -f Makefile.%BUILD_TYPE% NXDK_DIR=%NXDK_DIR% CONFIG=%BUILD_MODE%
-
-:: Create build log (using single write block to avoid file lock issues)
-set "LOG_FILE=!BUILD_DIR!\build.log"
-(
-    echo Nedflix Original Xbox %BUILD_TYPE% Build
-    echo ====================================
-    echo Date: %date% %time%
-    echo Toolchain: nxdk
-    echo Target: Original Xbox ^(2001^)
-    echo Architecture: i686 ^(Pentium III^)
+:: Check if actual source code exists
+if exist "src\main.c" (
+    :: Real build with nxdk
     echo.
-    if /i "%BUILD_TYPE%"=="client" (
-        echo Mode: CLIENT
-        echo Features:
-        echo   - Network streaming from Nedflix server
-        echo   - OAuth authentication support
-        echo   - Server library browsing
-        echo   - Xbox controller navigation
-        echo   - 480i/480p/720p/1080i output
-        echo   - Dolby Digital 5.1 audio
+    echo Compiling with nxdk...
+    if defined NXDK_DIR (
+        pushd "!BUILD_DIR!"
+        make -f ..\..\Makefile.%BUILD_TYPE% NXDK_DIR="%NXDK_DIR%" CONFIG=%BUILD_MODE%
+        set "MAKE_RESULT=!errorlevel!"
+        popd
+        if !MAKE_RESULT! equ 0 (
+            echo.
+            echo Build completed successfully!
+            echo Output: !BUILD_DIR!\!OUTPUT_FILE!
+            exit /b 0
+        ) else (
+            echo.
+            echo Build failed with error code !MAKE_RESULT!
+            exit /b !MAKE_RESULT!
+        )
     ) else (
-        echo Mode: DESKTOP
-        echo Features:
-        echo   - Embedded HTTP server ^(port 3000^)
-        echo   - Local media playback ^(E:\ F:\ drives^)
-        echo   - No authentication required
-        echo   - Web UI bundled
-        echo   - USB drive support
-        echo   - Offline mode ^(no network required^)
+        echo ERROR: NXDK_DIR not set. Please install nxdk first ^(option 9^).
+        exit /b 1
     )
+) else (
+    :: No source code - create placeholder to show what would be built
     echo.
-    echo Build completed successfully!
-    echo Output: !OUTPUT_FILE!
-) > "!LOG_FILE!" 2>nul
+    echo ========================================
+    echo   PLACEHOLDER BUILD - No source code
+    echo ========================================
+    echo.
+    echo Source code not found at src\main.c
+    echo This build script is ready, but actual Xbox
+    echo source code needs to be implemented.
+    echo.
+    echo Creating placeholder files to demonstrate
+    echo the build output structure...
+    echo.
 
-echo.
-echo Build simulation complete!
-echo Output would be: !BUILD_DIR!\!OUTPUT_FILE!
+    :: Create placeholder XBE info file
+    set "LOG_FILE=!BUILD_DIR!\build.log"
+    (
+        echo Nedflix Original Xbox %BUILD_TYPE% Build
+        echo ====================================
+        echo Date: %date% %time%
+        echo Status: PLACEHOLDER ^(no source code^)
+        echo Toolchain: nxdk
+        echo Target: Original Xbox ^(2001^)
+        echo Architecture: i686 ^(Pentium III^)
+        echo.
+        if /i "%BUILD_TYPE%"=="client" (
+            echo Mode: CLIENT
+            echo Features ^(when implemented^):
+            echo   - Network streaming from Nedflix server
+            echo   - OAuth authentication support
+            echo   - Server library browsing
+            echo   - Xbox controller navigation
+            echo   - 480i/480p/720p/1080i output
+            echo   - Dolby Digital 5.1 audio
+        ) else (
+            echo Mode: DESKTOP
+            echo Features ^(when implemented^):
+            echo   - Embedded HTTP server ^(port 3000^)
+            echo   - Local media playback ^(E:\ F:\ drives^)
+            echo   - No authentication required
+            echo   - Web UI bundled
+            echo   - USB drive support
+            echo   - Offline mode ^(no network required^)
+        )
+        echo.
+        echo NOTE: This is a placeholder. To build a real XBE:
+        echo   1. Create src\main.c with Xbox application code
+        echo   2. Create Makefile.%BUILD_TYPE% for nxdk
+        echo   3. Run this build script again
+    ) > "!LOG_FILE!" 2>nul
+
+    :: Create a placeholder readme instead of fake binary
+    (
+        echo This directory would contain: !OUTPUT_FILE!
+        echo.
+        echo To generate a real XBE binary:
+        echo   1. Implement Xbox source code in src\
+        echo   2. Create nxdk Makefile
+        echo   3. Install nxdk toolchain
+        echo   4. Run build.bat again
+    ) > "!BUILD_DIR!\README.txt" 2>nul
+
+    echo Placeholder files created in: !BUILD_DIR!\
+    echo.
+    echo To create a real build:
+    echo   1. Add source code to src\main.c
+    echo   2. Create Makefile.client and Makefile.desktop
+    echo   3. Run this script again
+    echo.
+)
 exit /b 0
 
 :end
