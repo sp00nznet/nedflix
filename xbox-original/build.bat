@@ -837,8 +837,11 @@ if "!XBE_PATH!"=="" (
 
 echo Found XBE: !XBE_PATH!
 
-:: Create ISO staging directory
-set "ISO_DIR=iso_staging"
+:: Get base name for ISO (without .iso extension)
+set "ISO_BASENAME=!XISO_OUTPUT:.iso=!"
+
+:: Create ISO staging directory using the target name
+set "ISO_DIR=!ISO_BASENAME!"
 if exist "!ISO_DIR!" rmdir /s /q "!ISO_DIR!"
 mkdir "!ISO_DIR!"
 
@@ -852,7 +855,7 @@ copy "!XBE_PATH!" "!ISO_DIR!\default.xbe" >nul
     echo Version=1.0.0
 ) > "!ISO_DIR!\xbe.cfg" 2>nul
 
-echo ISO staging directory created.
+echo ISO staging directory created: !ISO_DIR!
 
 :: Check for extract-xiso in MSYS2
 set "MSYS2_PATH="
@@ -939,11 +942,17 @@ echo Creating XISO with extract-xiso...
 echo   Source: !ISO_DIR!
 echo   Output: iso\!XISO_OUTPUT!
 
-"!EXTRACT_XISO!" -c "!ISO_DIR!" -d "iso\!XISO_OUTPUT!"
+:: extract-xiso creates <dirname>.iso in current directory
+"!EXTRACT_XISO!" -c "!ISO_DIR!"
 set "XISO_RESULT=!errorlevel!"
 
+:: Move the created ISO to the iso/ directory
+if exist "!ISO_BASENAME!.iso" (
+    move /Y "!ISO_BASENAME!.iso" "iso\!XISO_OUTPUT!" >nul
+)
+
 :: Clean up staging directory
-rmdir /s /q "!ISO_DIR!"
+rmdir /s /q "!ISO_DIR!" 2>nul
 
 :: Check result
 if exist "iso\!XISO_OUTPUT!" (
