@@ -56,7 +56,7 @@
 #define RECV_BUFFER_SIZE    4096
 #define STREAM_BUFFER_SIZE  (256 * 1024)  /* 256KB audio buffer */
 
-/* Colors (PVR format: ARGB4444 or ARGB1555) */
+/* Colors (PVR format: ARGB) */
 #define COLOR_BLACK       0xFF000000
 #define COLOR_WHITE       0xFFFFFFFF
 #define COLOR_RED         0xFFE50914
@@ -81,10 +81,10 @@ typedef enum {
 
 /* Media types */
 typedef enum {
-    MEDIA_UNKNOWN,
-    MEDIA_DIRECTORY,
-    MEDIA_AUDIO,
-    MEDIA_VIDEO
+    MEDIA_TYPE_UNKNOWN,
+    MEDIA_TYPE_DIRECTORY,
+    MEDIA_TYPE_AUDIO,
+    MEDIA_TYPE_VIDEO
 } media_type_t;
 
 /* Library types */
@@ -96,7 +96,22 @@ typedef enum {
     LIBRARY_COUNT
 } library_t;
 
-/* Dreamcast controller buttons */
+/* Button mask flags */
+typedef enum {
+    BTN_A             = (1 << 0),
+    BTN_B             = (1 << 1),
+    BTN_X             = (1 << 2),
+    BTN_Y             = (1 << 3),
+    BTN_START         = (1 << 4),
+    BTN_DPAD_UP       = (1 << 5),
+    BTN_DPAD_DOWN     = (1 << 6),
+    BTN_DPAD_LEFT     = (1 << 7),
+    BTN_DPAD_RIGHT    = (1 << 8),
+    BTN_LEFT_TRIGGER  = (1 << 9),
+    BTN_RIGHT_TRIGGER = (1 << 10)
+} button_mask_t;
+
+/* Dreamcast controller buttons (for compatibility) */
 typedef enum {
     DC_BTN_C       = CONT_C,
     DC_BTN_B       = CONT_B,
@@ -114,12 +129,12 @@ typedef enum {
     DC_TRIG_R      = 0x20000   /* Right trigger (analog) */
 } dc_button_t;
 
-/* Media item (compact for memory) */
+/* Media item */
 typedef struct {
     char name[MAX_TITLE_LENGTH];
     char path[MAX_PATH_LENGTH];
-    uint8_t type;       /* media_type_t */
-    uint8_t flags;      /* is_directory, etc */
+    media_type_t type;
+    bool is_directory;
     uint16_t duration;  /* seconds, for audio */
 } media_item_t;
 
@@ -127,9 +142,9 @@ typedef struct {
 typedef struct {
     media_item_t items[MAX_MEDIA_ITEMS];
     int16_t count;
-    int16_t selected;
-    int16_t scroll;
-    char path[MAX_PATH_LENGTH];
+    int16_t selected_index;
+    int16_t scroll_offset;
+    char current_path[MAX_PATH_LENGTH];
 } media_list_t;
 
 /* User settings (fits in VMU) */
@@ -137,11 +152,14 @@ typedef struct {
     char server_url[MAX_URL_LENGTH];
     char username[32];
     char session_token[64];
+    char subtitle_language[8];
+    char audio_language[8];
     uint8_t volume;          /* 0-100 */
     uint8_t library;         /* Current library */
     uint8_t theme;           /* 0=dark */
-    uint8_t flags;           /* autoplay, shuffle, repeat */
-} settings_t;
+    bool autoplay;
+    bool show_subtitles;
+} user_settings_t;
 
 /* Playback state */
 typedef struct {
@@ -150,8 +168,8 @@ typedef struct {
     bool playing;
     bool paused;
     bool is_audio;
-    uint32_t position_ms;
-    uint32_t duration_ms;
+    double position;
+    double duration;
     uint8_t volume;
 } playback_t;
 
@@ -161,20 +179,20 @@ typedef struct {
     bool connected;
     uint32_t ip_addr;
     int socket;
-} network_t;
+} network_state_t;
 
 /* Global application context */
 typedef struct {
     app_state_t state;
-    settings_t settings;
+    user_settings_t settings;
     playback_t playback;
     media_list_t media;
-    network_t net;
+    network_state_t net;
     library_t current_library;
 
     /* Input state */
-    uint32_t buttons;
     uint32_t buttons_pressed;
+    uint32_t buttons_just_pressed;
     int8_t analog_x;
     int8_t analog_y;
     uint8_t ltrig;
@@ -182,7 +200,7 @@ typedef struct {
 
     /* Timing */
     uint32_t frame_count;
-    uint32_t last_input_time;
+    uint64_t last_input_time;
 
     /* Error handling */
     char error_msg[128];
@@ -195,6 +213,21 @@ typedef struct {
 extern app_t g_app;
 
 /*
+ * Debug/Logging macros
+ */
+#ifdef DEBUG
+#define LOG(fmt, ...) dbglog(DBG_INFO, "[NEDFLIX] " fmt "\n", ##__VA_ARGS__)
+#define LOG_ERROR(fmt, ...) dbglog(DBG_ERROR, "[ERROR] " fmt "\n", ##__VA_ARGS__)
+#define DBG(fmt, ...) dbglog(DBG_INFO, "[NEDFLIX] " fmt "\n", ##__VA_ARGS__)
+#define ERR(fmt, ...) dbglog(DBG_ERROR, "[ERROR] " fmt "\n", ##__VA_ARGS__)
+#else
+#define LOG(fmt, ...)
+#define LOG_ERROR(fmt, ...)
+#define DBG(fmt, ...)
+#define ERR(fmt, ...)
+#endif
+
+/*
  * Module functions
  */
 
@@ -205,82 +238,83 @@ void app_shutdown(void);
 void app_set_error(const char *msg);
 
 /* network.c */
-int net_init(void);
-void net_shutdown(void);
-int net_http_get(const char *url, const char *auth, char **response, size_t *len);
-int net_http_post(const char *url, const char *body, char **response, size_t *len);
+int network_init(void);
+void network_shutdown(void);
+bool network_is_available(void);
+int http_get(const char *url, char **response, size_t *len);
+int http_get_with_auth(const char *url, const char *token, char **response, size_t *len);
+int http_post(const char *url, const char *body, char **response, size_t *len);
+int http_post_with_auth(const char *url, const char *token, const char *body, char **response, size_t *len);
 
 /* ui.c */
-void ui_init(void);
+int ui_init(void);
 void ui_shutdown(void);
-void ui_begin_frame(void);
-void ui_end_frame(void);
-void ui_draw_background(void);
-void ui_draw_header(const char *title);
-void ui_draw_text(float x, float y, const char *text, uint32_t color);
-void ui_draw_text_centered(float y, const char *text, uint32_t color);
-void ui_draw_menu(const char **items, int count, int selected);
-void ui_draw_media_list(media_list_t *list);
-void ui_draw_loading(const char *msg);
-void ui_draw_error(const char *msg);
-void ui_draw_playback(playback_t *pb);
-void ui_draw_progress(float x, float y, float w, float h, float progress, uint32_t color);
+void ui_set_status(const char *message, uint32_t color);
+void ui_draw_loading(const char *message);
+void ui_draw_error(const char *message);
+void ui_draw_login(int selected_field, const char *username, const char *password, bool connecting);
+void ui_draw_main_menu(int selected, const char *username);
+void ui_draw_browser(const media_list_t *list, const char *current_path);
+void ui_draw_playback(const char *title, double position, double duration, bool paused, int volume);
+void ui_draw_settings(const user_settings_t *settings, int selected);
 
 /* input.c */
-void input_init(void);
+int input_init(void);
+void input_shutdown(void);
 void input_update(void);
-bool input_pressed(dc_button_t btn);
-bool input_held(dc_button_t btn);
-int input_analog_x(void);
-int input_analog_y(void);
+bool input_button_pressed(button_mask_t button);
+bool input_button_just_pressed(button_mask_t button);
+int input_get_stick_x(void);
+int input_get_stick_y(void);
+int input_get_left_trigger(void);
+int input_get_right_trigger(void);
+bool input_controller_connected(void);
+void input_rumble(int duration_ms);
 
 /* audio.c */
 int audio_init(void);
 void audio_shutdown(void);
-int audio_play_stream(const char *url);
+int audio_play(const char *url);
 void audio_stop(void);
 void audio_pause(void);
 void audio_resume(void);
+void audio_seek(double seconds);
 void audio_set_volume(int vol);
+int audio_get_volume(void);
 void audio_update(void);
 bool audio_is_playing(void);
-uint32_t audio_get_position(void);
-uint32_t audio_get_duration(void);
+double audio_get_position(void);
+double audio_get_duration(void);
+const char *audio_get_current_url(void);
 
 /* api.c */
 int api_init(const char *server);
+void api_shutdown(void);
 int api_login(const char *user, const char *pass, char *token, size_t len);
-int api_browse(const char *token, const char *path, library_t lib, media_list_t *list);
+int api_get_user_info(const char *token, char *username_out, size_t username_len);
+int api_browse(const char *token, const char *path, media_list_t *list);
+int api_search(const char *token, const char *query, media_list_t *list);
 int api_get_stream_url(const char *token, const char *path, char *url, size_t len);
 
 /* config.c */
-int config_load(settings_t *s);
-int config_save(const settings_t *s);
-void config_defaults(settings_t *s);
+int config_load(user_settings_t *s);
+int config_save(const user_settings_t *s);
+void config_defaults(user_settings_t *s);
 
 /* json.c - minimal parser */
-typedef struct json_value json_t;
-json_t *json_parse(const char *text);
-void json_free(json_t *v);
-const char *json_string(json_t *obj, const char *key);
-int json_int(json_t *obj, const char *key, int def);
-bool json_bool(json_t *obj, const char *key, bool def);
-json_t *json_array(json_t *obj, const char *key);
-int json_array_len(json_t *arr);
-json_t *json_array_get(json_t *arr, int i);
+typedef struct json_value json_value_t;
+json_value_t *json_parse(const char *text);
+void json_free(json_value_t *v);
+const char *json_get_string(json_value_t *obj, const char *key);
+int json_get_int(json_value_t *obj, const char *key, int def);
+bool json_get_bool(json_value_t *obj, const char *key, bool def);
+json_value_t *json_get_array(json_value_t *obj, const char *key);
+int json_array_length(json_value_t *arr);
+json_value_t *json_array_get(json_value_t *arr, int i);
 
 /* Utility macros */
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 #define CLAMP(x,lo,hi) MIN(MAX(x,lo),hi)
-
-/* Debug output */
-#ifdef DEBUG
-#define DBG(fmt, ...) dbglog(DBG_INFO, "[NEDFLIX] " fmt "\n", ##__VA_ARGS__)
-#define ERR(fmt, ...) dbglog(DBG_ERROR, "[ERROR] " fmt "\n", ##__VA_ARGS__)
-#else
-#define DBG(fmt, ...)
-#define ERR(fmt, ...)
-#endif
 
 #endif /* NEDFLIX_DC_H */
