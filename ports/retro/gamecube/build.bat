@@ -64,7 +64,11 @@ goto menu
 :build
 echo.
 echo Building Nedflix for GameCube...
-"%MSYS_PATH%\usr\bin\bash.exe" -lc "cd '%~dp0' && source /opt/devkitpro/devkitppc/base.sh 2>/dev/null; export DEVKITPRO=/opt/devkitpro; export DEVKITPPC=/opt/devkitpro/devkitPPC; make"
+REM Convert path and set up devkitPro environment properly
+set "BUILD_DIR=%~dp0"
+set "BUILD_DIR=!BUILD_DIR:\=/!"
+set "BUILD_DIR=/!BUILD_DIR::=!"
+"%MSYS_PATH%\usr\bin\bash.exe" -lc "export DEVKITPRO=/opt/devkitpro && export DEVKITPPC=/opt/devkitpro/devkitPPC && export PATH=$DEVKITPPC/bin:$PATH && cd '!BUILD_DIR!' && make"
 if exist "%~dp0nedflix.dol" (
     echo.
     echo Build successful!
@@ -80,7 +84,10 @@ goto menu
 :clean
 echo.
 echo Cleaning build...
-"%MSYS_PATH%\usr\bin\bash.exe" -lc "cd '%~dp0' && make clean"
+set "BUILD_DIR=%~dp0"
+set "BUILD_DIR=!BUILD_DIR:\=/!"
+set "BUILD_DIR=/!BUILD_DIR::=!"
+"%MSYS_PATH%\usr\bin\bash.exe" -lc "export DEVKITPRO=/opt/devkitpro && export DEVKITPPC=/opt/devkitpro/devkitPPC && cd '!BUILD_DIR!' && make clean"
 echo Clean complete.
 echo.
 pause

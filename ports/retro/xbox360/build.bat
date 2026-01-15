@@ -77,7 +77,8 @@ goto menu
 echo.
 echo Building Nedflix for Xbox 360...
 if "%BUILD_ENV%"=="WSL" (
-    wsl bash -c "cd '%~dp0' && ./build.sh"
+    REM Use wslpath to convert Windows path to WSL format
+    wsl bash -c "cd \"$(wslpath '%~dp0')\" && ./build.sh"
 ) else (
     "%MSYS_PATH%\usr\bin\bash.exe" -lc "cd '%~dp0' && ./build.sh"
 )
@@ -101,7 +102,8 @@ goto menu
 echo.
 echo Cleaning build...
 if "%BUILD_ENV%"=="WSL" (
-    wsl bash -c "cd '%~dp0' && ./build.sh clean"
+    REM Use wslpath to convert Windows path to WSL format
+    wsl bash -c "cd \"$(wslpath '%~dp0')\" && ./build.sh clean"
 ) else (
     "%MSYS_PATH%\usr\bin\bash.exe" -lc "cd '%~dp0' && ./build.sh clean"
 )

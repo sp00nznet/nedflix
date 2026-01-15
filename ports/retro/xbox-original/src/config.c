@@ -41,9 +41,8 @@ void config_set_defaults(user_settings_t *settings)
 
     memset(settings, 0, sizeof(*settings));
 
-    /* Default server URL */
-    strncpy(settings->server_url, "http://192.168.1.100:3000",
-            sizeof(settings->server_url) - 1);
+    /* Default server URL - empty so client mode will prompt for IP entry */
+    settings->server_url[0] = '\0';
 
     /* Default settings */
     settings->volume = 80;
