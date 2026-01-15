@@ -12,6 +12,7 @@ These ports demonstrate homebrew development on vintage gaming consoles. They ar
 | [GameCube](./gamecube/) | 2001 | devkitPPC/libogc | Audio Playback | Functional |
 | [Xbox Original](./xbox-original/) | 2001 | nxdk | Full Client | Functional |
 | [PlayStation 3](./ps3/) | 2006 | PSL1GHT | Full Client | Functional |
+| [Xbox 360](./xbox360/) | 2005 | libxenon | Full Client | Functional |
 
 ## Port Details
 
@@ -47,6 +48,15 @@ These ports demonstrate homebrew development on vintage gaming consoles. They ar
 - **Features:** Most capable port - HD video, SPE-assisted decode
 - **Build:** Requires PSL1GHT + ps3toolchain
 
+### Xbox 360 (2005)
+- **CPU:** 3.2 GHz PowerPC Xenon (3 cores, 6 threads)
+- **RAM:** 512 MB GDDR3 (unified)
+- **Network:** 100 Mbps Ethernet (built-in)
+- **Focus:** Full HD client with network streaming
+- **Features:** HD output, unified memory, hardware-accelerated graphics
+- **Build:** Requires libxenon from Free60 project
+- **Note:** Requires JTAG/RGH modified console
+
 ## Building
 
 Each port has its own build script and Makefile. See the individual port directories for detailed instructions.
@@ -68,6 +78,10 @@ cd xbox-original
 # Example for PS3
 cd ps3
 ./build.sh
+
+# Example for Xbox 360
+cd xbox360
+./build.sh
 ```
 
 ## Testing
@@ -76,6 +90,7 @@ cd ps3
 - **GameCube:** Use Dolphin emulator
 - **Xbox Original:** Use xemu emulator or real hardware with softmod
 - **PS3:** Requires CFW (Custom Firmware) PS3 or RPCS3 emulator
+- **Xbox 360:** Requires JTAG/RGH console or Xenia emulator (limited support)
 
 ## Hardware Requirements Summary
 
@@ -85,6 +100,7 @@ cd ps3
 | GameCube | No | No | SD card audio only |
 | Xbox Original | Limited | Yes | Best 6th gen port |
 | PS3 | Yes | Yes | HD capable |
+| Xbox 360 | Limited | Yes | HD capable, JTAG/RGH required |
 
 ## License
 

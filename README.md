@@ -61,17 +61,29 @@ Output files are created in `desktop/dist/`.
 
 ## Platforms
 
+### Modern Platforms
+
 | Platform | Directory | Build Script | Notes |
 |----------|-----------|--------------|-------|
 | **Web (Docker)** | `/` | `docker compose up` | Full features, PostgreSQL, ErsatzTV |
 | **Desktop** | `/desktop` | `build.bat` / `build.sh` | Windows/Linux, Xbox controller |
-| **Xbox Series X/S** | `/xbox` | `build.bat` | UWP app, Dev Mode required |
-| **Original Xbox** | `/xbox-original` | `build.bat` / `build-*.sh` | nxdk toolchain, softmod required |
-| **Apple TV** | `/appletv` | `build-*.sh` | Xcode required |
+| **Xbox Series X/S** | `/xbox` | `build.bat` / `build.ps1` | UWP app, Dev Mode required |
+| **iOS** | `/ios` | `build.sh` | macOS + Xcode required |
+| **Android** | `/android` | `build.sh` | Android SDK required |
+| **Apple TV** | `/appletv` | `build-*.sh` | macOS + Xcode required |
 | **Android TV** | `/androidtv` | `build-*.sh` | Android SDK required |
-| **Dreamcast** | `/dreamcast` | `build.bat` / `build-*.sh` | KallistiOS, novelty build |
 
-> **Note:** Retro console builds (Original Xbox, Dreamcast) are experimental/novelty projects with hardware limitations.
+### Retro Console Ports (Technical Demos)
+
+| Platform | Directory | Build Script | SDK | Notes |
+|----------|-----------|--------------|-----|-------|
+| **Dreamcast** | `/ports/retro/dreamcast` | `build.sh` | KallistiOS | Audio streaming focus |
+| **GameCube** | `/ports/retro/gamecube` | `build.sh` | devkitPPC | Audio playback only |
+| **Xbox Original** | `/ports/retro/xbox-original` | `build.sh` / `build.bat` | nxdk | Full client, softmod required |
+| **PlayStation 3** | `/ports/retro/ps3` | `build.sh` | PSL1GHT | Full HD client, CFW required |
+| **Xbox 360** | `/ports/retro/xbox360` | `build.sh` | libxenon | Full HD client, JTAG/RGH required |
+
+> **Note:** Retro console ports are experimental/novelty projects demonstrating homebrew development. They have hardware limitations and may require modified console firmware.
 
 ---
 
@@ -135,11 +147,17 @@ nedflix/
 ├── docker-compose.yml     # Docker orchestration
 ├── public/                # Web UI
 ├── desktop/               # Electron app (Windows/Linux)
+├── ios/                   # iOS app (Swift/UIKit)
+├── android/               # Android app (Kotlin/Compose)
 ├── xbox/                  # Xbox Series X/S (UWP)
-├── xbox-original/         # Original Xbox (nxdk)
 ├── appletv/               # Apple TV
 ├── androidtv/             # Android TV
-├── dreamcast/             # Sega Dreamcast (KallistiOS)
+├── ports/retro/           # Retro console ports
+│   ├── dreamcast/         # Sega Dreamcast (KallistiOS)
+│   ├── gamecube/          # Nintendo GameCube (devkitPPC)
+│   ├── xbox-original/     # Original Xbox (nxdk)
+│   ├── ps3/               # PlayStation 3 (PSL1GHT)
+│   └── xbox360/           # Xbox 360 (libxenon)
 └── docs/                  # Documentation
 ```
 
