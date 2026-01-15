@@ -533,7 +533,232 @@ async function rebuildChannelPlayout(channelId) {
     }
 }
 
+// ==========================================
+// THEMED CHANNELS INTEGRATION
+// ==========================================
+
+const themedChannels = require('./themed-channels');
+
+/**
+ * Get all available themed channel presets
+ */
+function getThemedChannelPresets() {
+    return themedChannels.getAllChannels().map(ch => ({
+        key: Object.keys(themedChannels.THEMED_CHANNELS).find(
+            k => themedChannels.THEMED_CHANNELS[k] === ch
+        ),
+        name: ch.name,
+        number: ch.number,
+        description: ch.description,
+        icon: ch.icon,
+        hasSchedule: ch.schedule.length > 0,
+        collectionCount: Object.keys(ch.collections).length
+    }));
+}
+
+/**
+ * Create a schedule block in ErsatzTV
+ */
+async function createScheduleBlock(channelId, block) {
+    try {
+        const result = await makeRequest(`/api/channels/${channelId}/schedule`, {
+            method: 'POST',
+            body: {
+                index: block.index || 0,
+                startTime: block.startTime,
+                playoutMode: block.playoutMode || 'Shuffle',
+                collectionType: 'SmartCollection',
+                collectionId: block.collectionId,
+                multipleCount: 1,
+                durationSeconds: (block.durationMinutes || 60) * 60,
+                offlineTail: false,
+                customTitle: block.title || null
+            }
+        });
+        return result;
+    } catch (error) {
+        console.error(`Failed to create schedule block:`, error.message);
+        throw error;
+    }
+}
+
+/**
+ * Create a themed channel with all its collections and schedules
+ */
+async function createThemedChannel(channelKey) {
+    const channelConfig = themedChannels.getChannel(channelKey);
+    if (!channelConfig) {
+        throw new Error(`Unknown themed channel: ${channelKey}`);
+    }
+
+    const results = {
+        channel: null,
+        collections: [],
+        scheduleBlocks: [],
+        errors: []
+    };
+
+    try {
+        // Check if channel number is already in use
+        const existingChannels = await getChannels();
+        const numberInUse = existingChannels.find(
+            ch => String(ch.number) === String(channelConfig.number)
+        );
+        if (numberInUse) {
+            throw new Error(`Channel number ${channelConfig.number} already in use by "${numberInUse.name}"`);
+        }
+
+        // Get FFmpeg profiles
+        const profiles = await getFFmpegProfiles();
+        const defaultProfile = profiles.find(p => p.name === 'Default') || profiles[0];
+
+        // Create the channel
+        const channel = await createChannel(
+            channelConfig.name,
+            channelConfig.number,
+            defaultProfile?.id
+        );
+        results.channel = {
+            id: channel?.id,
+            name: channelConfig.name,
+            number: channelConfig.number
+        };
+
+        // Create smart collections for this channel
+        for (const [collName, collConfig] of Object.entries(channelConfig.collections)) {
+            try {
+                const collection = await createSmartCollection(
+                    `${channelConfig.name} - ${collName}`,
+                    collConfig.query
+                );
+                results.collections.push({
+                    name: collName,
+                    id: collection?.id,
+                    query: collConfig.query,
+                    status: 'created'
+                });
+            } catch (error) {
+                results.errors.push({
+                    type: 'collection',
+                    name: collName,
+                    error: error.message
+                });
+            }
+        }
+
+        // Note: Schedule blocks require additional ErsatzTV API setup
+        // which varies by ErsatzTV version. This provides the framework.
+        results.scheduleBlocks = themedChannels.toErsatzTVSchedule(channelConfig);
+
+        return {
+            success: true,
+            ...results
+        };
+
+    } catch (error) {
+        return {
+            success: false,
+            error: error.message,
+            ...results
+        };
+    }
+}
+
+/**
+ * Setup all themed channels at once
+ */
+async function setupThemedChannels(channelKeys = null) {
+    const results = {
+        success: true,
+        channels: [],
+        errors: []
+    };
+
+    // If no keys specified, setup all themed channels
+    const keysToSetup = channelKeys || Object.keys(themedChannels.THEMED_CHANNELS);
+
+    for (const key of keysToSetup) {
+        try {
+            const result = await createThemedChannel(key);
+            results.channels.push({
+                key,
+                ...result
+            });
+            if (!result.success) {
+                results.errors.push({
+                    channel: key,
+                    error: result.error
+                });
+            }
+        } catch (error) {
+            results.errors.push({
+                channel: key,
+                error: error.message
+            });
+        }
+    }
+
+    results.success = results.errors.length === 0;
+    return results;
+}
+
+/**
+ * Get themed channels that would work with current library content
+ */
+async function getRecommendedThemedChannels() {
+    const recommendations = [];
+
+    try {
+        const libraries = await getLocalLibraries();
+        const hasMovies = libraries.some(lib => lib.mediaKind === 'Movies');
+        const hasShows = libraries.some(lib => lib.mediaKind === 'Shows');
+        const hasMusic = libraries.some(lib => lib.mediaKind === 'MusicVideos');
+
+        const allChannels = themedChannels.getAllChannels();
+
+        for (const channel of allChannels) {
+            const queries = Object.values(channel.collections).map(c => c.query);
+            const needsMovies = queries.some(q => q.includes('type:movie'));
+            const needsShows = queries.some(q => q.includes('type:show'));
+            const needsMusic = queries.some(q => q.includes('type:musicvideo'));
+
+            let compatible = true;
+            let reason = [];
+
+            if (needsMovies && !hasMovies) {
+                compatible = false;
+                reason.push('Requires movie library');
+            }
+            if (needsShows && !hasShows) {
+                compatible = false;
+                reason.push('Requires TV show library');
+            }
+            if (needsMusic && !hasMusic) {
+                compatible = false;
+                reason.push('Requires music video library');
+            }
+
+            recommendations.push({
+                key: Object.keys(themedChannels.THEMED_CHANNELS).find(
+                    k => themedChannels.THEMED_CHANNELS[k] === channel
+                ),
+                name: channel.name,
+                number: channel.number,
+                description: channel.description,
+                compatible,
+                reason: reason.length > 0 ? reason.join(', ') : 'Ready to use'
+            });
+        }
+
+    } catch (error) {
+        console.error('Failed to get channel recommendations:', error.message);
+    }
+
+    return recommendations;
+}
+
 module.exports = {
+    // Core ErsatzTV functions
     checkHealth,
     getLocalLibraries,
     createLocalLibrary,
@@ -553,5 +778,13 @@ module.exports = {
     getChannelGuide,
     getStatus,
     rebuildChannelPlayout,
-    CHANNEL_PRESETS
+    CHANNEL_PRESETS,
+
+    // Themed channels
+    getThemedChannelPresets,
+    createThemedChannel,
+    setupThemedChannels,
+    getRecommendedThemedChannels,
+    createScheduleBlock,
+    themedChannels
 };

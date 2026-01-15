@@ -2481,6 +2481,55 @@ app.post('/api/ersatztv/setup', ensureAdmin, async (req, res) => {
     }
 });
 
+// ==========================================
+// THEMED CHANNELS API
+// ==========================================
+
+// API: Get all available themed channel presets
+app.get('/api/ersatztv/themed-channels', ensureAuthenticated, (req, res) => {
+    try {
+        const presets = ersatztvService.getThemedChannelPresets();
+        res.json({ channels: presets });
+    } catch (error) {
+        console.error('Error getting themed channels:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Get themed channel recommendations based on library content
+app.get('/api/ersatztv/themed-channels/recommendations', ensureAuthenticated, async (req, res) => {
+    try {
+        const recommendations = await ersatztvService.getRecommendedThemedChannels();
+        res.json({ recommendations });
+    } catch (error) {
+        console.error('Error getting recommendations:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Create a specific themed channel (admin only)
+app.post('/api/ersatztv/themed-channels/:key', ensureAdmin, async (req, res) => {
+    try {
+        const result = await ersatztvService.createThemedChannel(req.params.key);
+        res.json(result);
+    } catch (error) {
+        console.error('Error creating themed channel:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Setup multiple themed channels at once (admin only)
+app.post('/api/ersatztv/themed-channels/setup', ensureAdmin, async (req, res) => {
+    try {
+        const { channels } = req.body; // Optional array of channel keys
+        const result = await ersatztvService.setupThemedChannels(channels);
+        res.json(result);
+    } catch (error) {
+        console.error('Error setting up themed channels:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // API: Get M3U playlist URL for ErsatzTV channels
 app.get('/api/ersatztv/playlist-url', ensureAuthenticated, (req, res) => {
     res.json({ url: ersatztvService.getPlaylistUrl() });

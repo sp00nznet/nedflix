@@ -491,6 +491,100 @@ Nedflix provides these endpoints for ErsatzTV integration:
 | `/api/ersatztv/channels/:id/rebuild` | POST | Admin | Rebuild channel playout |
 | `/api/ersatztv/playlist-url` | GET | User | Get M3U playlist URL |
 | `/api/ersatztv/epg-url` | GET | User | Get XMLTV EPG URL |
+| `/api/ersatztv/themed-channels` | GET | User | List available themed channel presets |
+| `/api/ersatztv/themed-channels/recommendations` | GET | User | Get channel recommendations for your library |
+| `/api/ersatztv/themed-channels/:key` | POST | Admin | Create a specific themed channel |
+| `/api/ersatztv/themed-channels/setup` | POST | Admin | Setup multiple themed channels at once |
+
+### Themed Channels
+
+Beyond the basic 24/7 shuffle channels, Nedflix includes pre-configured themed channels with smart scheduling. These channels automatically populate from your library and feature time-based programming like traditional TV.
+
+#### Available Themed Channels
+
+| Channel | # | Description | Schedule |
+|---------|---|-------------|----------|
+| **Friday Night Movie** | 10 | Curated movie experience | Movie at 7 PM Fridays, late double feature at 10 PM |
+| **INSOMNIA TV** | 11 | Day/night content split | Family content by day, edgy content after midnight |
+| **Saturday Morning Cartoons** | 12 | Classic animation block | Cartoon marathon Saturday 6 AM-12 PM |
+| **Midnight Movies** | 13 | Cult classics & B-movies | Intense cult films midnight-6 AM |
+| **Background Beats** | 14 | Music videos | 24/7 music video rotation |
+| **Laugh Track** | 15 | Comedy channel | Sitcoms by day, adult comedy at night |
+| **Action Zone** | 16 | Action & adventure | 24/7 action movies |
+| **Kids Zone** | 17 | Age-appropriate content | G/PG rated kids content only |
+| **Documentary Discovery** | 18 | Documentaries | 24/7 documentary rotation |
+| **Sci-Fi Sundays** | 19 | Science fiction marathon | Full sci-fi marathon every Sunday |
+| **Throwback Thursday** | 20 | Decade-themed classics | 50s-60s morning, 70s-80s afternoon, 90s evening on Thursdays |
+| **Drama Queens** | 21 | Drama & romance | 24/7 dramatic content |
+| **Horror House** | 22 | Horror channel | Lighter horror by day, intense at night |
+| **World Cinema** | 23 | International films | Non-English language films |
+| **Binge Watch** | 24 | TV show marathon | Episodes in chronological order |
+| **Ambient Cinema** | 25 | Relaxing visuals | Nature docs and slow cinema |
+
+#### Channel Scheduling Types
+
+**Day-of-Week Blocks**
+Some channels feature special programming on specific days:
+- **Friday Night Movie**: Movie starts at exactly 7 PM on Fridays
+- **Saturday Morning Cartoons**: 6-hour cartoon block Saturday mornings
+- **Throwback Thursday**: Decade-themed blocks throughout Thursday
+- **Sci-Fi Sundays**: All-day sci-fi marathon every Sunday
+
+**Dayparting (Time-Based)**
+Channels that change content based on time of day:
+- **INSOMNIA TV**: Family content 6 AM-6 PM, mature content 10 PM-6 AM
+- **Horror House**: Light horror daytime, intense horror at night
+- **Laugh Track**: Sitcoms during day, adult comedy after 8 PM
+
+**24/7 Rotation**
+Continuous shuffle of themed content:
+- **Action Zone**, **Kids Zone**, **Documentary Discovery**, etc.
+
+#### Setting Up Themed Channels
+
+1. **Via API** (Recommended):
+   ```bash
+   # Setup all themed channels
+   curl -X POST http://localhost:3443/api/ersatztv/themed-channels/setup \
+        -H "Content-Type: application/json" \
+        -H "Cookie: your-session-cookie"
+
+   # Setup specific channels only
+   curl -X POST http://localhost:3443/api/ersatztv/themed-channels/setup \
+        -H "Content-Type: application/json" \
+        -d '{"channels": ["fridayNightMovie", "insomniaTV", "saturdayMorningCartoons"]}' \
+        -H "Cookie: your-session-cookie"
+   ```
+
+2. **Single Channel**:
+   ```bash
+   curl -X POST http://localhost:3443/api/ersatztv/themed-channels/fridayNightMovie \
+        -H "Cookie: your-session-cookie"
+   ```
+
+3. **Check Recommendations**:
+   ```bash
+   # See which channels work with your library
+   curl http://localhost:3443/api/ersatztv/themed-channels/recommendations \
+        -H "Cookie: your-session-cookie"
+   ```
+
+#### Smart Collections
+
+Each themed channel uses smart collection queries to filter content. For example:
+
+- **Kids Zone**: `(genre:Children OR genre:Family) AND rating:(G OR TV-G OR TV-Y)`
+- **Horror House**: `type:movie AND genre:Horror AND rating:(R OR TV-MA)`
+- **Throwback Thursday 70s-80s**: `type:movie AND year:>=1970 AND year:<=1989`
+
+The queries adapt to your library's metadata, so content automatically populates as you add media.
+
+#### Requirements
+
+For themed channels to work effectively:
+1. **Proper metadata** - Movies/shows need genre, rating, and year info
+2. **Sufficient content** - More variety means better rotation
+3. **ErsatzTV running** - Themed channels use ErsatzTV backend
 
 ### Using Channels in External Players
 
