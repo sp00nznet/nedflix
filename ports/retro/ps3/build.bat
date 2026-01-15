@@ -74,8 +74,11 @@ goto menu
 echo.
 echo Building Nedflix for PS3...
 if "%BUILD_ENV%"=="WSL" (
-    REM Use wslpath to convert Windows path to WSL format
-    wsl bash -c "cd \"$(wslpath '%~dp0')\" && ./build.sh"
+    REM Convert Windows path to WSL format and build
+    set "SCRIPT_DIR=%~dp0"
+    set "SCRIPT_DIR=!SCRIPT_DIR:~0,-1!"
+    for /f "usebackq tokens=*" %%i in (`wsl wslpath -u "!SCRIPT_DIR!"`) do set "WSL_DIR=%%i"
+    wsl bash -c "cd '!WSL_DIR!' && ./build.sh"
 ) else (
     "%MSYS_PATH%\usr\bin\bash.exe" -lc "cd '%~dp0' && ./build.sh"
 )
@@ -95,8 +98,11 @@ goto menu
 echo.
 echo Cleaning build...
 if "%BUILD_ENV%"=="WSL" (
-    REM Use wslpath to convert Windows path to WSL format
-    wsl bash -c "cd \"$(wslpath '%~dp0')\" && ./build.sh clean"
+    REM Convert Windows path to WSL format and clean
+    set "SCRIPT_DIR=%~dp0"
+    set "SCRIPT_DIR=!SCRIPT_DIR:~0,-1!"
+    for /f "usebackq tokens=*" %%i in (`wsl wslpath -u "!SCRIPT_DIR!"`) do set "WSL_DIR=%%i"
+    wsl bash -c "cd '!WSL_DIR!' && ./build.sh clean"
 ) else (
     "%MSYS_PATH%\usr\bin\bash.exe" -lc "cd '%~dp0' && ./build.sh clean"
 )
