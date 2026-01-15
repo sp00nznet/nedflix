@@ -9,16 +9,14 @@
 #ifdef NXDK
 #include <SDL.h>
 #include <hal/debug.h>
+#else
+/* Non-Xbox builds also use SDL for input */
+#include <SDL2/SDL.h>
+#endif
 
 /* SDL gamepad state */
 static SDL_GameController *g_controller = NULL;
 static bool g_sdl_initialized = false;
-
-#else
-/* Stub for non-Xbox builds */
-static uint16_t g_buttons = 0;
-static uint16_t g_prev_buttons = 0;
-#endif
 
 /* Dead zone for analog sticks */
 #define STICK_DEADZONE 8000
@@ -31,13 +29,20 @@ int input_init(void)
 {
     LOG("Initializing input...");
 
-#ifdef NXDK
     /* Initialize SDL subsystems if not already done */
     if (!g_sdl_initialized) {
+#ifdef NXDK
         if (SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) < 0) {
             LOG_ERROR("SDL_InitSubSystem failed: %s", SDL_GetError());
             return -1;
         }
+#else
+        /* Non-Xbox: Initialize both gamecontroller and keyboard */
+        if (SDL_Init(SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) < 0) {
+            LOG_ERROR("SDL_Init failed: %s", SDL_GetError());
+            return -1;
+        }
+#endif
         g_sdl_initialized = true;
     }
 
@@ -56,9 +61,8 @@ int input_init(void)
     }
 
     if (!g_controller) {
-        LOG("No controller found - keyboard input only");
+        LOG("No controller found - keyboard input available");
     }
-#endif
 
     return 0;
 }
@@ -68,16 +72,18 @@ int input_init(void)
  */
 void input_shutdown(void)
 {
-#ifdef NXDK
     if (g_controller) {
         SDL_GameControllerClose(g_controller);
         g_controller = NULL;
     }
     if (g_sdl_initialized) {
+#ifdef NXDK
         SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
+#else
+        SDL_Quit();
+#endif
         g_sdl_initialized = false;
     }
-#endif
     LOG("Input shutdown");
 }
 
@@ -86,12 +92,12 @@ void input_shutdown(void)
  */
 void input_update(void)
 {
-#ifdef NXDK
     /* Pump SDL events */
     SDL_PumpEvents();
 
     uint16_t buttons = 0;
 
+    /* Process gamepad input if controller is connected */
     if (g_controller) {
         /* Face buttons */
         if (SDL_GameControllerGetButton(g_controller, SDL_CONTROLLER_BUTTON_A))
@@ -146,6 +152,67 @@ void input_update(void)
         if (stick_x > STICK_DEADZONE) buttons |= BTN_DPAD_RIGHT;
     }
 
+    /* Always process keyboard input as fallback/alternative
+     * Keyboard mapping:
+     *   Arrow keys = D-pad
+     *   Enter/Space = A button
+     *   Backspace/Escape = B button
+     *   X = X button
+     *   Y = Y button
+     *   Tab = Start
+     *   Shift = Back
+     *   Q/E = Left/Right trigger (LT/RT for library switching)
+     *   1/2 = White/Black shoulder buttons
+     */
+    const Uint8 *keystate = SDL_GetKeyboardState(NULL);
+    if (keystate) {
+        /* D-pad / Arrow keys */
+        if (keystate[SDL_SCANCODE_UP] || keystate[SDL_SCANCODE_W])
+            buttons |= BTN_DPAD_UP;
+        if (keystate[SDL_SCANCODE_DOWN] || keystate[SDL_SCANCODE_S])
+            buttons |= BTN_DPAD_DOWN;
+        if (keystate[SDL_SCANCODE_LEFT] || keystate[SDL_SCANCODE_A])
+            buttons |= BTN_DPAD_LEFT;
+        if (keystate[SDL_SCANCODE_RIGHT] || keystate[SDL_SCANCODE_D])
+            buttons |= BTN_DPAD_RIGHT;
+
+        /* Face buttons */
+        if (keystate[SDL_SCANCODE_RETURN] || keystate[SDL_SCANCODE_SPACE] ||
+            keystate[SDL_SCANCODE_Z])
+            buttons |= BTN_A;
+        if (keystate[SDL_SCANCODE_BACKSPACE] || keystate[SDL_SCANCODE_ESCAPE] ||
+            keystate[SDL_SCANCODE_X])
+            buttons |= BTN_B;
+        if (keystate[SDL_SCANCODE_C])
+            buttons |= BTN_X;
+        if (keystate[SDL_SCANCODE_V])
+            buttons |= BTN_Y;
+
+        /* Start/Back */
+        if (keystate[SDL_SCANCODE_TAB])
+            buttons |= BTN_START;
+        if (keystate[SDL_SCANCODE_LSHIFT] || keystate[SDL_SCANCODE_RSHIFT])
+            buttons |= BTN_BACK;
+
+        /* Triggers - Q/E for library switching */
+        if (keystate[SDL_SCANCODE_Q])
+            buttons |= BTN_LEFT_TRIGGER;
+        if (keystate[SDL_SCANCODE_E])
+            buttons |= BTN_RIGHT_TRIGGER;
+
+        /* Shoulder buttons */
+        if (keystate[SDL_SCANCODE_1])
+            buttons |= BTN_WHITE;
+        if (keystate[SDL_SCANCODE_2])
+            buttons |= BTN_BLACK;
+
+        /* Thumbstick clicks */
+        if (keystate[SDL_SCANCODE_F])
+            buttons |= BTN_LEFT_THUMB;
+        if (keystate[SDL_SCANCODE_G])
+            buttons |= BTN_RIGHT_THUMB;
+    }
+
     /* Calculate just-pressed buttons */
     uint16_t prev_buttons = g_app.buttons_pressed;
     g_app.buttons_pressed = buttons;
@@ -155,15 +222,6 @@ void input_update(void)
     if (buttons != 0) {
         g_app.last_input_time = SDL_GetTicks();
     }
-
-#else
-    /* Non-Xbox: use keyboard simulation or just clear */
-    g_prev_buttons = g_buttons;
-    g_buttons = 0;
-
-    g_app.buttons_just_pressed = g_buttons & ~g_prev_buttons;
-    g_app.buttons_pressed = g_buttons;
-#endif
 }
 
 /*
@@ -187,14 +245,10 @@ bool input_button_just_pressed(button_mask_t button)
  */
 int input_get_left_stick_x(void)
 {
-#ifdef NXDK
     if (!g_controller) return 0;
     int value = SDL_GameControllerGetAxis(g_controller, SDL_CONTROLLER_AXIS_LEFTX);
     if (abs(value) < STICK_DEADZONE) return 0;
     return value;
-#else
-    return 0;
-#endif
 }
 
 /*
@@ -202,14 +256,10 @@ int input_get_left_stick_x(void)
  */
 int input_get_left_stick_y(void)
 {
-#ifdef NXDK
     if (!g_controller) return 0;
     int value = SDL_GameControllerGetAxis(g_controller, SDL_CONTROLLER_AXIS_LEFTY);
     if (abs(value) < STICK_DEADZONE) return 0;
     return value;
-#else
-    return 0;
-#endif
 }
 
 /*
@@ -217,14 +267,10 @@ int input_get_left_stick_y(void)
  */
 int input_get_right_stick_x(void)
 {
-#ifdef NXDK
     if (!g_controller) return 0;
     int value = SDL_GameControllerGetAxis(g_controller, SDL_CONTROLLER_AXIS_RIGHTX);
     if (abs(value) < STICK_DEADZONE) return 0;
     return value;
-#else
-    return 0;
-#endif
 }
 
 /*
@@ -232,14 +278,10 @@ int input_get_right_stick_x(void)
  */
 int input_get_right_stick_y(void)
 {
-#ifdef NXDK
     if (!g_controller) return 0;
     int value = SDL_GameControllerGetAxis(g_controller, SDL_CONTROLLER_AXIS_RIGHTY);
     if (abs(value) < STICK_DEADZONE) return 0;
     return value;
-#else
-    return 0;
-#endif
 }
 
 /*
@@ -247,12 +289,8 @@ int input_get_right_stick_y(void)
  */
 int input_get_left_trigger(void)
 {
-#ifdef NXDK
     if (!g_controller) return 0;
     return SDL_GameControllerGetAxis(g_controller, SDL_CONTROLLER_AXIS_TRIGGERLEFT);
-#else
-    return 0;
-#endif
 }
 
 /*
@@ -260,10 +298,6 @@ int input_get_left_trigger(void)
  */
 int input_get_right_trigger(void)
 {
-#ifdef NXDK
     if (!g_controller) return 0;
     return SDL_GameControllerGetAxis(g_controller, SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
-#else
-    return 0;
-#endif
 }

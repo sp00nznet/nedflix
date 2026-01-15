@@ -573,8 +573,13 @@ static void handle_state_settings(void)
     if (input_button_just_pressed(BTN_A)) {
         switch (selected) {
             case 0:  /* Server URL - show on-screen keyboard */
-                /* Copy current URL to edit buffer */
-                strncpy(url_buffer, g_app.settings.server_url, sizeof(url_buffer) - 1);
+                /* Copy current URL to edit buffer, or show placeholder if empty */
+                if (strlen(g_app.settings.server_url) > 0) {
+                    strncpy(url_buffer, g_app.settings.server_url, sizeof(url_buffer) - 1);
+                } else {
+                    /* Provide example URL as starting point for new users */
+                    strncpy(url_buffer, "http://192.168.1.", sizeof(url_buffer) - 1);
+                }
                 url_buffer[sizeof(url_buffer) - 1] = '\0';
                 /* Initialize OSK */
                 osk_init(&osk, "Enter Server URL (e.g. http://192.168.1.100:3000)", url_buffer, sizeof(url_buffer));
