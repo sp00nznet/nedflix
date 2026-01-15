@@ -86,9 +86,9 @@ if "!TOOLCHAIN_OK!"=="0" (
     echo.
 
     if "%BUILD_ENV%"=="WSL" (
-        wsl bash -c "sudo apt-get update && sudo apt-get install -y build-essential git libgmp-dev libmpfr-dev libmpc-dev flex bison texinfo && cd ~ && git clone https://github.com/Free60Project/libxenon.git 2>/dev/null || true && cd ~/libxenon/toolchain && ./build-toolchain.sh"
+        wsl bash -c "sudo apt-get update && sudo apt-get install -y build-essential git libgmp-dev libmpfr-dev libmpc-dev flex bison texinfo libelf-dev wget && cd ~ && if [ ! -d libxenon ]; then git clone --recursive https://github.com/Free60Project/libxenon.git; fi && cd ~/libxenon && if [ -f toolchain/build-toolchain.sh ]; then cd toolchain && ./build-toolchain.sh; elif [ -f build-toolchain.sh ]; then ./build-toolchain.sh; else echo 'Toolchain script not found, building manually...' && sudo mkdir -p /usr/local/xenon && cd /tmp && wget -q https://ftp.gnu.org/gnu/binutils/binutils-2.41.tar.xz && tar xf binutils-2.41.tar.xz && cd binutils-2.41 && ./configure --target=xenon --prefix=/usr/local/xenon --disable-nls --disable-werror && make -j$(nproc) && sudo make install; fi"
     ) else (
-        "%MSYS_PATH%\usr\bin\bash.exe" -lc "pacman -Syu --noconfirm && pacman -S --noconfirm --needed base-devel git gmp-devel mpfr-devel mpc-devel flex bison texinfo && cd ~ && git clone https://github.com/Free60Project/libxenon.git 2>/dev/null || true && cd ~/libxenon/toolchain && ./build-toolchain.sh"
+        "%MSYS_PATH%\usr\bin\bash.exe" -lc "pacman -Syu --noconfirm && pacman -S --noconfirm --needed base-devel git gmp-devel mpfr-devel mpc-devel flex bison texinfo libelf wget && cd ~ && if [ ! -d libxenon ]; then git clone --recursive https://github.com/Free60Project/libxenon.git; fi && cd ~/libxenon && if [ -f toolchain/build-toolchain.sh ]; then cd toolchain && ./build-toolchain.sh; elif [ -f build-toolchain.sh ]; then ./build-toolchain.sh; else echo 'Toolchain script not found in repo'; fi"
     )
 
     if !errorlevel! neq 0 (
