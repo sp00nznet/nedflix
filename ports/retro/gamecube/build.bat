@@ -2,15 +2,7 @@
 REM Nedflix GameCube Build Script for Windows
 REM
 REM TECHNICAL DEMO / NOVELTY PORT
-REM
-REM Prerequisites:
-REM   - devkitPro with devkitPPC (via MSYS2)
-REM   - MSYS2 installed at C:\msys64 or custom path
-REM
-REM Installation:
-REM   1. Install MSYS2: https://www.msys2.org/
-REM   2. In MSYS2 terminal: pacman -S dkp-pacman
-REM   3. Then: dkp-pacman -S gamecube-dev
+REM One-click build with automatic toolchain installation.
 REM
 
 setlocal enabledelayedexpansion
@@ -28,20 +20,76 @@ if exist "C:\msys32\msys2_shell.cmd" set "MSYS_PATH=C:\msys32"
 if exist "%USERPROFILE%\msys64\msys2_shell.cmd" set "MSYS_PATH=%USERPROFILE%\msys64"
 
 if "%MSYS_PATH%"=="" (
-    echo Error: MSYS2 not found!
+    echo ========================================
+    echo  MSYS2 Not Found - Installing...
+    echo ========================================
     echo.
-    echo Please install MSYS2 from https://www.msys2.org/
-    echo Then install devkitPro:
-    echo   1. Open MSYS2 terminal
-    echo   2. Run: pacman -Syu
-    echo   3. Run: pacman -S mingw-w64-x86_64-devkitPro-pacman
-    echo   4. Run: dkp-pacman -S gamecube-dev
+    echo MSYS2 is required for GameCube development.
     echo.
+    choice /C YN /M "Download and install MSYS2 automatically"
+    if !errorlevel! equ 2 (
+        echo.
+        echo Please install MSYS2 manually from https://www.msys2.org/
+        pause
+        exit /b 1
+    )
+    echo.
+    echo Downloading MSYS2 installer...
+    powershell -Command "Invoke-WebRequest -Uri 'https://github.com/msys2/msys2-installer/releases/download/2024-01-13/msys2-x86_64-20240113.exe' -OutFile '%TEMP%\msys2-installer.exe'"
+    if !errorlevel! neq 0 (
+        echo ERROR: Failed to download MSYS2. Please install manually.
+        pause
+        exit /b 1
+    )
+    echo Running MSYS2 installer...
+    "%TEMP%\msys2-installer.exe"
+    echo.
+    echo After MSYS2 installation completes, please run this script again.
     pause
-    exit /b 1
+    exit /b 0
 )
 
 echo Found MSYS2 at: %MSYS_PATH%
+
+REM Check if devkitPro is installed
+set "DEVKIT_OK=0"
+if exist "%MSYS_PATH%\opt\devkitpro\devkitPPC\bin\powerpc-eabi-gcc.exe" set "DEVKIT_OK=1"
+
+if "!DEVKIT_OK!"=="0" (
+    echo.
+    echo ========================================
+    echo  devkitPro Not Found
+    echo ========================================
+    echo.
+    echo The devkitPro GameCube toolchain needs to be installed.
+    echo This will download and install the toolchain (takes 5-10 minutes^).
+    echo.
+    choice /C YN /M "Install devkitPro GameCube toolchain automatically"
+    if !errorlevel! equ 2 (
+        echo.
+        echo Please install devkitPro manually.
+        pause
+        exit /b 1
+    )
+    echo.
+    echo Installing devkitPro GameCube toolchain...
+    echo.
+
+    REM Install devkitPro using pacman
+    "%MSYS_PATH%\usr\bin\bash.exe" -lc "pacman-key --recv BC26F752D25B92CE272E0F44F7FD5492264BB9D0 --keyserver keyserver.ubuntu.com 2>/dev/null || true && pacman-key --lsign BC26F752D25B92CE272E0F44F7FD5492264BB9D0 2>/dev/null || true && pacman -U --noconfirm https://pkg.devkitpro.org/devkitpro-keyring.pkg.tar.xz 2>/dev/null || true && echo '[dkp-libs]' >> /etc/pacman.conf && echo 'Server = https://pkg.devkitpro.org/packages' >> /etc/pacman.conf && echo '[dkp-windows]' >> /etc/pacman.conf && echo 'Server = https://pkg.devkitpro.org/packages/windows/\$arch' >> /etc/pacman.conf && pacman -Syu --noconfirm && pacman -S --noconfirm gamecube-dev"
+
+    if !errorlevel! neq 0 (
+        echo.
+        echo ERROR: Toolchain installation failed.
+        echo Check the output above for errors.
+        pause
+        exit /b 1
+    )
+    echo.
+    echo devkitPro installed successfully!
+    echo.
+)
+
 echo.
 
 :menu
