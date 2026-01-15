@@ -238,6 +238,24 @@ void ui_draw_loading(const char *message);
 void ui_draw_error(const char *message);
 void ui_draw_playback_hud(playback_state_t *state);
 
+/* On-screen keyboard */
+typedef struct {
+    char *buffer;           /* Output buffer */
+    int buffer_size;        /* Max buffer size */
+    int cursor_pos;         /* Cursor position in buffer */
+    int keyboard_row;       /* Selected row on keyboard */
+    int keyboard_col;       /* Selected column on keyboard */
+    bool active;            /* Is OSK currently active */
+    bool confirmed;         /* User pressed confirm */
+    bool cancelled;         /* User pressed cancel */
+    const char *title;      /* Title to display */
+} osk_state_t;
+
+void osk_init(osk_state_t *osk, const char *title, char *buffer, int buffer_size);
+void osk_update(osk_state_t *osk);
+void osk_draw(osk_state_t *osk);
+bool osk_is_active(osk_state_t *osk);
+
 /* input.c */
 int input_init(void);
 void input_shutdown(void);

@@ -490,9 +490,32 @@ static void handle_state_playing(void)
 
 static void handle_state_settings(void)
 {
-    ui_draw_header("Settings");
-
+    /* Static state for on-screen keyboard */
+    static osk_state_t osk;
+    static char url_buffer[MAX_URL_LENGTH];
+    static bool osk_initialized = false;
     static int selected = 0;
+
+    /* Handle OSK if active */
+    if (osk_is_active(&osk)) {
+        osk_update(&osk);
+        osk_draw(&osk);
+
+        /* Check if OSK completed */
+        if (osk.confirmed) {
+            /* Copy the edited URL back to settings */
+            strncpy(g_app.settings.server_url, url_buffer, sizeof(g_app.settings.server_url) - 1);
+            g_app.settings.server_url[sizeof(g_app.settings.server_url) - 1] = '\0';
+            osk.active = false;
+            osk_initialized = false;
+        } else if (osk.cancelled) {
+            osk.active = false;
+            osk_initialized = false;
+        }
+        return;  /* Don't process menu while OSK is active */
+    }
+
+    ui_draw_header("Settings");
 
     /* Settings menu items */
     char server_item[128];
@@ -513,10 +536,11 @@ static void handle_state_settings(void)
         volume_item,
         autoplay_item,
         subtitles_item,
+        "Reconnect to Server",
         "Save & Exit",
         "Cancel"
     };
-    int menu_count = 6;
+    int menu_count = 7;
 
     ui_draw_menu(menu_items, menu_count, selected);
 
@@ -548,14 +572,24 @@ static void handle_state_settings(void)
     /* Select action */
     if (input_button_just_pressed(BTN_A)) {
         switch (selected) {
-            case 0:  /* Server URL - would show keyboard */
-                /* TODO: Implement on-screen keyboard */
+            case 0:  /* Server URL - show on-screen keyboard */
+                /* Copy current URL to edit buffer */
+                strncpy(url_buffer, g_app.settings.server_url, sizeof(url_buffer) - 1);
+                url_buffer[sizeof(url_buffer) - 1] = '\0';
+                /* Initialize OSK */
+                osk_init(&osk, "Enter Server URL (e.g. http://192.168.1.100:3000)", url_buffer, sizeof(url_buffer));
+                osk_initialized = true;
                 break;
-            case 4:  /* Save & Exit */
+            case 4:  /* Reconnect to Server */
+                config_save(&g_app.settings);
+                api_shutdown();
+                g_app.state = STATE_CONNECTING;
+                break;
+            case 5:  /* Save & Exit */
                 config_save(&g_app.settings);
                 g_app.state = STATE_BROWSING;
                 break;
-            case 5:  /* Cancel */
+            case 6:  /* Cancel */
                 config_load(&g_app.settings);  /* Reload saved settings */
                 g_app.state = STATE_BROWSING;
                 break;

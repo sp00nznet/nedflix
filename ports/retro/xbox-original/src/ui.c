@@ -556,3 +556,226 @@ void ui_draw_playback_hud(playback_state_t *state)
         ui_draw_text_centered(SCREEN_HEIGHT / 2, "|| PAUSED ||", COLOR_WHITE);
     }
 }
+
+/*
+ * On-Screen Keyboard Implementation
+ * A simple QWERTY keyboard for entering text on Xbox with controller
+ */
+
+/* Keyboard layout - 4 character rows + 1 special row */
+static const char *g_osk_rows[] = {
+    "1234567890-=",
+    "qwertyuiop[]",
+    "asdfghjkl;'\\",
+    "zxcvbnm,./",
+    NULL  /* Special row */
+};
+
+#define OSK_SPECIAL_ROW 4
+#define OSK_KEY_SPACE     0
+#define OSK_KEY_BACKSPACE 1
+#define OSK_KEY_CLEAR     2
+#define OSK_KEY_OK        3
+#define OSK_KEY_CANCEL    4
+#define OSK_SPECIAL_COUNT 5
+
+static const char *g_osk_special_labels[] = {
+    "SPACE", "BKSP", "CLEAR", "  OK  ", "CANCEL"
+};
+
+/* Initialize on-screen keyboard */
+void osk_init(osk_state_t *osk, const char *title, char *buffer, int buffer_size)
+{
+    if (!osk || !buffer) return;
+
+    osk->buffer = buffer;
+    osk->buffer_size = buffer_size;
+    osk->cursor_pos = strlen(buffer);
+    osk->keyboard_row = 0;
+    osk->keyboard_col = 0;
+    osk->active = true;
+    osk->confirmed = false;
+    osk->cancelled = false;
+    osk->title = title ? title : "Enter Text";
+}
+
+/* Get key count for a row */
+static int osk_row_key_count(int row)
+{
+    if (row == OSK_SPECIAL_ROW) return OSK_SPECIAL_COUNT;
+    if (g_osk_rows[row]) return strlen(g_osk_rows[row]);
+    return 0;
+}
+
+/* Update OSK state based on input */
+void osk_update(osk_state_t *osk)
+{
+    if (!osk || !osk->active) return;
+
+    int row_count = 5;
+    int col_count = osk_row_key_count(osk->keyboard_row);
+
+    /* Navigation with D-pad */
+    if (input_button_just_pressed(BTN_DPAD_UP)) {
+        osk->keyboard_row = (osk->keyboard_row - 1 + row_count) % row_count;
+        int new_col_count = osk_row_key_count(osk->keyboard_row);
+        if (osk->keyboard_col >= new_col_count) osk->keyboard_col = new_col_count - 1;
+    }
+    if (input_button_just_pressed(BTN_DPAD_DOWN)) {
+        osk->keyboard_row = (osk->keyboard_row + 1) % row_count;
+        int new_col_count = osk_row_key_count(osk->keyboard_row);
+        if (osk->keyboard_col >= new_col_count) osk->keyboard_col = new_col_count - 1;
+    }
+    if (input_button_just_pressed(BTN_DPAD_LEFT)) {
+        osk->keyboard_col = (osk->keyboard_col - 1 + col_count) % col_count;
+    }
+    if (input_button_just_pressed(BTN_DPAD_RIGHT)) {
+        osk->keyboard_col = (osk->keyboard_col + 1) % col_count;
+    }
+
+    /* A button - select key */
+    if (input_button_just_pressed(BTN_A)) {
+        if (osk->keyboard_row == OSK_SPECIAL_ROW) {
+            switch (osk->keyboard_col) {
+                case OSK_KEY_SPACE:
+                    if (osk->cursor_pos < osk->buffer_size - 1) {
+                        osk->buffer[osk->cursor_pos++] = ' ';
+                        osk->buffer[osk->cursor_pos] = '\0';
+                    }
+                    break;
+                case OSK_KEY_BACKSPACE:
+                    if (osk->cursor_pos > 0) osk->buffer[--osk->cursor_pos] = '\0';
+                    break;
+                case OSK_KEY_CLEAR:
+                    osk->cursor_pos = 0;
+                    osk->buffer[0] = '\0';
+                    break;
+                case OSK_KEY_OK:
+                    osk->confirmed = true;
+                    osk->active = false;
+                    break;
+                case OSK_KEY_CANCEL:
+                    osk->cancelled = true;
+                    osk->active = false;
+                    break;
+            }
+        } else {
+            if (osk->cursor_pos < osk->buffer_size - 1) {
+                char c = g_osk_rows[osk->keyboard_row][osk->keyboard_col];
+                osk->buffer[osk->cursor_pos++] = c;
+                osk->buffer[osk->cursor_pos] = '\0';
+            }
+        }
+    }
+
+    /* B button - backspace shortcut */
+    if (input_button_just_pressed(BTN_B)) {
+        if (osk->cursor_pos > 0) osk->buffer[--osk->cursor_pos] = '\0';
+    }
+
+    /* Y button - insert colon (useful for URLs) */
+    if (input_button_just_pressed(BTN_Y)) {
+        if (osk->cursor_pos < osk->buffer_size - 1) {
+            osk->buffer[osk->cursor_pos++] = ':';
+            osk->buffer[osk->cursor_pos] = '\0';
+        }
+    }
+
+    /* Black button - insert / (useful for URLs) */
+    if (input_button_just_pressed(BTN_BLACK)) {
+        if (osk->cursor_pos < osk->buffer_size - 1) {
+            osk->buffer[osk->cursor_pos++] = '/';
+            osk->buffer[osk->cursor_pos] = '\0';
+        }
+    }
+
+    /* White button - insert . (useful for IPs) */
+    if (input_button_just_pressed(BTN_WHITE)) {
+        if (osk->cursor_pos < osk->buffer_size - 1) {
+            osk->buffer[osk->cursor_pos++] = '.';
+            osk->buffer[osk->cursor_pos] = '\0';
+        }
+    }
+
+    /* Start button - confirm */
+    if (input_button_just_pressed(BTN_START)) {
+        osk->confirmed = true;
+        osk->active = false;
+    }
+
+    /* Back button - cancel */
+    if (input_button_just_pressed(BTN_BACK)) {
+        osk->cancelled = true;
+        osk->active = false;
+    }
+}
+
+/* Draw OSK overlay */
+void osk_draw(osk_state_t *osk)
+{
+    if (!osk || !osk->active) return;
+
+    /* Semi-transparent background overlay */
+    ui_draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0xE0000000);
+
+    /* Title */
+    ui_draw_text_centered(30, osk->title, COLOR_RED);
+
+    /* Current input display with cursor */
+    ui_draw_rect(40, 60, SCREEN_WIDTH - 80, 30, COLOR_LIGHT_GRAY);
+    ui_draw_rect(42, 62, SCREEN_WIDTH - 84, 26, COLOR_BLACK);
+
+    char display_buf[MAX_URL_LENGTH + 2];
+    snprintf(display_buf, sizeof(display_buf), "%s_", osk->buffer);
+    ui_draw_text(50, 68, display_buf, COLOR_WHITE);
+
+    /* Draw keyboard rows */
+    int kb_start_y = 110;
+    int key_width = 40;
+    int key_height = 30;
+    int key_spacing = 4;
+
+    for (int row = 0; row < 4; row++) {
+        const char *row_chars = g_osk_rows[row];
+        int row_len = strlen(row_chars);
+        int row_width = row_len * (key_width + key_spacing);
+        int row_x = (SCREEN_WIDTH - row_width) / 2;
+
+        for (int col = 0; col < row_len; col++) {
+            int key_x = row_x + col * (key_width + key_spacing);
+            int key_y = kb_start_y + row * (key_height + key_spacing);
+
+            uint32_t bg_color = (osk->keyboard_row == row && osk->keyboard_col == col)
+                                ? COLOR_RED : COLOR_LIGHT_GRAY;
+            ui_draw_rect(key_x, key_y, key_width, key_height, bg_color);
+
+            char key_str[2] = { row_chars[col], '\0' };
+            ui_draw_text(key_x + 16, key_y + 8, key_str, COLOR_WHITE);
+        }
+    }
+
+    /* Special row */
+    int special_y = kb_start_y + 4 * (key_height + key_spacing) + 10;
+    int special_widths[] = { 80, 60, 60, 60, 80 };
+    int total_special_width = 0;
+    for (int i = 0; i < OSK_SPECIAL_COUNT; i++) total_special_width += special_widths[i] + key_spacing;
+    int special_x = (SCREEN_WIDTH - total_special_width) / 2;
+
+    for (int i = 0; i < OSK_SPECIAL_COUNT; i++) {
+        uint32_t bg_color = (osk->keyboard_row == OSK_SPECIAL_ROW && osk->keyboard_col == i)
+                            ? COLOR_RED : COLOR_LIGHT_GRAY;
+        ui_draw_rect(special_x, special_y, special_widths[i], key_height, bg_color);
+        ui_draw_text(special_x + 8, special_y + 8, g_osk_special_labels[i], COLOR_WHITE);
+        special_x += special_widths[i] + key_spacing;
+    }
+
+    /* Help text */
+    ui_draw_text_centered(SCREEN_HEIGHT - 60, "A:Select  B:Backspace  Y:':'  BLACK:'/'  WHITE:'.'", COLOR_TEXT_DIM);
+    ui_draw_text_centered(SCREEN_HEIGHT - 40, "START:Confirm  BACK:Cancel", COLOR_TEXT_DIM);
+}
+
+/* Check if OSK is still active */
+bool osk_is_active(osk_state_t *osk)
+{
+    return osk && osk->active;
+}

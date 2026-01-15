@@ -2,6 +2,10 @@
  * Nedflix for PlayStation 3
  * Uses PSL1GHT (open source SDK)
  *
+ * TECHNICAL DEMO / NOVELTY PORT
+ * This port demonstrates homebrew development on the PS3 using the
+ * open-source PSL1GHT SDK. Not intended for production use.
+ *
  * Hardware specs (2006):
  *   - CPU: 3.2 GHz Cell BE (1 PPE + 6 SPEs)
  *   - RAM: 256 MB XDR + 256 MB GDDR3
@@ -14,6 +18,17 @@
  *   - Full network stack
  *   - HD video output
  *   - Large storage
+ *
+ * Features in this demo:
+ *   - RSX-based UI rendering (720p/1080p)
+ *   - DualShock 3 controller input
+ *   - BSD sockets networking
+ *   - Audio streaming via Cell
+ *   - Video playback (SPE-assisted decode)
+ *
+ * Build requirements:
+ *   - PSL1GHT SDK (https://github.com/ps3dev/PSL1GHT)
+ *   - ps3toolchain
  */
 
 #ifndef NEDFLIX_PS3_H

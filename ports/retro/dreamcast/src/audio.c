@@ -180,6 +180,134 @@ void audio_shutdown(void)
     LOG("Audio shutdown");
 }
 
+/* Local WAV file state (for SD card playback via adapter) */
+static struct {
+    file_t handle;
+    bool is_open;
+    uint32_t data_offset;
+    uint32_t data_size;
+    uint32_t bytes_played;
+    int sample_rate;
+    int channels;
+    int bits_per_sample;
+} g_wav_state;
+
+/*
+ * Check if path is a local file (starts with /sd/ or /cd/)
+ */
+static bool is_local_path(const char *path)
+{
+    if (!path) return false;
+    return (strncmp(path, "/sd/", 4) == 0 ||
+            strncmp(path, "/cd/", 4) == 0 ||
+            strncmp(path, "/pc/", 4) == 0 ||
+            strncmp(path, "/ram/", 5) == 0);
+}
+
+/*
+ * Open and parse WAV file header
+ */
+static int open_wav_file(const char *path)
+{
+    uint8_t header[44];
+
+    g_wav_state.handle = fs_open(path, O_RDONLY);
+    if (g_wav_state.handle == FILEHND_INVALID) {
+        LOG_ERROR("Failed to open WAV file: %s", path);
+        return -1;
+    }
+
+    /* Read RIFF header */
+    if (fs_read(g_wav_state.handle, header, 44) != 44) {
+        LOG_ERROR("Failed to read WAV header");
+        fs_close(g_wav_state.handle);
+        return -1;
+    }
+
+    /* Verify RIFF/WAVE signature */
+    if (memcmp(header, "RIFF", 4) != 0 || memcmp(header + 8, "WAVE", 4) != 0) {
+        LOG_ERROR("Not a valid WAV file");
+        fs_close(g_wav_state.handle);
+        return -1;
+    }
+
+    /* Check for PCM format (format code 1) */
+    uint16_t audio_format = header[20] | (header[21] << 8);
+    if (audio_format != 1) {
+        LOG_ERROR("Only PCM WAV supported (format: %d)", audio_format);
+        fs_close(g_wav_state.handle);
+        return -1;
+    }
+
+    /* Parse format info */
+    g_wav_state.channels = header[22] | (header[23] << 8);
+    g_wav_state.sample_rate = header[24] | (header[25] << 8) |
+                               (header[26] << 16) | (header[27] << 24);
+    g_wav_state.bits_per_sample = header[34] | (header[35] << 8);
+
+    /* Data chunk size */
+    g_wav_state.data_size = header[40] | (header[41] << 8) |
+                             (header[42] << 16) | (header[43] << 24);
+    g_wav_state.data_offset = 44;
+    g_wav_state.bytes_played = 0;
+    g_wav_state.is_open = true;
+
+    LOG("WAV: %d Hz, %d ch, %d bit, %u bytes",
+        g_wav_state.sample_rate, g_wav_state.channels,
+        g_wav_state.bits_per_sample, g_wav_state.data_size);
+
+    /* Calculate duration */
+    uint32_t bytes_per_sec = g_wav_state.sample_rate * g_wav_state.channels *
+                              (g_wav_state.bits_per_sample / 8);
+    g_audio.duration = (double)g_wav_state.data_size / bytes_per_sec;
+
+    return 0;
+}
+
+/*
+ * Fill buffer from local WAV file
+ */
+static int fill_buffer_local(int buf_idx)
+{
+    if (!g_wav_state.is_open || g_wav_state.handle == FILEHND_INVALID) {
+        memset(g_audio.buffers[buf_idx], 0, AUDIO_BUFFER_SIZE);
+        mutex_lock(&audio_mutex);
+        g_audio.buffer_ready[buf_idx] = true;
+        mutex_unlock(&audio_mutex);
+        return 0;
+    }
+
+    /* Calculate how much to read */
+    uint32_t remaining = g_wav_state.data_size - g_wav_state.bytes_played;
+    size_t to_read = (remaining < AUDIO_BUFFER_SIZE) ? remaining : AUDIO_BUFFER_SIZE;
+
+    if (to_read == 0) {
+        /* End of file */
+        memset(g_audio.buffers[buf_idx], 0, AUDIO_BUFFER_SIZE);
+        g_audio.playing = false;
+    } else {
+        ssize_t bytes_read = fs_read(g_wav_state.handle,
+                                      g_audio.buffers[buf_idx], to_read);
+        if (bytes_read > 0) {
+            g_wav_state.bytes_played += bytes_read;
+            /* Zero-fill remainder */
+            if ((size_t)bytes_read < AUDIO_BUFFER_SIZE) {
+                memset(g_audio.buffers[buf_idx] + bytes_read, 0,
+                       AUDIO_BUFFER_SIZE - bytes_read);
+            }
+        } else {
+            memset(g_audio.buffers[buf_idx], 0, AUDIO_BUFFER_SIZE);
+            g_audio.playing = false;
+        }
+    }
+
+    mutex_lock(&audio_mutex);
+    g_audio.buffer_ready[buf_idx] = true;
+    mutex_unlock(&audio_mutex);
+
+    return AUDIO_BUFFER_SIZE;
+}
+
 /*
  * Fill audio buffer from network stream
  * This should be called from the main thread periodically
@@ -190,17 +318,38 @@ static int fill_buffer(int buf_idx)
         return 0;  /* Buffer already has data */
     }
 
-    /*
-     * In a real implementation, this would:
-     * 1. Read raw audio data from network socket
-     * 2. Decode MP3/AAC/OGG to PCM
-     * 3. Fill the buffer with decoded samples
-     *
-     * For this placeholder, we just zero the buffer (silence)
-     */
+    /* Check if we're playing a local file */
+    if (g_wav_state.is_open) {
+        return fill_buffer_local(buf_idx);
+    }
 
-    /* Simulate filling buffer */
-    memset(g_audio.buffers[buf_idx], 0, AUDIO_BUFFER_SIZE);
+    /*
+     * Network streaming:
+     * For best compatibility, the Nedflix server should transcode
+     * audio to raw PCM (44100 Hz, stereo, 16-bit) before streaming.
+     * This avoids the need for a software decoder on the DC.
+     */
+    if (g_audio.socket > 0) {
+        ssize_t bytes = recv(g_audio.socket, g_audio.buffers[buf_idx],
+                             AUDIO_BUFFER_SIZE, MSG_DONTWAIT);
+        if (bytes > 0) {
+            g_audio.bytes_received += bytes;
+            if ((size_t)bytes < AUDIO_BUFFER_SIZE) {
+                memset(g_audio.buffers[buf_idx] + bytes, 0,
+                       AUDIO_BUFFER_SIZE - bytes);
+            }
+        } else if (bytes == 0) {
+            /* Connection closed - end of stream */
+            g_audio.playing = false;
+            memset(g_audio.buffers[buf_idx], 0, AUDIO_BUFFER_SIZE);
+        } else {
+            /* Would block - fill with silence temporarily */
+            memset(g_audio.buffers[buf_idx], 0, AUDIO_BUFFER_SIZE);
+        }
+    } else {
+        /* No active source - silence */
+        memset(g_audio.buffers[buf_idx], 0, AUDIO_BUFFER_SIZE);
+    }
 
     mutex_lock(&audio_mutex);
     g_audio.buffer_ready[buf_idx] = true;
@@ -210,7 +359,7 @@ static int fill_buffer(int buf_idx)
 }
 
 /*
- * Start playing audio from URL
+ * Start playing audio from URL or local path
  */
 int audio_play(const char *url)
 {
@@ -226,15 +375,26 @@ int audio_play(const char *url)
     g_audio.position = 0.0;
     g_audio.duration = 0.0;
 
-    /*
-     * In a real implementation:
-     * 1. Open HTTP connection to streaming URL
-     * 2. Parse audio format from headers or stream
-     * 3. Initialize appropriate decoder (MP3, AAC, OGG)
-     * 4. Start filling buffers
-     */
+    /* Check if this is a local file */
+    if (is_local_path(url)) {
+        /* Local file playback - try to open as WAV */
+        if (open_wav_file(url) != 0) {
+            LOG_ERROR("Failed to open local audio file");
+            return -1;
+        }
+    } else {
+        /*
+         * Network streaming:
+         * 1. The Nedflix server should transcode to raw PCM
+         * 2. Open streaming connection
+         * 3. Start receiving audio data
+         *
+         * For network streams, duration comes from server metadata
+         */
+        g_audio.duration = 180.0;  /* Default estimate */
+    }
 
-    /* Pre-fill first buffer */
+    /* Pre-fill buffers */
     g_audio.buffer_ready[0] = false;
     g_audio.buffer_ready[1] = false;
     g_audio.current_buffer = 0;
@@ -243,17 +403,23 @@ int audio_play(const char *url)
     fill_buffer(0);
     fill_buffer(1);
 
+    /* Determine sample rate from source or use default */
+    int sample_rate = AUDIO_SAMPLE_RATE;
+    int channels = AUDIO_CHANNELS;
+
+    if (g_wav_state.is_open) {
+        sample_rate = g_wav_state.sample_rate;
+        channels = g_wav_state.channels;
+    }
+
     /* Start stream playback */
-    snd_stream_start(g_audio.stream, AUDIO_SAMPLE_RATE, AUDIO_CHANNELS - 1);
+    snd_stream_start(g_audio.stream, sample_rate, channels - 1);
 
     /* Set initial volume */
     snd_stream_volume(g_audio.stream, g_audio.volume * 255 / 100);
 
     g_audio.playing = true;
     g_audio.paused = false;
-
-    /* Estimate duration (would come from metadata in real implementation) */
-    g_audio.duration = 180.0;  /* Assume 3 minutes */
 
     return 0;
 }
@@ -263,7 +429,9 @@ int audio_play(const char *url)
  */
 void audio_stop(void)
 {
-    if (!g_audio.playing) return;
+    if (!g_audio.playing && !g_wav_state.is_open && g_audio.socket <= 0) {
+        return;
+    }
 
     LOG("Stopping audio playback");
 
@@ -285,6 +453,16 @@ void audio_stop(void)
     }
 
     mutex_unlock(&audio_mutex);
+
+    /* Close local file if open */
+    if (g_wav_state.is_open) {
+        if (g_wav_state.handle != FILEHND_INVALID) {
+            fs_close(g_wav_state.handle);
+            g_wav_state.handle = FILEHND_INVALID;
+        }
+        g_wav_state.is_open = false;
+        g_wav_state.bytes_played = 0;
+    }
 
     /* Close network connection if open */
     if (g_audio.socket > 0) {
