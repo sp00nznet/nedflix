@@ -1,202 +1,193 @@
-# Nedflix for Original Xbox (2001)
+# Nedflix for Original Xbox
 
-Build scripts for compiling Nedflix for the original Xbox console (2001).
+**TECHNICAL DEMO / NOVELTY PORT**
 
-## ⚠️ Novelty Build - Experimental
+This port demonstrates homebrew development on the original Xbox (2001) using the nxdk open-source SDK. It is not intended for production use.
 
-**IMPORTANT:** This is an experimental "for fun" build targeting 23-year-old hardware. While the Original Xbox is more capable than the Dreamcast, it still has significant limitations (64MB RAM, 733MHz CPU, DirectX 8.1) that make full modern Nedflix functionality very challenging. This build is provided for:
+## Requirements
 
-- **Retro gaming enthusiasts** and Xbox homebrew fans
-- **Educational purposes** (embedded development, DirectX 8 programming)
-- **Nostalgia projects** and preservation
-- **Technical challenge** / "because we can" projects
+**Note: This port requires a softmodded or hardmodded Xbox to run unsigned code.**
 
-**Realistic expectations:** Basic media playback might work with heavily optimized content, but don't expect HD streaming or modern codec support!
+## Hardware Specifications
 
-## Overview
+| Component | Specification |
+|-----------|---------------|
+| CPU | 733 MHz Intel Pentium III |
+| RAM | 64 MB DDR SDRAM |
+| GPU | 233 MHz NVIDIA NV2A (DirectX 8.1) |
+| Network | 10/100 Mbps Ethernet (built-in) |
+| Storage | 8-10 GB internal HDD |
 
-The original Xbox was a gaming console released by Microsoft in 2001. It featured:
-- **CPU**: 733 MHz Intel Pentium III "Coppermine-based" processor
-- **GPU**: 233 MHz NVIDIA NV2A (DirectX 8.1)
-- **RAM**: 64 MB DDR SDRAM
-- **Storage**: 8/10 GB internal HDD
-- **OS**: Modified Windows 2000 kernel
+## Design Rationale
 
-## Versions
+### Why Original Xbox?
 
-### Client Version
-- **Purpose**: Connect to remote Nedflix server
-- **Network**: Required for streaming
-- **Authentication**: OAuth/Local supported
-- **Use case**: Access your media library over home network
+The original Xbox (2001) is the most capable 6th-generation console for homebrew:
 
-### Desktop Version
-- **Purpose**: Standalone media player
-- **Network**: Not required (offline mode)
-- **Authentication**: None (direct access)
-- **Use case**: Play media from Xbox HDD or connected USB drives
+1. **Built-in Ethernet**: Every Xbox has 10/100 Mbps networking, enabling true client/server operation.
 
-## Build Requirements
+2. **Substantial RAM**: 64 MB is enough for reasonable video buffering.
 
-### Development Environment
-1. **nxdk Toolchain**
-   - Open Xbox Development Kit
-   - Download: https://github.com/XboxDev/nxdk
-   - Set `NXDK_DIR` environment variable
+3. **x86 Architecture**: Standard PC-like architecture is familiar to developers.
 
-2. **Dependencies**
-   - SDL 1.2 for Xbox
-   - DirectX 8.1 libraries
-   - Mongoose HTTP server (for Desktop mode)
-   - DirectShow filters
+4. **Internal HDD**: Persistent storage without memory cards.
 
-### System Requirements
-- Linux or Windows with WSL
-- GCC cross-compiler for i686-xbox
-- 500MB free disk space
+5. **Active Scene**: nxdk is maintained and XBMC proved the platform's media capabilities.
+
+### Implementation Choices
+
+**DirectX 8.1 Rendering**
+
+We use the NV2A GPU via DirectX 8.1:
+- Hardware-accelerated 2D/3D rendering
+- Well-documented API
+- Sufficient for UI at 480p/720p
+
+**Full Network Client**
+
+Unlike other 6th-gen consoles, Xbox can be a full streaming client:
+- BSD-like socket API
+- HTTP client for API communication
+- Audio/video streaming over network
+- No rare accessories needed
+
+**HDD Storage**
+
+With an internal hard drive:
+- Settings saved to E:\ or F:\ partitions
+- Can cache media metadata
+- No memory card management
+
+**On-Screen Keyboard**
+
+For server URL entry:
+- Virtual keyboard navigable with controller
+- IP address and credential input
+- Saved to HDD for next session
+
+### What This Port Can Do
+
+- **Network streaming** via built-in Ethernet
+- **Video playback** at 480p (with limitations)
+- **Audio playback** (MP3, WMA, AAC)
+- **Full HD UI** at 480p/720p/1080i
+- **Xbox controller** input
+- **Persistent settings** on HDD
+
+### Limitations
+
+1. **Softmod Required**: No official way to run unsigned code.
+
+2. **No H.264**: Hardware only supports older codecs (MPEG-4, XviD, DivX).
+
+3. **64 MB RAM**: Limits HD video quality.
+
+4. **DirectX 8.1**: No shader model 2.0 or later.
 
 ## Building
 
-### Windows (Recommended)
+### Prerequisites
 
-Run the interactive build script:
-```cmd
-cd xbox-original
-build.bat
-```
+1. **nxdk toolchain**:
+   ```bash
+   git clone --recursive https://github.com/XboxDev/nxdk
+   cd nxdk
+   ./setup.sh
+   ```
 
-The menu provides options for:
-- Client builds (Debug/Release)
-- Desktop builds (Debug/Release)
-- Creating XBE packages
-- Installing nxdk toolchain
+2. **Environment setup**:
+   ```bash
+   export NXDK_DIR=/path/to/nxdk
+   ```
 
-### Linux/macOS
+### Build Commands
 
-Use the Unix build script:
 ```bash
-cd xbox-original
-chmod +x build.sh
+# Linux/macOS
 ./build.sh
+
+# Windows
+build.bat
+
+# Clean
+./build.sh clean
 ```
 
-Or build directly with make:
-```bash
-export NXDK_DIR=/path/to/nxdk
-cd xbox-original/src
-make CLIENT=1          # Client version
-make CLIENT=0          # Desktop version
-make DEBUG=1 CLIENT=1  # Debug client
-```
+### Output
 
-Output: `src/default.xbe`
+- `default.xbe` - Xbox executable
 
 ## Deployment
 
-### Prerequisites
-1. Modded Xbox with custom dashboard (EvolutionX, UnleashX, or XBMC)
-2. FTP access enabled
-3. Network connection (for Client version)
+### Via FTP
 
-### Installation Steps
-1. **Transfer XBE to Xbox**
-   ```bash
-   # FTP to your Xbox
-   ftp <xbox-ip>
-   # Login: xbox / xbox (default)
-   cd E:\Apps
-   mkdir Nedflix
-   cd Nedflix
-   put nedflix-client.xbe  # or nedflix-desktop.xbe
-   ```
+1. Enable FTP on your modded Xbox (UnleashX, XBMC, etc.)
+2. Connect: `ftp <xbox-ip>` (default: xbox/xbox)
+3. Upload to `E:\Apps\Nedflix\default.xbe`
+4. Launch from dashboard
 
-2. **Launch Application**
-   - Boot Xbox to dashboard
-   - Navigate to Apps > Nedflix
-   - Launch the XBE file
+### Via USB
 
-3. **First-Time Setup**
-   - **Client**: Enter your Nedflix server URL and credentials
-   - **Desktop**: Configure local media paths (E:\ or F:\ drives)
+1. Copy `default.xbe` to USB drive
+2. Use file manager on Xbox to copy to HDD
+3. Launch from Apps menu
 
-## Features
+### Directory Structure
 
-### Supported Features
-- Video playback (MPEG-4, XviD, DivX)
-- Audio playback (MP3, WMA, AAC)
-- Gamepad navigation (Xbox controller)
-- Network streaming (Client version)
-- Local media playback (Desktop version)
-- Resolution support: 480i/480p/720p/1080i
-- Surround sound (Dolby Digital 5.1)
+```
+E:\Apps\Nedflix\
+├── default.xbe
+└── config.dat    (created on first run)
+```
 
-### Limitations
-- 64 MB RAM limits HD video quality
-- No hardware H.264 decoding
-- Maximum 1080i output resolution
-- Limited to DirectX 8.1 capabilities
+## Controls
 
-## Troubleshooting
+| Button | Action |
+|--------|--------|
+| A | Select / Play-Pause |
+| B | Back / Stop |
+| X | Play/Pause (alternate) |
+| D-Pad Up/Down | Navigate |
+| D-Pad Left/Right | Adjust volume |
+| L/R Triggers | Switch library / Seek |
+| Left Stick | Navigate / Scroll |
+| Right Stick | Seek (during playback) |
+| Start | Settings |
+| Back | Open keyboard |
 
-### Build Issues
-- **"NXDK_DIR not set"**: Export the nxdk installation path
-  ```bash
-  export NXDK_DIR=/path/to/nxdk
-  ```
+## Configuration
 
-- **Missing dependencies**: Install nxdk dependencies
-  ```bash
-  cd $NXDK_DIR
-  ./setup.sh
-  ```
+On first run, you'll be prompted to enter:
+- Server URL (e.g., `http://192.168.1.100:3000`)
+- Username and password (if required)
 
-### Runtime Issues
-- **"Unable to connect"** (Client): Check network connection and server URL
-- **"No media found"** (Desktop): Ensure media is in E:\ or F:\ drives
-- **Black screen**: Check video output settings (480p/720p/1080i)
+Settings are stored in `config.dat` on the HDD.
 
-## Technical Details
+## Known Issues
 
-### Architecture
-- **Binary Format**: XBE (Xbox Executable)
-- **Compiler**: GCC i686-xbox target
-- **Graphics API**: DirectX 8.1
-- **Audio API**: DirectSound
-- **Input**: Xbox controller via XInput
+1. Some HTTPS servers may not work (limited SSL support)
+2. High-bitrate video may stutter
+3. Network configuration is DHCP only
+4. Some video codecs require transcoding
 
-### Desktop Mode Implementation
-- **HTTP Server**: Mongoose (lightweight, ~60KB)
-- **Port**: 3000 (localhost)
-- **Web UI**: Embedded in XBE resources
-- **API**: RESTful endpoints for media browsing/playback
-- **Storage**: FATX filesystem (E:\ and F:\ partitions)
+## Why Xbox is Best 6th-Gen Port
 
-### Client Mode Implementation
-- **Protocol**: HTTP/HTTPS
-- **Streaming**: Progressive download + buffering
-- **Authentication**: OAuth 2.0 or local credentials
-- **Network**: 10/100 Ethernet
+| Feature | Dreamcast | GameCube | Xbox |
+|---------|-----------|----------|------|
+| Network | Rare | No | Yes |
+| RAM | 16 MB | 24 MB | 64 MB |
+| Storage | VMU | MemCard | HDD |
+| Video | No | No | Yes |
+| CPU | 200 MHz | 485 MHz | 733 MHz |
 
-## Development Notes
+The original Xbox is the only 6th-generation console where a full media streaming client is practical.
 
-This is a **novelty build** for the original Xbox platform. While the build scripts are provided and simulate the build process, a full implementation would require:
+## Resources
 
-1. Complete C/C++ codebase targeting Xbox platform
-2. DirectX 8.1 renderer for UI
-3. DirectShow filter integration for media playback
-4. Custom memory management (64MB constraint)
-5. FATX filesystem drivers for local storage
-6. Network stack for streaming (Client version)
+- [nxdk](https://github.com/XboxDev/nxdk)
+- [XboxDev Wiki](https://xboxdevwiki.net/)
+- [XBMC4Xbox](https://github.com/Rocky5/XBMC4Xbox)
 
-The original Xbox homebrew scene has limited modern development activity, but projects like XBMC (now Kodi) demonstrated the platform's media capabilities.
+## Legal Notice
 
-## References
-
-- nxdk: https://github.com/XboxDev/nxdk
-- Original Xbox specs: https://en.wikipedia.org/wiki/Xbox_(console)
-- XboxDev Wiki: https://xboxdevwiki.net/
-- XBMC4Xbox: https://github.com/Rocky5/XBMC4Xbox
-
-## License
-
-Same as parent Nedflix project.
+This software is provided for educational purposes. Running homebrew on Xbox requires modification which may void warranty. We do not condone piracy.
