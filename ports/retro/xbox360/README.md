@@ -2,11 +2,29 @@
 
 **TECHNICAL DEMO / NOVELTY PORT**
 
-This port demonstrates homebrew development on the Xbox 360 using the libxenon SDK from the Free60 project. It is not intended for production use.
+This port demonstrates homebrew development on the Xbox 360 using the libxenon SDK from the Free60 project. It produces a XEX file that can run on the **Xenia emulator** or on JTAG/RGH modified consoles.
+
+## Quick Start (Xenia Emulator)
+
+```bash
+# Install toolchain (first time only)
+./build.sh install
+
+# Build XEX file
+./build.sh
+
+# Output: nedflix.xex - Open with Xenia Canary
+```
 
 ## Requirements
 
-**WARNING: This port requires a JTAG/RGH modified Xbox 360 console.**
+### For Xenia Emulator (Recommended for Testing)
+- [Xenia Canary](https://xenia.jp/) - Xbox 360 emulator
+- No hardware modification required
+- Works on Windows, Linux (via Wine/Proton)
+
+### For Real Hardware
+**WARNING: This requires a JTAG/RGH modified Xbox 360 console.**
 
 Running unsigned code on an Xbox 360 requires hardware modification. This is for educational and hobbyist purposes only.
 
@@ -20,67 +38,21 @@ Running unsigned code on an Xbox 360 requires hardware modification. This is for
 | Network | 100 Mbps Ethernet, WiFi (later models) |
 | Storage | HDD 20-250 GB, USB |
 
-## Design Rationale
-
-### Why Xbox 360?
-
-The Xbox 360 (2005) represents an interesting target for homebrew:
-
-1. **Powerful Hardware**: The tri-core Xenon CPU with VMX128 extensions and unified memory architecture makes it capable of media streaming.
-
-2. **Network Connectivity**: Built-in Ethernet (and WiFi on later models) enables true client/server operation.
-
-3. **Modern Architecture**: PowerPC architecture is well-documented and toolchains exist.
-
-4. **Active Homebrew Scene**: The Free60 project provides libxenon, a functional homebrew SDK.
-
-### Implementation Choices
-
-**Graphics: Framebuffer Mode**
-
-We use Xenos in framebuffer mode rather than full 3D rendering because:
-- libxenon's GPU support is limited compared to the official XDK
-- Xenos shader documentation is incomplete
-- Framebuffer rendering is simpler and more reliable for UI
-
-**Audio: Software Streaming**
-
-The XMA hardware decoder isn't accessible via libxenon, so we:
-- Use software PCM playback
-- Stream audio from the server pre-decoded
-- Focus on audio-first experience
-
-**Network: lwIP Stack**
-
-libxenon includes lwIP which provides:
-- Standard BSD socket API
-- DHCP client
-- HTTP client capability
-
-### Limitations
-
-1. **Hardware Modification Required**: No way around this - the Xbox 360 has robust security.
-
-2. **No XMA Decode**: We can't use the hardware audio decoder, limiting compressed audio support.
-
-3. **Limited GPU Access**: Complex rendering requires reverse-engineered shader knowledge.
-
-4. **No Video Playback**: Without XMA/hardware decode, video would require significant CPU resources.
-
-### What Works
-
-- UI rendering at 720p
-- Xbox 360 controller input (wired USB)
-- Network initialization via DHCP
-- HTTP client for API communication
-- Audio streaming (PCM)
-- Configuration save to USB
-
 ## Building
 
-### Prerequisites
+### Automatic Installation (Recommended)
 
-1. **libxenon toolchain**:
+```bash
+# Install libxenon toolchain automatically
+./build.sh install
+
+# Build XEX for Xenia
+./build.sh
+```
+
+### Manual Installation
+
+1. **Install libxenon toolchain**:
    ```bash
    git clone https://github.com/Free60Project/libxenon
    cd libxenon/toolchain
@@ -93,35 +65,63 @@ libxenon includes lwIP which provides:
    export PATH=$DEVKITXENON/bin:$PATH
    ```
 
+3. **Build**:
+   ```bash
+   ./build.sh
+   ```
+
 ### Build Commands
 
 ```bash
-# Build
-./build.sh
-
-# Clean
-./build.sh clean
+./build.sh              # Build XEX file for Xenia/Xbox 360
+./build.sh install      # Install libxenon toolchain
+./build.sh xex          # Rebuild XEX only (skip compile if ELF exists)
+./build.sh clean        # Clean build artifacts
+./build.sh help         # Show help
 ```
 
-### Output
+### Output Files
 
-- `nedflix.elf` - Main executable
-- `nedflix.elf32` - 32-bit variant for some loaders
+| File | Description |
+|------|-------------|
+| `nedflix.elf` | PowerPC ELF executable |
+| `nedflix.elf32` | 32-bit ELF for XeLL loader |
+| `nedflix.xex` | **Xbox 360 executable for Xenia** |
 
-## Deployment
+## Running on Xenia
 
-1. Copy `nedflix.elf32` to a USB drive
-2. Optionally rename to `default.xex`
+1. Download [Xenia Canary](https://xenia.jp/) (recommended over master branch)
+2. Extract and run `xenia_canary.exe`
+3. File → Open → Select `nedflix.xex`
+4. The app should boot and display the UI
+
+### Xenia Configuration Tips
+
+For best experience in Xenia:
+- Enable "Vsync" for smooth rendering
+- Set resolution to 720p or 1080p
+- Use an Xbox controller or configure keyboard mapping
+
+## Deployment to Real Hardware
+
+### JTAG/RGH Console
+
+1. Copy `nedflix.xex` to USB drive
+2. Create directory structure:
+   ```
+   USB:/
+   └── Apps/
+       └── Nedflix/
+           └── default.xex    (rename nedflix.xex)
+   ```
 3. Boot your JTAG/RGH Xbox 360
-4. Launch via XeLL or a dashboard that supports ELF loading
+4. Launch from FreeStyle, Aurora, or XeLL
 
-### USB Directory Structure
+### XeLL Boot
 
-```
-USB:/
-└── nedflix/
-    └── config.dat    (created automatically)
-```
+If using XeLL directly:
+1. Place `nedflix.elf32` on USB root
+2. XeLL will auto-detect and offer to boot
 
 ## Controls
 
@@ -137,18 +137,104 @@ USB:/
 | Back | Settings |
 | Guide | Settings |
 
-## Known Issues
+## Architecture
 
-1. Controller support requires wired USB controller
-2. Network may take several seconds to initialize
-3. No persistent storage without USB drive
+### Design Rationale
+
+**Graphics: Framebuffer Mode**
+- Uses Xenos in framebuffer mode for simplicity
+- 720p rendering at 60fps
+- Compatible with Xenia's GPU emulation
+
+**Audio: PCM Streaming**
+- Software PCM playback (no XMA hardware access)
+- Streams from server pre-decoded
+- Works in both Xenia and real hardware
+
+**Network: lwIP Stack**
+- Standard BSD socket API
+- DHCP client support
+- HTTP client for API communication
+
+### What Works
+
+- UI rendering at 720p
+- Xbox 360 controller input
+- Network initialization via DHCP
+- HTTP client for API communication
+- Audio streaming (PCM)
+- Configuration persistence
+
+### Limitations
+
+1. **XMA Decode**: Hardware audio decoder not accessible
+2. **GPU Shaders**: Limited to framebuffer mode
+3. **Video Playback**: Would require significant CPU resources
+
+## Troubleshooting
+
+### Xenia Issues
+
+| Problem | Solution |
+|---------|----------|
+| Black screen | Try Xenia Canary instead of master |
+| Controller not working | Check Xenia input settings |
+| Crash on boot | Verify XEX was built correctly |
+| Network timeout | Check firewall settings |
+
+### Build Issues
+
+| Problem | Solution |
+|---------|----------|
+| `DEVKITXENON not set` | Run `./build.sh install` |
+| `xenon-gcc not found` | Ensure PATH includes $DEVKITXENON/bin |
+| Python errors | Install Python 3: `apt install python3` |
+
+## Development
+
+### Source Structure
+
+```
+xbox360/
+├── build.sh         # Build script with XEX creation
+├── Makefile         # libxenon makefile
+├── README.md        # This file
+└── src/
+    ├── main.c       # Application entry point
+    ├── ui.c         # Xenos framebuffer UI
+    ├── input.c      # Controller handling
+    ├── audio.c      # PCM audio playback
+    ├── network.c    # lwIP networking
+    ├── api.c        # Server API client
+    ├── config.c     # Settings persistence
+    ├── json.c       # JSON parser
+    └── nedflix.h    # Shared header
+```
+
+### Building for Development
+
+```bash
+# Quick rebuild after code changes
+make -j$(nproc)
+./build.sh xex
+
+# Full clean rebuild
+./build.sh clean
+./build.sh
+```
 
 ## Resources
 
-- [Free60 Project](https://free60.org/)
-- [libxenon GitHub](https://github.com/Free60Project/libxenon)
-- [Xbox 360 Homebrew Wiki](https://www.yourwikiname.com)
+- [Xenia Emulator](https://xenia.jp/) - Xbox 360 emulator
+- [Free60 Project](https://free60.org/) - Xbox 360 homebrew wiki
+- [libxenon GitHub](https://github.com/Free60Project/libxenon) - Homebrew SDK
+- [Xenia Compatibility List](https://github.com/xenia-project/game-compatibility)
 
 ## Legal Notice
 
-This software is provided for educational purposes. Using homebrew on Xbox 360 requires hardware modification which may void your warranty. We do not condone piracy or circumvention of copy protection for commercial games.
+This software is provided for educational purposes.
+
+- **Xenia**: Legal to use with homebrew and games you own
+- **Real Hardware**: Requires JTAG/RGH modification (may void warranty)
+
+We do not condone piracy or circumvention of copy protection for commercial games.
