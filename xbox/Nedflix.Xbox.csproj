@@ -14,7 +14,7 @@
     <WindowsPackageType>MSIX</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <SelfContained>true</SelfContained>
-    <ApplicationIcon>Assets\nedflix.ico</ApplicationIcon>
+    <!-- MSIX apps use PNG assets from Package.appxmanifest instead of .ico -->
     <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
     <AppxAutoIncrementPackageRevision>True</AppxAutoIncrementPackageRevision>
     <AppxSymbolPackageEnabled>False</AppxSymbolPackageEnabled>
