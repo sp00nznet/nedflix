@@ -53,11 +53,10 @@ namespace Nedflix.Xbox
         /// </summary>
         private void ConfigureForXbox()
         {
-            // Enable gamepad focus navigation
-            this.RequiresPointerMode = ApplicationRequiresPointerMode.WhenRequested;
-
-            // Set focus engagement mode for better gamepad experience
-            this.FocusVisualKind = FocusVisualKind.Reveal;
+            // In WinUI 3 / Windows App SDK, gamepad focus navigation is enabled
+            // by default when running on Xbox. Focus visuals and pointer mode
+            // are configured at the element level rather than the application level.
+            // Xbox-specific UI optimizations are applied in MainWindow.
         }
 
         /// <summary>
