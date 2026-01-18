@@ -85,6 +85,9 @@ namespace Nedflix.Xbox
 #else
             // Client mode: Load saved server URL
             LoadSettings();
+
+            // Yield to ensure UI updates before WebView initialization
+            await Task.Yield();
 #endif
             // Initialize WebView2
             InitializeWebViewAsync();
