@@ -1,24 +1,25 @@
 /*
- * Nedflix PS3 - Audio playback system
- * Fully functional implementation with HTTP streaming and PS3 audio output
+ * Nedflix Nintendo Switch - Audio playback system
+ * Full implementation with streaming and audren
  */
 
 #include "nedflix.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <audio/audio.h>
-#include <sys/thread.h>
-#include <sys/mutex.h>
+#include <switch.h>
 
 /* Audio configuration */
 #define AUDIO_SAMPLE_RATE   48000
 #define AUDIO_CHANNELS      2
-#define AUDIO_SAMPLES       1024
-#define AUDIO_BLOCK_SIZE    (AUDIO_SAMPLES * AUDIO_CHANNELS * sizeof(int16_t))
+#define AUDIO_SAMPLE_SIZE   sizeof(int16_t)
+#define AUDIO_FRAME_SIZE    (AUDIO_CHANNELS * AUDIO_SAMPLE_SIZE)
+#define AUDIO_BUFFER_FRAMES 2048
+#define AUDIO_BUFFER_SIZE   (AUDIO_BUFFER_FRAMES * AUDIO_FRAME_SIZE)
+#define NUM_AUDIO_BUFFERS   4
 
-/* Ring buffer for audio data */
-#define RING_BUFFER_SIZE    (AUDIO_BUFFER_SIZE)
+/* Ring buffer for streaming */
+#define RING_BUFFER_SIZE    (256 * 1024)  /* 256KB ring buffer */
 
 typedef struct {
     uint8_t *data;
@@ -26,7 +27,7 @@ typedef struct {
     size_t read_pos;
     size_t write_pos;
     size_t available;
-    sys_mutex_t mutex;
+    Mutex mutex;
 } ring_buffer_t;
 
 /* Audio state */
@@ -45,29 +46,33 @@ static struct {
     int channels;
     int bitrate;
 
-    /* Buffers */
+    /* Audio buffers */
+    AudioDriverWaveBuf wave_bufs[NUM_AUDIO_BUFFERS];
+    int16_t *sample_buffers[NUM_AUDIO_BUFFERS];
+    int current_buffer;
+
+    /* Ring buffer for streaming */
     ring_buffer_t ring;
-    int16_t *decode_buffer;
-    size_t decode_size;
 
     /* Volume */
     int volume;
     float volume_scale;
 
-    /* Threading */
-    sys_ppu_thread_t stream_thread;
-    sys_ppu_thread_t decode_thread;
-    bool threads_running;
+    /* Audren */
+    AudioDriver drv;
+    int mem_pool_id;
+    void *mem_pool;
+    size_t mem_pool_size;
 
-    /* PS3 audio port */
-    u32 audio_port;
-    audioPortConfig port_config;
+    /* Threading */
+    Thread stream_thread;
+    bool thread_running;
 } audio_state;
 
 /* Initialize ring buffer */
 static int ring_init(ring_buffer_t *rb, size_t size)
 {
-    rb->data = malloc(size);
+    rb->data = aligned_alloc(0x1000, size);
     if (!rb->data) return -1;
 
     rb->size = size;
@@ -75,7 +80,7 @@ static int ring_init(ring_buffer_t *rb, size_t size)
     rb->write_pos = 0;
     rb->available = 0;
 
-    sysMutexCreate(&rb->mutex, NULL);
+    mutexInit(&rb->mutex);
     return 0;
 }
 
@@ -86,13 +91,12 @@ static void ring_free(ring_buffer_t *rb)
         free(rb->data);
         rb->data = NULL;
     }
-    sysMutexDestroy(rb->mutex);
 }
 
 /* Write to ring buffer */
 static size_t ring_write(ring_buffer_t *rb, const void *data, size_t len)
 {
-    sysMutexLock(rb->mutex, 0);
+    mutexLock(&rb->mutex);
 
     size_t free_space = rb->size - rb->available;
     if (len > free_space) len = free_space;
@@ -110,14 +114,14 @@ static size_t ring_write(ring_buffer_t *rb, const void *data, size_t len)
     rb->write_pos = (rb->write_pos + len) % rb->size;
     rb->available += len;
 
-    sysMutexUnlock(rb->mutex);
+    mutexUnlock(&rb->mutex);
     return len;
 }
 
 /* Read from ring buffer */
 static size_t ring_read(ring_buffer_t *rb, void *data, size_t len)
 {
-    sysMutexLock(rb->mutex, 0);
+    mutexLock(&rb->mutex);
 
     if (len > rb->available) len = rb->available;
 
@@ -134,20 +138,20 @@ static size_t ring_read(ring_buffer_t *rb, void *data, size_t len)
     rb->read_pos = (rb->read_pos + len) % rb->size;
     rb->available -= len;
 
-    sysMutexUnlock(rb->mutex);
+    mutexUnlock(&rb->mutex);
     return len;
 }
 
 /* Get buffer fill percentage */
 static int ring_percent(ring_buffer_t *rb)
 {
-    sysMutexLock(rb->mutex, 0);
+    mutexLock(&rb->mutex);
     int percent = (rb->available * 100) / rb->size;
-    sysMutexUnlock(rb->mutex);
+    mutexUnlock(&rb->mutex);
     return percent;
 }
 
-/* Streaming thread - fetches data from network */
+/* Streaming thread function */
 static void stream_thread_func(void *arg)
 {
     (void)arg;
@@ -157,28 +161,26 @@ static void stream_thread_func(void *arg)
     if (http_stream_start(audio_state.url) != 0) {
         printf("Failed to start HTTP stream\n");
         audio_state.buffering = false;
-        sysThreadExit(0);
         return;
     }
 
     uint8_t *buffer = malloc(32768);
     if (!buffer) {
         http_stream_stop();
-        sysThreadExit(0);
         return;
     }
 
     audio_state.buffering = true;
 
-    while (audio_state.threads_running && !audio_state.stop_requested) {
+    while (audio_state.thread_running && !audio_state.stop_requested) {
         /* Check if buffer has space */
-        sysMutexLock(audio_state.ring.mutex, 0);
+        mutexLock(&audio_state.ring.mutex);
         size_t free_space = audio_state.ring.size - audio_state.ring.available;
-        sysMutexUnlock(audio_state.ring.mutex);
+        mutexUnlock(&audio_state.ring.mutex);
 
         if (free_space < 32768) {
             /* Buffer full, wait */
-            usleep(10000);
+            svcSleepThread(10000000);  /* 10ms */
             continue;
         }
 
@@ -197,45 +199,35 @@ static void stream_thread_func(void *arg)
             break;
         } else {
             /* Error or timeout, retry */
-            usleep(50000);
+            svcSleepThread(50000000);  /* 50ms */
         }
     }
 
     free(buffer);
     http_stream_stop();
     printf("Audio stream thread ended\n");
-    sysThreadExit(0);
 }
 
-/* Audio output callback - called by PS3 audio system */
-static void audio_callback(void)
+/* Fill audio buffer from ring buffer */
+static void fill_audio_buffer(int buf_idx)
 {
-    if (!audio_state.playing || audio_state.paused) {
-        /* Output silence */
-        return;
-    }
-
-    /* Read from ring buffer */
-    int16_t samples[AUDIO_SAMPLES * 2];
-    size_t needed = sizeof(samples);
+    int16_t *samples = audio_state.sample_buffers[buf_idx];
+    size_t needed = AUDIO_BUFFER_SIZE;
     size_t got = ring_read(&audio_state.ring, samples, needed);
 
     if (got < needed) {
-        /* Underrun - fill rest with silence */
+        /* Fill rest with silence */
         memset((uint8_t*)samples + got, 0, needed - got);
         audio_state.buffering = true;
     }
 
     /* Apply volume */
-    for (int i = 0; i < AUDIO_SAMPLES * 2; i++) {
+    for (size_t i = 0; i < AUDIO_BUFFER_FRAMES * AUDIO_CHANNELS; i++) {
         samples[i] = (int16_t)(samples[i] * audio_state.volume_scale);
     }
 
-    /* Update position */
-    audio_state.position_ms += (AUDIO_SAMPLES * 1000) / audio_state.sample_rate;
-
-    /* Output to audio port */
-    /* In real implementation: copy to audio port buffer */
+    /* Flush cache for DMA */
+    armDCacheFlush(samples, AUDIO_BUFFER_SIZE);
 }
 
 /* Initialize audio subsystem */
@@ -251,35 +243,71 @@ int audio_init(void)
 
     /* Initialize ring buffer */
     if (ring_init(&audio_state.ring, RING_BUFFER_SIZE) != 0) {
-        printf("Failed to allocate audio buffer\n");
+        printf("Failed to allocate ring buffer\n");
         return -1;
     }
 
-    /* Allocate decode buffer */
-    audio_state.decode_buffer = malloc(AUDIO_BLOCK_SIZE * 4);
-    if (!audio_state.decode_buffer) {
+    /* Allocate memory pool for audio */
+    audio_state.mem_pool_size = (AUDIO_BUFFER_SIZE * NUM_AUDIO_BUFFERS + 0xFFF) & ~0xFFF;
+    audio_state.mem_pool = aligned_alloc(0x1000, audio_state.mem_pool_size);
+    if (!audio_state.mem_pool) {
+        printf("Failed to allocate audio memory pool\n");
+        ring_free(&audio_state.ring);
+        return -1;
+    }
+    memset(audio_state.mem_pool, 0, audio_state.mem_pool_size);
+
+    /* Set up sample buffer pointers */
+    uint8_t *pool_ptr = audio_state.mem_pool;
+    for (int i = 0; i < NUM_AUDIO_BUFFERS; i++) {
+        audio_state.sample_buffers[i] = (int16_t*)pool_ptr;
+        pool_ptr += AUDIO_BUFFER_SIZE;
+    }
+
+    /* Initialize audren */
+    static const AudioRendererConfig arConfig = {
+        .output_rate     = AudioRendererOutputRate_48kHz,
+        .num_voices      = 4,
+        .num_effects     = 0,
+        .num_sinks       = 1,
+        .num_mix_objs    = 1,
+        .num_mix_buffers = 2,
+    };
+
+    Result rc = audrenInitialize(&arConfig);
+    if (R_FAILED(rc)) {
+        printf("audrenInitialize failed: 0x%x\n", rc);
+        free(audio_state.mem_pool);
         ring_free(&audio_state.ring);
         return -1;
     }
 
-    /* Initialize PS3 audio */
-    audioInit();
-
-    /* Configure audio port */
-    audioPortParam params;
-    params.numChannels = AUDIO_CHANNELS;
-    params.numBlocks = 8;
-    params.attrib = 0;
-    params.level = 1.0f;
-
-    int ret = audioPortOpen(&params, &audio_state.audio_port);
-    if (ret != 0) {
-        printf("Failed to open audio port: %d\n", ret);
-        /* Non-fatal - continue anyway */
+    /* Create audio driver */
+    rc = audrvCreate(&audio_state.drv, &arConfig, 2);
+    if (R_FAILED(rc)) {
+        printf("audrvCreate failed: 0x%x\n", rc);
+        audrenExit();
+        free(audio_state.mem_pool);
+        ring_free(&audio_state.ring);
+        return -1;
     }
 
-    audioGetPortConfig(audio_state.audio_port, &audio_state.port_config);
-    audioPortStart(audio_state.audio_port);
+    /* Add memory pool */
+    audio_state.mem_pool_id = audrvMemPoolAdd(&audio_state.drv, audio_state.mem_pool,
+                                               audio_state.mem_pool_size);
+    audrvMemPoolAttach(&audio_state.drv, audio_state.mem_pool_id);
+
+    /* Configure output sink */
+    static const u8 sink_channels[] = {0, 1};
+    audrvDeviceSinkAdd(&audio_state.drv, AUDREN_DEFAULT_DEVICE_NAME, 2, sink_channels);
+
+    /* Start audio renderer */
+    rc = audrvUpdate(&audio_state.drv);
+    if (R_FAILED(rc)) {
+        printf("audrvUpdate failed: 0x%x\n", rc);
+    }
+
+    audrenStartAudioRenderer();
 
     audio_state.initialized = true;
     printf("Audio initialized\n");
@@ -295,15 +323,13 @@ void audio_shutdown(void)
 
     audio_stop();
 
-    if (audio_state.audio_port) {
-        audioPortStop(audio_state.audio_port);
-        audioPortClose(audio_state.audio_port);
-    }
-    audioQuit();
+    /* Cleanup audren */
+    audrvClose(&audio_state.drv);
+    audrenExit();
 
-    if (audio_state.decode_buffer) {
-        free(audio_state.decode_buffer);
-        audio_state.decode_buffer = NULL;
+    if (audio_state.mem_pool) {
+        free(audio_state.mem_pool);
+        audio_state.mem_pool = NULL;
     }
 
     ring_free(&audio_state.ring);
@@ -329,18 +355,40 @@ int audio_play_stream(const char *url)
     audio_state.duration_ms = 0;
     audio_state.buffering = true;
     audio_state.stop_requested = false;
-    audio_state.threads_running = true;
+    audio_state.thread_running = true;
 
     /* Clear ring buffer */
-    sysMutexLock(audio_state.ring.mutex, 0);
+    mutexLock(&audio_state.ring.mutex);
     audio_state.ring.read_pos = 0;
     audio_state.ring.write_pos = 0;
     audio_state.ring.available = 0;
-    sysMutexUnlock(audio_state.ring.mutex);
+    mutexUnlock(&audio_state.ring.mutex);
+
+    /* Initialize wave buffers */
+    for (int i = 0; i < NUM_AUDIO_BUFFERS; i++) {
+        audio_state.wave_bufs[i].data_raw = audio_state.sample_buffers[i];
+        audio_state.wave_bufs[i].size = AUDIO_BUFFER_SIZE;
+        audio_state.wave_bufs[i].start_sample_offset = 0;
+        audio_state.wave_bufs[i].end_sample_offset = AUDIO_BUFFER_FRAMES;
+    }
+
+    /* Set up voice for playback */
+    audrvVoiceInit(&audio_state.drv, 0, AUDIO_CHANNELS, PcmFormat_Int16, AUDIO_SAMPLE_RATE);
+    audrvVoiceSetDestinationMix(&audio_state.drv, 0, AUDREN_FINAL_MIX_ID);
+
+    /* Set channel volumes */
+    audrvVoiceSetMixFactor(&audio_state.drv, 0, 1.0f, 0, 0);
+    audrvVoiceSetMixFactor(&audio_state.drv, 0, 1.0f, 1, 1);
 
     /* Start streaming thread */
-    sysThreadCreate(&audio_state.stream_thread, stream_thread_func, NULL,
-                    1500, 0x10000, THREAD_JOINABLE, "audio_stream");
+    Result rc = threadCreate(&audio_state.stream_thread, stream_thread_func, NULL,
+                             NULL, 0x10000, 0x2B, -2);
+    if (R_SUCCEEDED(rc)) {
+        threadStart(&audio_state.stream_thread);
+    }
+
+    /* Start voice playback */
+    audrvVoiceStart(&audio_state.drv, 0);
 
     audio_state.playing = true;
     audio_state.paused = false;
@@ -364,14 +412,14 @@ void audio_stop(void)
     printf("Stopping audio...\n");
 
     audio_state.stop_requested = true;
-    audio_state.threads_running = false;
+    audio_state.thread_running = false;
 
-    /* Wait for threads to finish */
-    if (audio_state.stream_thread) {
-        u64 retval;
-        sysThreadJoin(audio_state.stream_thread, &retval);
-        audio_state.stream_thread = 0;
-    }
+    /* Wait for thread to finish */
+    threadWaitForExit(&audio_state.stream_thread);
+    threadClose(&audio_state.stream_thread);
+
+    /* Stop voice */
+    audrvVoiceStop(&audio_state.drv, 0);
 
     audio_state.playing = false;
     audio_state.paused = false;
@@ -385,6 +433,7 @@ void audio_stop(void)
 void audio_pause(void)
 {
     if (audio_state.playing && !audio_state.paused) {
+        audrvVoiceSetPaused(&audio_state.drv, 0, true);
         audio_state.paused = true;
         printf("Audio paused\n");
     }
@@ -394,6 +443,7 @@ void audio_pause(void)
 void audio_resume(void)
 {
     if (audio_state.playing && audio_state.paused) {
+        audrvVoiceSetPaused(&audio_state.drv, 0, false);
         audio_state.paused = false;
         printf("Audio resumed\n");
     }
@@ -411,8 +461,6 @@ void audio_seek(int offset_ms)
     }
 
     audio_state.position_ms = (uint32_t)new_pos;
-
-    /* In full implementation: seek in stream */
     printf("Audio seek to %u ms\n", audio_state.position_ms);
 }
 
@@ -435,9 +483,10 @@ void audio_set_volume(int vol)
     audio_state.volume = CLAMP(vol, 0, 100);
     audio_state.volume_scale = audio_state.volume / 100.0f;
 
-    /* Apply to PS3 audio port */
-    if (audio_state.audio_port) {
-        audioSetPortLevel(audio_state.audio_port, audio_state.volume_scale);
+    /* Update voice volume */
+    if (audio_state.initialized) {
+        audrvVoiceSetMixFactor(&audio_state.drv, 0, audio_state.volume_scale, 0, 0);
+        audrvVoiceSetMixFactor(&audio_state.drv, 0, audio_state.volume_scale, 1, 1);
     }
 }
 
@@ -445,17 +494,38 @@ void audio_set_volume(int vol)
 void audio_set_track(int track)
 {
     (void)track;
-    /* For future: switch audio track in multi-track content */
+    /* For future: switch audio track */
 }
 
 /* Update audio (called each frame) */
 void audio_update(void)
 {
-    if (!audio_state.playing) return;
+    if (!audio_state.initialized || !audio_state.playing) return;
 
-    /* Update playback state */
+    /* Update audio driver */
+    audrvUpdate(&audio_state.drv);
+
+    /* Fill and queue buffers as needed */
+    for (int i = 0; i < NUM_AUDIO_BUFFERS; i++) {
+        AudioDriverWaveBuf *buf = &audio_state.wave_bufs[i];
+
+        if (buf->state == AudioDriverWaveBufState_Free ||
+            buf->state == AudioDriverWaveBufState_Done) {
+
+            /* Fill this buffer */
+            fill_audio_buffer(i);
+
+            /* Queue it for playback */
+            audrvVoiceAddWaveBuf(&audio_state.drv, 0, buf);
+            audrvUpdate(&audio_state.drv);
+        }
+    }
+
+    /* Update position */
     if (!audio_state.paused && !audio_state.buffering) {
-        /* Position is updated by audio callback */
+        /* Approximate position based on played samples */
+        uint64_t played = audrvVoiceGetPlayedSampleCount(&audio_state.drv, 0);
+        audio_state.position_ms = (uint32_t)((played * 1000) / audio_state.sample_rate);
     }
 
     /* Check for end of stream */
@@ -463,9 +533,6 @@ void audio_update(void)
         audio_state.playing = false;
         printf("Audio playback complete\n");
     }
-
-    /* Handle audio output (would be done via interrupt/callback in real impl) */
-    audio_callback();
 }
 
 /* Check if audio is playing */
