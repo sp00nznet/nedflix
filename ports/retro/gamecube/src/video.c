@@ -1,31 +1,36 @@
 /*
- * Nedflix Nintendo Switch - Video playback system
+ * Nedflix for Nintendo GameCube - Video playback system
  * Real MPEG1 video decoding using pl_mpeg
+ *
+ * Hardware limitations:
+ *   - 24 MB RAM (16 main + 8 ARAM)
+ *   - 485 MHz PowerPC (Gekko)
+ *   - Max practical resolution: 640x480
+ *   - Uses LWP (lightweight processes) for threading
  */
 
 #define PL_MPEG_IMPLEMENTATION
 #include "../../common/pl_mpeg.h"
 
 #include "nedflix.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <switch.h>
+#include <ogc/lwp.h>
+#include <ogc/mutex.h>
+#include <ogc/cond.h>
 
 /* Video configuration */
-#define VIDEO_MAX_WIDTH     1920
-#define VIDEO_MAX_HEIGHT    1080
-#define NUM_VIDEO_BUFFERS   3
+#define VIDEO_MAX_WIDTH     640
+#define VIDEO_MAX_HEIGHT    480
+#define NUM_VIDEO_BUFFERS   2
+#define DECODE_STACK_SIZE   (32 * 1024)
 
 /* Video frame buffer */
 typedef struct {
     uint32_t *data;
     uint32_t width;
     uint32_t height;
-    uint32_t stride;
+    double pts;
     bool ready;
     bool displayed;
-    double pts;
 } video_frame_t;
 
 /* Video state */
@@ -33,12 +38,11 @@ static struct {
     bool initialized;
     bool playing;
     bool paused;
-    bool buffering;
     bool stop_requested;
     bool eof;
 
     /* Stream info */
-    char current_path[512];
+    char current_path[MAX_PATH_LENGTH];
     uint32_t position_ms;
     uint32_t duration_ms;
     int width;
@@ -48,42 +52,44 @@ static struct {
     /* MPEG decoder */
     plm_t *plm;
 
-    /* Frame buffers (triple buffering) */
+    /* Frame buffers (double buffering) */
     video_frame_t frames[NUM_VIDEO_BUFFERS];
     int decode_index;
     int display_index;
 
     /* Threading */
-    Thread decode_thread;
+    lwp_t decode_thread;
+    uint8_t *decode_stack;
     bool thread_running;
-    Mutex frame_mutex;
-    CondVar frame_cond;
-
-    /* Subtitle overlay */
-    char subtitle_text[512];
-    uint64_t subtitle_start;
-    uint64_t subtitle_end;
+    mutex_t frame_mutex;
+    cond_t frame_cond;
 } video_state;
 
-/* Initialize video frame buffer */
-static int frame_init(video_frame_t *frame, uint32_t width, uint32_t height)
+/* Initialize a frame buffer */
+static int frame_init(video_frame_t *frame)
 {
-    size_t size = width * height * sizeof(uint32_t);
-    frame->data = aligned_alloc(0x1000, size);
-    if (!frame->data) return -1;
+    size_t size = VIDEO_MAX_WIDTH * VIDEO_MAX_HEIGHT * sizeof(uint32_t);
 
-    frame->width = width;
-    frame->height = height;
-    frame->stride = width;
+    /* Allocate 32-byte aligned for GX */
+    frame->data = memalign(32, size);
+    if (!frame->data) {
+        printf("Failed to allocate video frame buffer\n");
+        return -1;
+    }
+
+    frame->width = 0;
+    frame->height = 0;
+    frame->pts = 0;
     frame->ready = false;
     frame->displayed = true;
-    frame->pts = 0;
 
     memset(frame->data, 0, size);
+    DCFlushRange(frame->data, size);
+
     return 0;
 }
 
-/* Free video frame buffer */
+/* Free a frame buffer */
 static void frame_free(video_frame_t *frame)
 {
     if (frame->data) {
@@ -94,30 +100,30 @@ static void frame_free(video_frame_t *frame)
 }
 
 /* Decode thread function - performs real MPEG1 decoding */
-static void decode_thread_func(void *arg)
+static void *decode_thread_func(void *arg)
 {
     (void)arg;
     printf("Video decode thread started\n");
 
     while (video_state.thread_running && !video_state.stop_requested && !video_state.eof) {
         if (video_state.paused) {
-            svcSleepThread(10000000);  /* 10ms */
+            usleep(10000);  /* 10ms */
             continue;
         }
 
         /* Get next frame buffer to decode into */
-        mutexLock(&video_state.frame_mutex);
+        LWP_MutexLock(video_state.frame_mutex);
 
         video_frame_t *frame = &video_state.frames[video_state.decode_index];
 
         if (frame->ready && !frame->displayed) {
             /* Buffer full, wait for display */
-            condvarWait(&video_state.frame_cond, &video_state.frame_mutex);
-            mutexUnlock(&video_state.frame_mutex);
+            LWP_CondWait(video_state.frame_cond, video_state.frame_mutex);
+            LWP_MutexUnlock(video_state.frame_mutex);
             continue;
         }
 
-        mutexUnlock(&video_state.frame_mutex);
+        LWP_MutexUnlock(video_state.frame_mutex);
 
         /* Decode the next video frame using pl_mpeg */
         plm_frame_t *plm_frame = plm_decode_video(video_state.plm);
@@ -129,8 +135,8 @@ static void decode_thread_func(void *arg)
             break;
         }
 
-        /* Convert YUV to RGBA and store in frame buffer */
-        /* Ensure we don't overflow the buffer */
+        /* Convert YUV to RGBA */
+        /* Clamp to GameCube max resolution */
         uint32_t decode_width = plm_frame->width;
         uint32_t decode_height = plm_frame->height;
 
@@ -139,8 +145,11 @@ static void decode_thread_func(void *arg)
 
         plm_frame_to_rgba(plm_frame, (uint8_t *)frame->data, decode_width * 4);
 
+        /* Flush data cache for GX */
+        DCFlushRange(frame->data, decode_width * decode_height * 4);
+
         /* Mark frame as ready */
-        mutexLock(&video_state.frame_mutex);
+        LWP_MutexLock(video_state.frame_mutex);
 
         frame->width = decode_width;
         frame->height = decode_height;
@@ -151,17 +160,17 @@ static void decode_thread_func(void *arg)
         video_state.decode_index = (video_state.decode_index + 1) % NUM_VIDEO_BUFFERS;
         video_state.position_ms = (uint32_t)(plm_frame->time * 1000.0);
 
-        condvarWakeAll(&video_state.frame_cond);
-        mutexUnlock(&video_state.frame_mutex);
+        LWP_CondSignal(video_state.frame_cond);
+        LWP_MutexUnlock(video_state.frame_mutex);
 
-        /* Frame rate timing - sleep to match video framerate */
+        /* Frame rate timing */
         if (video_state.framerate > 0) {
-            uint64_t frame_time_ns = (uint64_t)(1000000000.0 / video_state.framerate);
-            svcSleepThread(frame_time_ns);
+            usleep((useconds_t)(1000000.0 / video_state.framerate));
         }
     }
 
     printf("Video decode thread ended\n");
+    return NULL;
 }
 
 /* Initialize video subsystem */
@@ -170,13 +179,11 @@ int video_init(void)
     printf("Initializing video subsystem...\n");
 
     memset(&video_state, 0, sizeof(video_state));
-    video_state.framerate = 30.0;
-    video_state.width = 1280;
-    video_state.height = 720;
+    video_state.framerate = 24.0;  /* Standard film framerate */
 
     /* Initialize frame buffers */
     for (int i = 0; i < NUM_VIDEO_BUFFERS; i++) {
-        if (frame_init(&video_state.frames[i], VIDEO_MAX_WIDTH, VIDEO_MAX_HEIGHT) != 0) {
+        if (frame_init(&video_state.frames[i]) != 0) {
             printf("Failed to allocate frame buffer %d\n", i);
             for (int j = 0; j < i; j++) {
                 frame_free(&video_state.frames[j]);
@@ -185,9 +192,19 @@ int video_init(void)
         }
     }
 
+    /* Allocate decode thread stack */
+    video_state.decode_stack = memalign(32, DECODE_STACK_SIZE);
+    if (!video_state.decode_stack) {
+        printf("Failed to allocate decode thread stack\n");
+        for (int i = 0; i < NUM_VIDEO_BUFFERS; i++) {
+            frame_free(&video_state.frames[i]);
+        }
+        return -1;
+    }
+
     /* Initialize synchronization */
-    mutexInit(&video_state.frame_mutex);
-    condvarInit(&video_state.frame_cond);
+    LWP_MutexInit(&video_state.frame_mutex, FALSE);
+    LWP_CondInit(&video_state.frame_cond);
 
     video_state.initialized = true;
     printf("Video initialized\n");
@@ -201,28 +218,38 @@ void video_shutdown(void)
 
     printf("Shutting down video...\n");
 
-    video_stop();
+    video_stop(&g_app.playback);
 
     /* Free frame buffers */
     for (int i = 0; i < NUM_VIDEO_BUFFERS; i++) {
         frame_free(&video_state.frames[i]);
     }
 
+    /* Free decode stack */
+    if (video_state.decode_stack) {
+        free(video_state.decode_stack);
+        video_state.decode_stack = NULL;
+    }
+
+    /* Destroy synchronization primitives */
+    LWP_MutexDestroy(video_state.frame_mutex);
+    LWP_CondDestroy(video_state.frame_cond);
+
     video_state.initialized = false;
     printf("Video shutdown complete\n");
 }
 
-/* Play video from local file */
-int video_play_file(const char *path)
+/* Load and play an MPEG video file */
+int video_load_mjpeg(const char *path, playback_state_t *state)
 {
     if (!video_state.initialized) {
         if (video_init() != 0) return -1;
     }
 
     /* Stop any current playback */
-    video_stop();
+    video_stop(state);
 
-    printf("Starting video file: %s\n", path);
+    printf("Loading video: %s\n", path);
 
     /* Open the MPEG file with pl_mpeg */
     video_state.plm = plm_create_with_filename(path);
@@ -237,16 +264,30 @@ int video_play_file(const char *path)
     video_state.framerate = plm_get_framerate(video_state.plm);
     video_state.duration_ms = (uint32_t)(plm_get_duration(video_state.plm) * 1000.0);
 
+    /* Check if video fits in GameCube memory */
+    if (video_state.width > VIDEO_MAX_WIDTH || video_state.height > VIDEO_MAX_HEIGHT) {
+        printf("Warning: Video %dx%d exceeds GameCube max %dx%d\n",
+               video_state.width, video_state.height,
+               VIDEO_MAX_WIDTH, VIDEO_MAX_HEIGHT);
+        printf("Video will be cropped\n");
+    }
+
     printf("Video: %dx%d @ %.2f fps, duration: %u ms\n",
            video_state.width, video_state.height,
            video_state.framerate, video_state.duration_ms);
 
-    /* Disable audio decoding (handled by audio.c) */
+    /* Disable audio in pl_mpeg (handled by audio.c) */
     plm_set_audio_enabled(video_state.plm, FALSE);
 
+    /* Update playback state */
     strncpy(video_state.current_path, path, sizeof(video_state.current_path) - 1);
+    strncpy(state->current_file, path, sizeof(state->current_file) - 1);
+    state->duration_ms = video_state.duration_ms;
+    state->video_width = video_state.width;
+    state->video_height = video_state.height;
+    state->has_video = true;
+
     video_state.position_ms = 0;
-    video_state.buffering = false;
     video_state.stop_requested = false;
     video_state.eof = false;
     video_state.thread_running = true;
@@ -261,11 +302,8 @@ int video_play_file(const char *path)
     }
 
     /* Start decode thread */
-    Result rc = threadCreate(&video_state.decode_thread, decode_thread_func, NULL,
-                             NULL, 0x20000, 0x2B, -2);
-    if (R_SUCCEEDED(rc)) {
-        threadStart(&video_state.decode_thread);
-    } else {
+    if (LWP_CreateThread(&video_state.decode_thread, decode_thread_func, NULL,
+                         video_state.decode_stack, DECODE_STACK_SIZE, 60) != 0) {
         printf("Failed to create decode thread\n");
         plm_destroy(video_state.plm);
         video_state.plm = NULL;
@@ -274,22 +312,13 @@ int video_play_file(const char *path)
 
     video_state.playing = true;
     video_state.paused = false;
+    state->is_playing = true;
 
     return 0;
 }
 
-/* Start playing video stream from URL */
-int video_play_stream(const char *url)
-{
-    /* For streaming, we'd need to implement a custom plm_buffer
-     * that reads from HTTP. For now, only local files are supported. */
-    printf("Streaming not yet implemented, use local files\n");
-    (void)url;
-    return -1;
-}
-
 /* Stop video playback */
-void video_stop(void)
+void video_stop(playback_state_t *state)
 {
     if (!video_state.playing && !video_state.plm) return;
 
@@ -298,13 +327,12 @@ void video_stop(void)
     video_state.stop_requested = true;
     video_state.thread_running = false;
 
-    /* Signal condition variable to wake threads */
-    condvarWakeAll(&video_state.frame_cond);
+    /* Signal condition variable to wake thread */
+    LWP_CondSignal(video_state.frame_cond);
 
     /* Wait for thread to finish */
     if (video_state.playing) {
-        threadWaitForExit(&video_state.decode_thread);
-        threadClose(&video_state.decode_thread);
+        LWP_JoinThread(video_state.decode_thread, NULL);
     }
 
     /* Clean up pl_mpeg decoder */
@@ -319,6 +347,11 @@ void video_stop(void)
     video_state.eof = false;
     video_state.current_path[0] = '\0';
 
+    if (state) {
+        state->is_playing = false;
+        state->has_video = false;
+    }
+
     printf("Video stopped\n");
 }
 
@@ -327,7 +360,6 @@ void video_pause(void)
 {
     if (video_state.playing && !video_state.paused) {
         video_state.paused = true;
-        printf("Video paused\n");
     }
 }
 
@@ -336,11 +368,10 @@ void video_resume(void)
 {
     if (video_state.playing && video_state.paused) {
         video_state.paused = false;
-        printf("Video resumed\n");
     }
 }
 
-/* Seek relative to current position */
+/* Seek to position */
 void video_seek(int offset_ms)
 {
     if (!video_state.playing || !video_state.plm) return;
@@ -356,59 +387,19 @@ void video_seek(int offset_ms)
     plm_seek(video_state.plm, seek_time, FALSE);
 
     /* Clear decode buffers */
-    mutexLock(&video_state.frame_mutex);
+    LWP_MutexLock(video_state.frame_mutex);
     for (int i = 0; i < NUM_VIDEO_BUFFERS; i++) {
         video_state.frames[i].ready = false;
         video_state.frames[i].displayed = true;
     }
     video_state.position_ms = (uint32_t)new_pos;
     video_state.eof = false;
-    mutexUnlock(&video_state.frame_mutex);
+    LWP_MutexUnlock(video_state.frame_mutex);
 
     printf("Video seek to %u ms\n", video_state.position_ms);
 }
 
-/* Seek to absolute position */
-void video_seek_absolute(uint32_t position_ms)
-{
-    if (!video_state.playing || !video_state.plm) return;
-
-    if (video_state.duration_ms > 0 && position_ms > video_state.duration_ms) {
-        position_ms = video_state.duration_ms;
-    }
-
-    /* Seek in the MPEG stream */
-    double seek_time = (double)position_ms / 1000.0;
-    plm_seek(video_state.plm, seek_time, FALSE);
-
-    mutexLock(&video_state.frame_mutex);
-    for (int i = 0; i < NUM_VIDEO_BUFFERS; i++) {
-        video_state.frames[i].ready = false;
-        video_state.frames[i].displayed = true;
-    }
-    video_state.position_ms = position_ms;
-    video_state.eof = false;
-    mutexUnlock(&video_state.frame_mutex);
-
-    printf("Video seek to %u ms\n", position_ms);
-}
-
-/* Set video track */
-void video_set_track(int track)
-{
-    (void)track;
-    /* MPEG1 typically only has one video track */
-}
-
-/* Enable/disable subtitles */
-void video_set_subtitles(bool enabled)
-{
-    if (!enabled) {
-        video_state.subtitle_text[0] = '\0';
-    }
-}
-
-/* Update video (called each frame) */
+/* Update video state (called each frame from main loop) */
 void video_update(void)
 {
     if (!video_state.initialized || !video_state.playing || video_state.paused) {
@@ -418,18 +409,19 @@ void video_update(void)
     /* Check for end of stream */
     if (video_state.eof) {
         video_state.playing = false;
+        g_app.playback.is_playing = false;
         printf("Video playback complete\n");
     }
 }
 
 /* Get current frame for display */
-uint32_t *video_get_frame(uint32_t *width, uint32_t *height)
+void *video_get_frame(uint32_t *width, uint32_t *height)
 {
     if (!video_state.initialized || !video_state.playing) {
         return NULL;
     }
 
-    mutexLock(&video_state.frame_mutex);
+    LWP_MutexLock(video_state.frame_mutex);
 
     /* Find a ready frame to display */
     video_frame_t *frame = &video_state.frames[video_state.display_index];
@@ -441,13 +433,13 @@ uint32_t *video_get_frame(uint32_t *width, uint32_t *height)
         frame->displayed = true;
         video_state.display_index = (video_state.display_index + 1) % NUM_VIDEO_BUFFERS;
 
-        condvarWakeAll(&video_state.frame_cond);
-        mutexUnlock(&video_state.frame_mutex);
+        LWP_CondSignal(video_state.frame_cond);
+        LWP_MutexUnlock(video_state.frame_mutex);
 
         return frame->data;
     }
 
-    mutexUnlock(&video_state.frame_mutex);
+    LWP_MutexUnlock(video_state.frame_mutex);
     return NULL;
 }
 
@@ -457,10 +449,10 @@ bool video_is_playing(void)
     return video_state.playing && !video_state.paused;
 }
 
-/* Check if buffering */
-bool video_is_buffering(void)
+/* Check if video is paused */
+bool video_is_paused(void)
 {
-    return video_state.buffering;
+    return video_state.paused;
 }
 
 /* Get current position in milliseconds */
@@ -476,18 +468,8 @@ uint32_t video_get_duration(void)
 }
 
 /* Get video dimensions */
-void video_get_dimensions(int *width, int *height)
+void video_get_dimensions(int *w, int *h)
 {
-    if (width) *width = video_state.width;
-    if (height) *height = video_state.height;
-}
-
-/* Get current subtitle text */
-const char *video_get_subtitle(void)
-{
-    uint64_t now = armGetSystemTick();
-    if (now >= video_state.subtitle_start && now <= video_state.subtitle_end) {
-        return video_state.subtitle_text;
-    }
-    return NULL;
+    if (w) *w = video_state.width;
+    if (h) *h = video_state.height;
 }

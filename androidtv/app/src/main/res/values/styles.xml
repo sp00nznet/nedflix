@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.NedflixTV" parent="@style/Theme.Leanback">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:colorPrimary">#E50914</item>
+        <item name="android:colorPrimaryDark">#B20710</item>
+        <item name="android:colorAccent">#E50914</item>
+    </style>
+</resources>

@@ -1,432 +1,384 @@
 /*
  * Nedflix for Nintendo GameCube
- * Audio playback using ASND library
- *
- * TECHNICAL DEMO / NOVELTY PORT
- *
- * Supports:
- *   - WAV files (PCM, 8/16-bit, mono/stereo)
- *   - Basic streaming from SD card
- *
- * Limitations:
- *   - No hardware MP3 decoding (would need software decoder)
- *   - Limited RAM for buffering (24 MB total system RAM)
- *   - Audio is buffered in ARAM (8 MB)
+ * Audio playback with real codec support
+ * Supports: WAV, MP3 (via dr_libs)
  */
 
 #include "nedflix.h"
 
+/* Include dr_libs implementations */
+#define DR_WAV_IMPLEMENTATION
+#define DR_MP3_IMPLEMENTATION
+#include "../../common/dr_wav.h"
+#include "../../common/dr_mp3.h"
+
+/* Audio configuration */
+#define DECODE_BUFFER_SAMPLES  4096
+#define DECODE_BUFFER_SIZE     (DECODE_BUFFER_SAMPLES * 2 * sizeof(int16_t))
+
+/* Codec types */
+typedef enum {
+    CODEC_NONE = 0,
+    CODEC_WAV,
+    CODEC_MP3
+} codec_t;
+
 /* Audio state */
-static bool g_audio_initialized = false;
-static int g_current_voice = -1;
-static bool g_audio_playing = false;
-static bool g_audio_paused = false;
-static double g_audio_position = 0.0;
-static double g_audio_duration = 0.0;
-static int g_audio_volume = 255;
+static struct {
+    bool initialized;
+    bool playing;
+    bool paused;
 
-/* Audio buffer in main RAM (for streaming) */
-static uint8_t *g_audio_buffer = NULL;
-static uint32_t g_buffer_size = 0;
-static uint32_t g_buffer_position = 0;
+    /* Codec */
+    codec_t codec;
+    drwav wav;
+    drmp3 mp3;
 
-/* WAV file header structure */
-typedef struct {
-    char riff[4];           /* "RIFF" */
-    uint32_t file_size;
-    char wave[4];           /* "WAVE" */
-    char fmt[4];            /* "fmt " */
-    uint32_t fmt_size;
-    uint16_t audio_format;  /* 1 = PCM */
-    uint16_t num_channels;
+    /* Format */
     uint32_t sample_rate;
-    uint32_t byte_rate;
-    uint16_t block_align;
-    uint16_t bits_per_sample;
-} wav_header_t;
+    uint32_t channels;
+    uint64_t total_frames;
+    uint64_t current_frame;
+    double duration;
+    double position;
 
-/* ASND voice callback */
-static void audio_voice_callback(int voice)
+    /* Buffers (double buffer) */
+    int16_t *buf_a;
+    int16_t *buf_b;
+    bool using_a;
+    size_t buf_frames;
+
+    /* ASND */
+    int voice;
+    int volume;
+    bool need_fill;
+} g_audio;
+
+/* Detect codec from file */
+static codec_t detect_codec(const char *path)
 {
-    (void)voice;
-    /* Voice finished playing */
-    g_audio_playing = false;
+    FILE *f = fopen(path, "rb");
+    if (!f) return CODEC_NONE;
+
+    uint8_t hdr[12];
+    size_t n = fread(hdr, 1, 12, f);
+    fclose(f);
+    if (n < 12) return CODEC_NONE;
+
+    /* RIFF....WAVE = WAV */
+    if (hdr[0]=='R' && hdr[1]=='I' && hdr[2]=='F' && hdr[3]=='F' &&
+        hdr[8]=='W' && hdr[9]=='A' && hdr[10]=='V' && hdr[11]=='E')
+        return CODEC_WAV;
+
+    /* ID3 or 0xFF sync = MP3 */
+    if ((hdr[0]=='I' && hdr[1]=='D' && hdr[2]=='3') ||
+        (hdr[0]==0xFF && (hdr[1]&0xE0)==0xE0))
+        return CODEC_MP3;
+
+    return CODEC_NONE;
 }
 
-/*
- * Initialize audio subsystem
- */
+/* Voice callback */
+static void voice_cb(int v) {
+    (void)v;
+    g_audio.need_fill = true;
+}
+
+/* Decode into buffer, return frames decoded */
+static size_t decode_frames(int16_t *out, size_t max_frames)
+{
+    size_t got = 0;
+    switch (g_audio.codec) {
+        case CODEC_WAV:
+            got = drwav_read_pcm_frames_s16(&g_audio.wav, max_frames, out);
+            break;
+        case CODEC_MP3:
+            got = drmp3_read_pcm_frames_s16(&g_audio.mp3, max_frames, out);
+            break;
+        default:
+            break;
+    }
+    g_audio.current_frame += got;
+    return got;
+}
+
+/* Initialize audio */
 int audio_init(void)
 {
-    if (g_audio_initialized) {
+    if (g_audio.initialized) return 0;
+
+    memset(&g_audio, 0, sizeof(g_audio));
+
+    ASND_Init();
+    ASND_Pause(0);
+
+    g_audio.buf_a = (int16_t*)memalign(32, DECODE_BUFFER_SIZE);
+    g_audio.buf_b = (int16_t*)memalign(32, DECODE_BUFFER_SIZE);
+    if (!g_audio.buf_a || !g_audio.buf_b) {
+        if (g_audio.buf_a) free(g_audio.buf_a);
+        if (g_audio.buf_b) free(g_audio.buf_b);
+        return -1;
+    }
+
+    g_audio.buf_frames = DECODE_BUFFER_SAMPLES;
+    g_audio.voice = -1;
+    g_audio.volume = 255;
+    g_audio.initialized = true;
+
+    LOG("Audio initialized");
+    return 0;
+}
+
+/* Shutdown */
+void audio_shutdown(void)
+{
+    if (!g_audio.initialized) return;
+    audio_stop(NULL);
+    free(g_audio.buf_a);
+    free(g_audio.buf_b);
+    ASND_End();
+    g_audio.initialized = false;
+}
+
+/* Load file */
+int audio_load(const char *path)
+{
+    if (!g_audio.initialized && audio_init() != 0)
+        return -1;
+
+    audio_stop(NULL);
+
+    g_audio.codec = detect_codec(path);
+    if (g_audio.codec == CODEC_NONE) {
+        LOG_ERROR("Unknown format: %s", path);
+        return -1;
+    }
+
+    bool ok = false;
+    switch (g_audio.codec) {
+        case CODEC_WAV:
+            if (drwav_init_file(&g_audio.wav, path, NULL)) {
+                g_audio.sample_rate = g_audio.wav.sampleRate;
+                g_audio.channels = g_audio.wav.channels;
+                g_audio.total_frames = g_audio.wav.totalPCMFrameCount;
+                ok = true;
+            }
+            break;
+        case CODEC_MP3:
+            if (drmp3_init_file(&g_audio.mp3, path, NULL)) {
+                g_audio.sample_rate = g_audio.mp3.sampleRate;
+                g_audio.channels = g_audio.mp3.channels;
+                g_audio.total_frames = drmp3_get_pcm_frame_count(&g_audio.mp3);
+                ok = true;
+            }
+            break;
+        default:
+            break;
+    }
+
+    if (!ok) {
+        LOG_ERROR("Failed to open: %s", path);
+        g_audio.codec = CODEC_NONE;
+        return -1;
+    }
+
+    g_audio.duration = (double)g_audio.total_frames / g_audio.sample_rate;
+    g_audio.current_frame = 0;
+    g_audio.position = 0;
+
+    LOG("Loaded: %s (%s, %uHz, %uch, %.1fs)",
+        path,
+        g_audio.codec == CODEC_WAV ? "WAV" : "MP3",
+        g_audio.sample_rate,
+        g_audio.channels,
+        g_audio.duration);
+
+    return 0;
+}
+
+/* Play */
+int audio_play(playback_state_t *state)
+{
+    if (g_audio.codec == CODEC_NONE) return -1;
+
+    if (g_audio.playing) {
+        if (g_audio.paused) {
+            audio_resume(state);
+        }
         return 0;
     }
 
-    /* Initialize ASND library */
-    ASND_Init();
-    ASND_Pause(0);  /* Unpause */
+    /* Decode first buffer */
+    size_t got = decode_frames(g_audio.buf_a, g_audio.buf_frames);
+    if (got == 0) return -1;
+    DCFlushRange(g_audio.buf_a, got * g_audio.channels * sizeof(int16_t));
 
-    g_audio_initialized = true;
-    g_current_voice = -1;
-    g_audio_playing = false;
-    g_audio_paused = false;
-    g_audio_volume = 255;
+    /* Pre-fill second buffer */
+    size_t got2 = decode_frames(g_audio.buf_b, g_audio.buf_frames);
+    if (got2 > 0) {
+        DCFlushRange(g_audio.buf_b, got2 * g_audio.channels * sizeof(int16_t));
+    }
+
+    g_audio.voice = ASND_GetFirstUnusedVoice();
+    if (g_audio.voice < 0) return -1;
+
+    int fmt = (g_audio.channels == 2) ? VOICE_STEREO_16BIT : VOICE_MONO_16BIT;
+
+    int r = ASND_SetVoice(g_audio.voice, fmt, g_audio.sample_rate, 0,
+                          g_audio.buf_a, got * g_audio.channels * sizeof(int16_t),
+                          g_audio.volume, g_audio.volume, voice_cb);
+    if (r != SND_OK) return -1;
+
+    g_audio.playing = true;
+    g_audio.paused = false;
+    g_audio.using_a = true;
+    g_audio.need_fill = false;
+
+    if (state) {
+        state->is_playing = true;
+        state->is_paused = false;
+    }
 
     return 0;
 }
 
-/*
- * Shutdown audio subsystem
- */
-void audio_shutdown(void)
-{
-    if (!g_audio_initialized) {
-        return;
-    }
-
-    /* Stop any playing audio */
-    if (g_current_voice >= 0) {
-        ASND_StopVoice(g_current_voice);
-        g_current_voice = -1;
-    }
-
-    /* Free audio buffer */
-    if (g_audio_buffer) {
-        free(g_audio_buffer);
-        g_audio_buffer = NULL;
-        g_buffer_size = 0;
-    }
-
-    ASND_End();
-    g_audio_initialized = false;
-}
-
-/*
- * Load WAV file into memory
- */
-int audio_load_wav(const char *path, playback_state_t *state)
-{
-    if (!path || !state) {
-        return -1;
-    }
-
-    /* Open file */
-    FILE *fp = fopen(path, "rb");
-    if (!fp) {
-        LOG_ERROR("Failed to open WAV file: %s", path);
-        return -1;
-    }
-
-    /* Read WAV header */
-    wav_header_t header;
-    if (fread(&header, 1, sizeof(wav_header_t), fp) != sizeof(wav_header_t)) {
-        LOG_ERROR("Failed to read WAV header");
-        fclose(fp);
-        return -1;
-    }
-
-    /* Verify RIFF/WAVE format */
-    if (memcmp(header.riff, "RIFF", 4) != 0 || memcmp(header.wave, "WAVE", 4) != 0) {
-        LOG_ERROR("Not a valid WAV file");
-        fclose(fp);
-        return -1;
-    }
-
-    /* Verify PCM format */
-    if (header.audio_format != 1) {
-        LOG_ERROR("Only PCM WAV files supported");
-        fclose(fp);
-        return -1;
-    }
-
-    /* Skip to data chunk */
-    char chunk_id[4];
-    uint32_t chunk_size;
-    uint32_t data_offset = sizeof(wav_header_t);
-
-    /* Skip any extra fmt bytes */
-    if (header.fmt_size > 16) {
-        fseek(fp, header.fmt_size - 16, SEEK_CUR);
-        data_offset += header.fmt_size - 16;
-    }
-
-    /* Find data chunk */
-    while (fread(chunk_id, 1, 4, fp) == 4) {
-        if (fread(&chunk_size, 1, 4, fp) != 4) {
-            break;
-        }
-        data_offset += 8;
-
-        if (memcmp(chunk_id, "data", 4) == 0) {
-            /* Found data chunk */
-            break;
-        }
-
-        /* Skip this chunk */
-        fseek(fp, chunk_size, SEEK_CUR);
-        data_offset += chunk_size;
-    }
-
-    if (memcmp(chunk_id, "data", 4) != 0) {
-        LOG_ERROR("Could not find data chunk");
-        fclose(fp);
-        return -1;
-    }
-
-    /* Store format info */
-    state->format.sample_rate = header.sample_rate;
-    state->format.channels = header.num_channels;
-    state->format.bits_per_sample = header.bits_per_sample;
-    state->format.data_size = chunk_size;
-    state->format.data_offset = data_offset;
-
-    /* Calculate duration */
-    uint32_t bytes_per_second = header.sample_rate * header.num_channels * (header.bits_per_sample / 8);
-    state->duration = (double)chunk_size / bytes_per_second;
-
-    /* Free previous buffer */
-    if (g_audio_buffer) {
-        free(g_audio_buffer);
-        g_audio_buffer = NULL;
-    }
-
-    /* Allocate buffer for audio data */
-    /* Limit to available RAM (leave some headroom) */
-    g_buffer_size = MIN(chunk_size, 4 * 1024 * 1024);  /* Max 4 MB */
-    g_audio_buffer = (uint8_t *)memalign(32, g_buffer_size);
-
-    if (!g_audio_buffer) {
-        LOG_ERROR("Failed to allocate audio buffer");
-        fclose(fp);
-        return -1;
-    }
-
-    /* Read audio data */
-    size_t bytes_read = fread(g_audio_buffer, 1, g_buffer_size, fp);
-    if (bytes_read == 0) {
-        LOG_ERROR("Failed to read audio data");
-        free(g_audio_buffer);
-        g_audio_buffer = NULL;
-        fclose(fp);
-        return -1;
-    }
-
-    /* Flush data cache */
-    DCFlushRange(g_audio_buffer, g_buffer_size);
-
-    fclose(fp);
-
-    /* Reset playback state */
-    state->current_time = 0.0;
-    state->is_playing = false;
-    state->is_paused = false;
-    state->audio_buffer = g_audio_buffer;
-    state->buffer_size = bytes_read;
-    state->play_position = 0;
-
-    g_audio_duration = state->duration;
-    g_audio_position = 0.0;
-    g_buffer_position = 0;
-
-    LOG("Loaded WAV: %d Hz, %d ch, %d bit, %.1f sec",
-        header.sample_rate, header.num_channels, header.bits_per_sample, state->duration);
-
-    return 0;
-}
-
-/*
- * Load MP3 file (stub - would need software decoder)
- */
-int audio_load_mp3(const char *path, playback_state_t *state)
-{
-    (void)path;
-    (void)state;
-
-    /* MP3 decoding would require a software library like libmad
-     * For this technical demo, we only support WAV files */
-    LOG_ERROR("MP3 playback not supported on GameCube");
-    return -1;
-}
-
-/*
- * Start audio playback
- */
-int audio_play(playback_state_t *state)
-{
-    if (!g_audio_initialized || !state || !g_audio_buffer) {
-        return -1;
-    }
-
-    /* Stop any current playback */
-    if (g_current_voice >= 0) {
-        ASND_StopVoice(g_current_voice);
-    }
-
-    /* Determine ASND format */
-    int format;
-    if (state->format.bits_per_sample == 16) {
-        format = (state->format.channels == 2) ? VOICE_STEREO_16BIT : VOICE_MONO_16BIT;
-    } else {
-        format = (state->format.channels == 2) ? VOICE_STEREO_8BIT : VOICE_MONO_8BIT;
-    }
-
-    /* Set voice callback */
-    g_current_voice = ASND_GetFirstUnusedVoice();
-    if (g_current_voice < 0) {
-        LOG_ERROR("No available audio voices");
-        return -1;
-    }
-
-    /* Set volume */
-    ASND_ChangeVolumeVoice(g_current_voice, g_audio_volume, g_audio_volume);
-
-    /* Start playback */
-    int result = ASND_SetVoice(
-        g_current_voice,
-        format,
-        state->format.sample_rate,
-        0,  /* Delay */
-        g_audio_buffer,
-        state->buffer_size,
-        g_audio_volume,
-        g_audio_volume,
-        audio_voice_callback
-    );
-
-    if (result != SND_OK) {
-        LOG_ERROR("Failed to start audio playback");
-        return -1;
-    }
-
-    state->is_playing = true;
-    state->is_paused = false;
-    state->voice = g_current_voice;
-    g_audio_playing = true;
-    g_audio_paused = false;
-    g_audio_position = 0.0;
-
-    return 0;
-}
-
-/*
- * Stop audio playback
- */
+/* Stop */
 void audio_stop(playback_state_t *state)
 {
-    if (g_current_voice >= 0) {
-        ASND_StopVoice(g_current_voice);
-        g_current_voice = -1;
+    if (g_audio.voice >= 0) {
+        ASND_StopVoice(g_audio.voice);
+        g_audio.voice = -1;
     }
+
+    switch (g_audio.codec) {
+        case CODEC_WAV: drwav_uninit(&g_audio.wav); break;
+        case CODEC_MP3: drmp3_uninit(&g_audio.mp3); break;
+        default: break;
+    }
+
+    g_audio.playing = false;
+    g_audio.paused = false;
+    g_audio.codec = CODEC_NONE;
+    g_audio.position = 0;
+    g_audio.current_frame = 0;
 
     if (state) {
         state->is_playing = false;
         state->is_paused = false;
-        state->current_time = 0.0;
+        state->current_time = 0;
     }
-
-    g_audio_playing = false;
-    g_audio_paused = false;
-    g_audio_position = 0.0;
 }
 
-/*
- * Pause audio playback
- */
+/* Pause */
 void audio_pause(playback_state_t *state)
 {
-    if (g_current_voice >= 0 && g_audio_playing) {
-        ASND_PauseVoice(g_current_voice, 1);
-        g_audio_paused = true;
-
-        if (state) {
-            state->is_paused = true;
-        }
+    if (g_audio.voice >= 0 && g_audio.playing && !g_audio.paused) {
+        ASND_PauseVoice(g_audio.voice, 1);
+        g_audio.paused = true;
+        if (state) state->is_paused = true;
     }
 }
 
-/*
- * Resume audio playback
- */
+/* Resume */
 void audio_resume(playback_state_t *state)
 {
-    if (g_current_voice >= 0 && g_audio_paused) {
-        ASND_PauseVoice(g_current_voice, 0);
-        g_audio_paused = false;
-
-        if (state) {
-            state->is_paused = false;
-        }
+    if (g_audio.voice >= 0 && g_audio.paused) {
+        ASND_PauseVoice(g_audio.voice, 0);
+        g_audio.paused = false;
+        if (state) state->is_paused = false;
     }
 }
 
-/*
- * Set playback volume (0-255)
- */
-void audio_set_volume(int volume)
+/* Seek */
+void audio_seek(double seconds)
 {
-    g_audio_volume = CLAMP(volume, 0, 255);
+    if (!g_audio.playing || g_audio.sample_rate == 0) return;
 
-    if (g_current_voice >= 0) {
-        ASND_ChangeVolumeVoice(g_current_voice, g_audio_volume, g_audio_volume);
+    if (seconds < 0) seconds = 0;
+    if (seconds > g_audio.duration) seconds = g_audio.duration;
+
+    uint64_t frame = (uint64_t)(seconds * g_audio.sample_rate);
+    bool ok = false;
+
+    switch (g_audio.codec) {
+        case CODEC_WAV: ok = drwav_seek_to_pcm_frame(&g_audio.wav, frame); break;
+        case CODEC_MP3: ok = drmp3_seek_to_pcm_frame(&g_audio.mp3, frame); break;
+        default: break;
+    }
+
+    if (ok) {
+        g_audio.current_frame = frame;
+        g_audio.position = seconds;
+        g_audio.need_fill = true;
     }
 }
 
-/*
- * Update audio state (called each frame)
- */
+/* Volume */
+void audio_set_volume(int vol)
+{
+    g_audio.volume = CLAMP(vol, 0, 255);
+    if (g_audio.voice >= 0) {
+        ASND_ChangeVolumeVoice(g_audio.voice, g_audio.volume, g_audio.volume);
+    }
+}
+
+/* Update - call every frame */
 void audio_update(void)
 {
-    if (!g_audio_playing || g_audio_paused) {
-        return;
+    if (!g_audio.playing || g_audio.paused) return;
+
+    /* Update position */
+    if (g_audio.sample_rate > 0) {
+        g_audio.position = (double)g_audio.current_frame / g_audio.sample_rate;
     }
 
-    /* Estimate position based on voice status */
-    /* Note: ASND doesn't provide precise position tracking,
-     * so we estimate based on elapsed frames */
-    static uint32_t last_tick = 0;
-    uint32_t current_tick = gettime();
-
-    if (last_tick > 0) {
-        double elapsed = (double)(current_tick - last_tick) / TB_TIMER_CLOCK;
-        g_audio_position += elapsed;
-
-        if (g_audio_position > g_audio_duration) {
-            g_audio_position = g_audio_duration;
+    /* Check end */
+    if (g_audio.voice >= 0 && ASND_StatusVoice(g_audio.voice) == SND_UNUSED) {
+        if (g_audio.current_frame >= g_audio.total_frames) {
+            g_audio.playing = false;
+            return;
         }
     }
-    last_tick = current_tick;
 
-    /* Check if voice has stopped */
-    if (g_current_voice >= 0 && ASND_StatusVoice(g_current_voice) == SND_UNUSED) {
-        g_audio_playing = false;
-        g_audio_position = g_audio_duration;
+    /* Double-buffer refill */
+    if (g_audio.need_fill) {
+        int16_t *buf = g_audio.using_a ? g_audio.buf_b : g_audio.buf_a;
+        size_t got = decode_frames(buf, g_audio.buf_frames);
+
+        if (got > 0) {
+            DCFlushRange(buf, got * g_audio.channels * sizeof(int16_t));
+            if (g_audio.voice >= 0) {
+                ASND_AddVoice(g_audio.voice, buf,
+                              got * g_audio.channels * sizeof(int16_t));
+            }
+            g_audio.using_a = !g_audio.using_a;
+        }
+        g_audio.need_fill = false;
     }
 }
 
-/*
- * Check if audio is currently playing
- */
-bool audio_is_playing(void)
+/* Query functions */
+bool audio_is_playing(void) { return g_audio.playing && !g_audio.paused; }
+double audio_get_position(void) { return g_audio.position; }
+double audio_get_duration(void) { return g_audio.duration; }
+
+/* Compatibility wrappers */
+int audio_load_wav(const char *path, playback_state_t *state)
 {
-    if (g_current_voice >= 0) {
-        int status = ASND_StatusVoice(g_current_voice);
-        return (status == SND_WORKING) && !g_audio_paused;
+    int r = audio_load(path);
+    if (r == 0 && state) {
+        state->duration = g_audio.duration;
+        state->current_time = 0;
+        state->is_playing = false;
+        state->is_paused = false;
+        state->format.sample_rate = g_audio.sample_rate;
+        state->format.channels = g_audio.channels;
+        state->format.bits_per_sample = 16;
     }
-    return false;
+    return r;
 }
 
-/*
- * Get current playback position in seconds
- */
-double audio_get_position(void)
+int audio_load_mp3(const char *path, playback_state_t *state)
 {
-    return g_audio_position;
-}
-
-/*
- * Get total duration in seconds
- */
-double audio_get_duration(void)
-{
-    return g_audio_duration;
+    return audio_load_wav(path, state);
 }

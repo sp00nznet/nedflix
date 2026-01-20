@@ -1,182 +1,76 @@
 @echo off
-REM Nedflix GameCube Build Script for Windows
-REM
-REM TECHNICAL DEMO / NOVELTY PORT
-REM One-click build with automatic toolchain installation.
-REM
-
+REM Nedflix GameCube - TRUE One-Click Windows Build
 setlocal enabledelayedexpansion
 
 echo ======================================
 echo   Nedflix for Nintendo GameCube
-echo   TECHNICAL DEMO / NOVELTY PORT
+echo   One-Click Build
 echo ======================================
 echo.
 
-REM Find MSYS2
-set "MSYS_PATH="
-if exist "C:\msys64\msys2_shell.cmd" set "MSYS_PATH=C:\msys64"
-if exist "C:\msys32\msys2_shell.cmd" set "MSYS_PATH=C:\msys32"
-if exist "%USERPROFILE%\msys64\msys2_shell.cmd" set "MSYS_PATH=%USERPROFILE%\msys64"
+REM Find devkitPro
+set "DEVKITPRO="
+if exist "C:\devkitPro\devkitPPC" set "DEVKITPRO=C:\devkitPro"
+if exist "D:\devkitPro\devkitPPC" set "DEVKITPRO=D:\devkitPro"
+if exist "%USERPROFILE%\devkitPro\devkitPPC" set "DEVKITPRO=%USERPROFILE%\devkitPro"
+if exist "C:\msys64\opt\devkitpro\devkitPPC" set "DEVKITPRO=C:\msys64\opt\devkitpro"
 
-if "%MSYS_PATH%"=="" (
-    echo ========================================
-    echo  MSYS2 Not Found - Installing...
-    echo ========================================
+if not defined DEVKITPRO (
+    echo [INFO] devkitPro not found. Installing automatically...
     echo.
-    echo MSYS2 is required for GameCube development.
-    echo.
-    choice /C YN /M "Download and install MSYS2 automatically"
-    if !errorlevel! equ 2 (
-        echo.
-        echo Please install MSYS2 manually from https://www.msys2.org/
+
+    REM Download installer
+    echo [1/3] Downloading devkitPro installer...
+    powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://github.com/devkitPro/installer/releases/download/v3.0.3/devkitProUpdater-3.0.3.exe' -OutFile '%TEMP%\devkitpro.exe'}" 2>nul
+    if not exist "%TEMP%\devkitpro.exe" (
+        echo [ERROR] Download failed. Please check your internet connection.
         pause
         exit /b 1
     )
-    echo.
-    echo Downloading MSYS2 installer...
-    powershell -Command "Invoke-WebRequest -Uri 'https://github.com/msys2/msys2-installer/releases/download/2024-01-13/msys2-x86_64-20240113.exe' -OutFile '%TEMP%\msys2-installer.exe'"
-    if !errorlevel! neq 0 (
-        echo ERROR: Failed to download MSYS2. Please install manually.
-        pause
-        exit /b 1
+
+    REM Run installer silently with GameCube/Wii selected
+    echo [2/3] Installing devkitPro (this takes 5-10 minutes)...
+    "%TEMP%\devkitpro.exe" /S /D=C:\devkitPro
+
+    REM Wait for installation
+    echo [INFO] Waiting for installation to complete...
+    :wait_install
+    if not exist "C:\devkitPro\devkitPPC\bin\powerpc-eabi-gcc.exe" (
+        timeout /t 5 /nobreak >nul
+        goto wait_install
     )
-    echo Running MSYS2 installer...
-    "%TEMP%\msys2-installer.exe"
-    echo.
-    echo After MSYS2 installation completes, please run this script again.
-    pause
-    exit /b 0
-)
 
-echo Found MSYS2 at: %MSYS_PATH%
-
-REM Check if devkitPro is installed
-set "DEVKIT_OK=0"
-if exist "%MSYS_PATH%\opt\devkitpro\devkitPPC\bin\powerpc-eabi-gcc.exe" set "DEVKIT_OK=1"
-
-if "!DEVKIT_OK!"=="0" (
-    echo.
-    echo ========================================
-    echo  devkitPro Not Found
-    echo ========================================
-    echo.
-    echo The devkitPro GameCube toolchain needs to be installed.
-    echo This will download and install the toolchain (takes 5-10 minutes^).
-    echo.
-    choice /C YN /M "Install devkitPro GameCube toolchain automatically"
-    if !errorlevel! equ 2 (
-        echo.
-        echo Please install devkitPro manually.
-        pause
-        exit /b 1
-    )
-    echo.
-    echo Installing devkitPro GameCube toolchain...
-    echo.
-
-    REM Install devkitPro using pacman
-    "%MSYS_PATH%\usr\bin\bash.exe" -lc "pacman-key --recv BC26F752D25B92CE272E0F44F7FD5492264BB9D0 --keyserver keyserver.ubuntu.com 2>/dev/null || true && pacman-key --lsign BC26F752D25B92CE272E0F44F7FD5492264BB9D0 2>/dev/null || true && pacman -U --noconfirm https://pkg.devkitpro.org/devkitpro-keyring.pkg.tar.xz 2>/dev/null || true && echo '[dkp-libs]' >> /etc/pacman.conf && echo 'Server = https://pkg.devkitpro.org/packages' >> /etc/pacman.conf && echo '[dkp-windows]' >> /etc/pacman.conf && echo 'Server = https://pkg.devkitpro.org/packages/windows/\$arch' >> /etc/pacman.conf && pacman -Syu --noconfirm && pacman -S --noconfirm gamecube-dev"
-
-    if !errorlevel! neq 0 (
-        echo.
-        echo ERROR: Toolchain installation failed.
-        echo Check the output above for errors.
-        pause
-        exit /b 1
-    )
-    echo.
-    echo devkitPro installed successfully!
+    set "DEVKITPRO=C:\devkitPro"
+    echo [3/3] Installation complete!
     echo.
 )
 
-echo.
+echo [OK] devkitPro: %DEVKITPRO%
 
-:menu
-echo Select build option:
-echo   1. Build DOL file
-echo   2. Clean build
-echo   3. Run in Dolphin emulator
-echo   4. Help
-echo   5. Exit
-echo.
-set /p choice="Enter choice (1-5): "
+REM Set environment
+set "DEVKITPPC=%DEVKITPRO%\devkitPPC"
+set "PATH=%DEVKITPPC%\bin;%DEVKITPRO%\tools\bin;%DEVKITPRO%\msys2\usr\bin;%PATH%"
 
-if "%choice%"=="1" goto build
-if "%choice%"=="2" goto clean
-if "%choice%"=="3" goto run
-if "%choice%"=="4" goto help
-if "%choice%"=="5" exit /b 0
-goto menu
-
-:build
+REM Build
 echo.
-echo Building Nedflix for GameCube...
-REM Convert path and set up devkitPro environment properly
-set "BUILD_DIR=%~dp0"
-set "BUILD_DIR=!BUILD_DIR:\=/!"
-set "BUILD_DIR=/!BUILD_DIR::=!"
-"%MSYS_PATH%\usr\bin\bash.exe" -lc "export DEVKITPRO=/opt/devkitpro && export DEVKITPPC=/opt/devkitpro/devkitPPC && export PATH=$DEVKITPPC/bin:$PATH && cd '!BUILD_DIR!' && make"
+echo [INFO] Building...
+cd /d "%~dp0"
+make -j%NUMBER_OF_PROCESSORS%
+
 if exist "%~dp0nedflix.dol" (
     echo.
-    echo Build successful!
-    echo Output: nedflix.dol
+    echo ======================================
+    echo   BUILD SUCCESSFUL
+    echo ======================================
+    echo Output: %~dp0nedflix.dol
+    for %%A in (nedflix.dol) do echo Size: %%~zA bytes
+    echo.
+    echo To test: Open in Dolphin emulator
+    echo To deploy: Copy to SD card /apps/nedflix/
 ) else (
     echo.
-    echo Build may have failed. Check output above.
+    echo [ERROR] Build failed. Check errors above.
 )
-echo.
-pause
-goto menu
 
-:clean
-echo.
-echo Cleaning build...
-set "BUILD_DIR=%~dp0"
-set "BUILD_DIR=!BUILD_DIR:\=/!"
-set "BUILD_DIR=/!BUILD_DIR::=!"
-"%MSYS_PATH%\usr\bin\bash.exe" -lc "export DEVKITPRO=/opt/devkitpro && export DEVKITPPC=/opt/devkitpro/devkitPPC && cd '!BUILD_DIR!' && make clean"
-echo Clean complete.
 echo.
 pause
-goto menu
-
-:run
-echo.
-if not exist "%~dp0nedflix.dol" (
-    echo No DOL file found. Building first...
-    goto build
-)
-echo Launching in Dolphin...
-where dolphin-emu >nul 2>&1
-if %errorlevel%==0 (
-    start dolphin-emu -e "%~dp0nedflix.dol"
-) else (
-    echo Dolphin not found in PATH.
-    echo Please open nedflix.dol manually in Dolphin.
-)
-echo.
-pause
-goto menu
-
-:help
-echo.
-echo Nedflix GameCube Build Script
-echo.
-echo Prerequisites:
-echo   - MSYS2 with devkitPro
-echo   - gamecube-dev package
-echo.
-echo Features (TECHNICAL DEMO):
-echo   - Audio playback (WAV files only)
-echo   - File browser for SD card media
-echo   - GX-based UI rendering
-echo   - GameCube controller support
-echo.
-echo Limitations:
-echo   - No video playback
-echo   - No network support
-echo   - WAV format only
-echo.
-pause
-goto menu
