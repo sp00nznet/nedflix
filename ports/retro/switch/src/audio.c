@@ -1,6 +1,6 @@
 /*
- * Nedflix Nintendo Switch - Audio playback system
- * Full implementation with streaming and audren
+ * Nedflix Nintendo Switch - Audio playback with real codec support
+ * Supports: WAV, MP3 (via dr_libs)
  */
 
 #include "nedflix.h"
@@ -8,6 +8,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <switch.h>
+
+/* Include dr_libs implementations */
+#define DR_WAV_IMPLEMENTATION
+#define DR_MP3_IMPLEMENTATION
+#include "../../common/dr_wav.h"
+#include "../../common/dr_mp3.h"
 
 /* Audio configuration */
 #define AUDIO_SAMPLE_RATE   48000
@@ -17,42 +23,40 @@
 #define AUDIO_BUFFER_FRAMES 2048
 #define AUDIO_BUFFER_SIZE   (AUDIO_BUFFER_FRAMES * AUDIO_FRAME_SIZE)
 #define NUM_AUDIO_BUFFERS   4
+#define DECODE_BUFFER_SIZE  4096
 
-/* Ring buffer for streaming */
-#define RING_BUFFER_SIZE    (256 * 1024)  /* 256KB ring buffer */
-
-typedef struct {
-    uint8_t *data;
-    size_t size;
-    size_t read_pos;
-    size_t write_pos;
-    size_t available;
-    Mutex mutex;
-} ring_buffer_t;
+/* Codec types */
+typedef enum {
+    CODEC_NONE = 0,
+    CODEC_WAV,
+    CODEC_MP3
+} codec_t;
 
 /* Audio state */
 static struct {
     bool initialized;
     bool playing;
     bool paused;
-    bool buffering;
-    bool stop_requested;
 
-    /* Stream info */
-    char url[MAX_URL_LENGTH];
-    uint32_t position_ms;
-    uint32_t duration_ms;
-    int sample_rate;
-    int channels;
-    int bitrate;
+    /* Codec state */
+    codec_t codec;
+    drwav wav;
+    drmp3 mp3;
+
+    /* File info */
+    char path[512];
+    uint32_t sample_rate;
+    uint32_t channels;
+    uint64_t total_frames;
+    uint64_t current_frame;
+    double duration;
+    double position;
 
     /* Audio buffers */
     AudioDriverWaveBuf wave_bufs[NUM_AUDIO_BUFFERS];
     int16_t *sample_buffers[NUM_AUDIO_BUFFERS];
     int current_buffer;
-
-    /* Ring buffer for streaming */
-    ring_buffer_t ring;
+    int16_t *decode_buf;
 
     /* Volume */
     int volume;
@@ -63,167 +67,76 @@ static struct {
     int mem_pool_id;
     void *mem_pool;
     size_t mem_pool_size;
+    bool audren_init;
+} g_audio;
 
-    /* Threading */
-    Thread stream_thread;
-    bool thread_running;
-} audio_state;
-
-/* Initialize ring buffer */
-static int ring_init(ring_buffer_t *rb, size_t size)
+/* Detect codec from file header */
+static codec_t detect_codec(const char *path)
 {
-    rb->data = aligned_alloc(0x1000, size);
-    if (!rb->data) return -1;
+    FILE *f = fopen(path, "rb");
+    if (!f) return CODEC_NONE;
 
-    rb->size = size;
-    rb->read_pos = 0;
-    rb->write_pos = 0;
-    rb->available = 0;
+    uint8_t hdr[12];
+    size_t n = fread(hdr, 1, 12, f);
+    fclose(f);
+    if (n < 12) return CODEC_NONE;
 
-    mutexInit(&rb->mutex);
-    return 0;
+    /* RIFF....WAVE = WAV */
+    if (hdr[0]=='R' && hdr[1]=='I' && hdr[2]=='F' && hdr[3]=='F' &&
+        hdr[8]=='W' && hdr[9]=='A' && hdr[10]=='V' && hdr[11]=='E')
+        return CODEC_WAV;
+
+    /* ID3 or 0xFF sync = MP3 */
+    if ((hdr[0]=='I' && hdr[1]=='D' && hdr[2]=='3') ||
+        (hdr[0]==0xFF && (hdr[1]&0xE0)==0xE0))
+        return CODEC_MP3;
+
+    return CODEC_NONE;
 }
 
-/* Free ring buffer */
-static void ring_free(ring_buffer_t *rb)
+/* Decode frames into buffer */
+static size_t decode_frames(int16_t *out, size_t max_frames)
 {
-    if (rb->data) {
-        free(rb->data);
-        rb->data = NULL;
-    }
-}
-
-/* Write to ring buffer */
-static size_t ring_write(ring_buffer_t *rb, const void *data, size_t len)
-{
-    mutexLock(&rb->mutex);
-
-    size_t free_space = rb->size - rb->available;
-    if (len > free_space) len = free_space;
-
-    const uint8_t *src = (const uint8_t*)data;
-    size_t to_end = rb->size - rb->write_pos;
-
-    if (len <= to_end) {
-        memcpy(rb->data + rb->write_pos, src, len);
-    } else {
-        memcpy(rb->data + rb->write_pos, src, to_end);
-        memcpy(rb->data, src + to_end, len - to_end);
-    }
-
-    rb->write_pos = (rb->write_pos + len) % rb->size;
-    rb->available += len;
-
-    mutexUnlock(&rb->mutex);
-    return len;
-}
-
-/* Read from ring buffer */
-static size_t ring_read(ring_buffer_t *rb, void *data, size_t len)
-{
-    mutexLock(&rb->mutex);
-
-    if (len > rb->available) len = rb->available;
-
-    uint8_t *dst = (uint8_t*)data;
-    size_t to_end = rb->size - rb->read_pos;
-
-    if (len <= to_end) {
-        memcpy(dst, rb->data + rb->read_pos, len);
-    } else {
-        memcpy(dst, rb->data + rb->read_pos, to_end);
-        memcpy(dst + to_end, rb->data, len - to_end);
-    }
-
-    rb->read_pos = (rb->read_pos + len) % rb->size;
-    rb->available -= len;
-
-    mutexUnlock(&rb->mutex);
-    return len;
-}
-
-/* Get buffer fill percentage */
-static int ring_percent(ring_buffer_t *rb)
-{
-    mutexLock(&rb->mutex);
-    int percent = (rb->available * 100) / rb->size;
-    mutexUnlock(&rb->mutex);
-    return percent;
-}
-
-/* Streaming thread function */
-static void stream_thread_func(void *arg)
-{
-    (void)arg;
-    printf("Audio stream thread started\n");
-
-    /* Start HTTP stream */
-    if (http_stream_start(audio_state.url) != 0) {
-        printf("Failed to start HTTP stream\n");
-        audio_state.buffering = false;
-        return;
-    }
-
-    uint8_t *buffer = malloc(32768);
-    if (!buffer) {
-        http_stream_stop();
-        return;
-    }
-
-    audio_state.buffering = true;
-
-    while (audio_state.thread_running && !audio_state.stop_requested) {
-        /* Check if buffer has space */
-        mutexLock(&audio_state.ring.mutex);
-        size_t free_space = audio_state.ring.size - audio_state.ring.available;
-        mutexUnlock(&audio_state.ring.mutex);
-
-        if (free_space < 32768) {
-            /* Buffer full, wait */
-            svcSleepThread(10000000);  /* 10ms */
-            continue;
-        }
-
-        /* Read from HTTP stream */
-        int bytes = http_stream_read(buffer, 32768);
-        if (bytes > 0) {
-            ring_write(&audio_state.ring, buffer, bytes);
-
-            /* Update buffering state */
-            int percent = ring_percent(&audio_state.ring);
-            if (percent > 10) {
-                audio_state.buffering = false;
-            }
-        } else if (bytes == 0) {
-            /* End of stream */
+    size_t got = 0;
+    switch (g_audio.codec) {
+        case CODEC_WAV:
+            got = drwav_read_pcm_frames_s16(&g_audio.wav, max_frames, out);
             break;
-        } else {
-            /* Error or timeout, retry */
-            svcSleepThread(50000000);  /* 50ms */
-        }
+        case CODEC_MP3:
+            got = drmp3_read_pcm_frames_s16(&g_audio.mp3, max_frames, out);
+            break;
+        default:
+            break;
     }
-
-    free(buffer);
-    http_stream_stop();
-    printf("Audio stream thread ended\n");
+    g_audio.current_frame += got;
+    return got;
 }
 
-/* Fill audio buffer from ring buffer */
+/* Fill audio buffer with decoded samples */
 static void fill_audio_buffer(int buf_idx)
 {
-    int16_t *samples = audio_state.sample_buffers[buf_idx];
-    size_t needed = AUDIO_BUFFER_SIZE;
-    size_t got = ring_read(&audio_state.ring, samples, needed);
+    int16_t *samples = g_audio.sample_buffers[buf_idx];
+    size_t frames_needed = AUDIO_BUFFER_FRAMES;
+    size_t total_got = 0;
 
-    if (got < needed) {
-        /* Fill rest with silence */
-        memset((uint8_t*)samples + got, 0, needed - got);
-        audio_state.buffering = true;
+    /* Decode directly into output buffer */
+    while (total_got < frames_needed && g_audio.playing) {
+        size_t to_decode = frames_needed - total_got;
+        size_t got = decode_frames(samples + (total_got * g_audio.channels), to_decode);
+
+        if (got == 0) break;
+        total_got += got;
     }
 
-    /* Apply volume */
+    /* Fill rest with silence if needed */
+    if (total_got < frames_needed) {
+        memset(samples + (total_got * g_audio.channels), 0,
+               (frames_needed - total_got) * g_audio.channels * sizeof(int16_t));
+    }
+
+    /* Apply volume scaling */
     for (size_t i = 0; i < AUDIO_BUFFER_FRAMES * AUDIO_CHANNELS; i++) {
-        samples[i] = (int16_t)(samples[i] * audio_state.volume_scale);
+        samples[i] = (int16_t)(samples[i] * g_audio.volume_scale);
     }
 
     /* Flush cache for DMA */
@@ -233,34 +146,34 @@ static void fill_audio_buffer(int buf_idx)
 /* Initialize audio subsystem */
 int audio_init(void)
 {
-    printf("Initializing audio subsystem...\n");
+    if (g_audio.initialized) return 0;
 
-    memset(&audio_state, 0, sizeof(audio_state));
-    audio_state.volume = 100;
-    audio_state.volume_scale = 1.0f;
-    audio_state.sample_rate = AUDIO_SAMPLE_RATE;
-    audio_state.channels = AUDIO_CHANNELS;
+    printf("Initializing Switch audio...\n");
+    memset(&g_audio, 0, sizeof(g_audio));
+    g_audio.volume = 100;
+    g_audio.volume_scale = 1.0f;
 
-    /* Initialize ring buffer */
-    if (ring_init(&audio_state.ring, RING_BUFFER_SIZE) != 0) {
-        printf("Failed to allocate ring buffer\n");
+    /* Allocate decode buffer */
+    g_audio.decode_buf = (int16_t*)aligned_alloc(0x1000, DECODE_BUFFER_SIZE * 2 * sizeof(int16_t));
+    if (!g_audio.decode_buf) {
+        printf("Failed to allocate decode buffer\n");
         return -1;
     }
 
-    /* Allocate memory pool for audio */
-    audio_state.mem_pool_size = (AUDIO_BUFFER_SIZE * NUM_AUDIO_BUFFERS + 0xFFF) & ~0xFFF;
-    audio_state.mem_pool = aligned_alloc(0x1000, audio_state.mem_pool_size);
-    if (!audio_state.mem_pool) {
+    /* Allocate memory pool for audio buffers */
+    g_audio.mem_pool_size = (AUDIO_BUFFER_SIZE * NUM_AUDIO_BUFFERS + 0xFFF) & ~0xFFF;
+    g_audio.mem_pool = aligned_alloc(0x1000, g_audio.mem_pool_size);
+    if (!g_audio.mem_pool) {
         printf("Failed to allocate audio memory pool\n");
-        ring_free(&audio_state.ring);
+        free(g_audio.decode_buf);
         return -1;
     }
-    memset(audio_state.mem_pool, 0, audio_state.mem_pool_size);
+    memset(g_audio.mem_pool, 0, g_audio.mem_pool_size);
 
     /* Set up sample buffer pointers */
-    uint8_t *pool_ptr = audio_state.mem_pool;
+    uint8_t *pool_ptr = g_audio.mem_pool;
     for (int i = 0; i < NUM_AUDIO_BUFFERS; i++) {
-        audio_state.sample_buffers[i] = (int16_t*)pool_ptr;
+        g_audio.sample_buffers[i] = (int16_t*)pool_ptr;
         pool_ptr += AUDIO_BUFFER_SIZE;
     }
 
@@ -277,290 +190,348 @@ int audio_init(void)
     Result rc = audrenInitialize(&arConfig);
     if (R_FAILED(rc)) {
         printf("audrenInitialize failed: 0x%x\n", rc);
-        free(audio_state.mem_pool);
-        ring_free(&audio_state.ring);
+        free(g_audio.mem_pool);
+        free(g_audio.decode_buf);
         return -1;
     }
 
     /* Create audio driver */
-    rc = audrvCreate(&audio_state.drv, &arConfig, 2);
+    rc = audrvCreate(&g_audio.drv, &arConfig, 2);
     if (R_FAILED(rc)) {
         printf("audrvCreate failed: 0x%x\n", rc);
         audrenExit();
-        free(audio_state.mem_pool);
-        ring_free(&audio_state.ring);
+        free(g_audio.mem_pool);
+        free(g_audio.decode_buf);
         return -1;
     }
 
     /* Add memory pool */
-    audio_state.mem_pool_id = audrvMemPoolAdd(&audio_state.drv, audio_state.mem_pool,
-                                               audio_state.mem_pool_size);
-    audrvMemPoolAttach(&audio_state.drv, audio_state.mem_pool_id);
+    g_audio.mem_pool_id = audrvMemPoolAdd(&g_audio.drv, g_audio.mem_pool,
+                                           g_audio.mem_pool_size);
+    audrvMemPoolAttach(&g_audio.drv, g_audio.mem_pool_id);
 
     /* Configure output sink */
     static const u8 sink_channels[] = {0, 1};
-    audrvDeviceSinkAdd(&audio_state.drv, AUDREN_DEFAULT_DEVICE_NAME, 2, sink_channels);
+    audrvDeviceSinkAdd(&g_audio.drv, AUDREN_DEFAULT_DEVICE_NAME, 2, sink_channels);
 
-    /* Start audio renderer */
-    rc = audrvUpdate(&audio_state.drv);
-    if (R_FAILED(rc)) {
-        printf("audrvUpdate failed: 0x%x\n", rc);
-    }
-
+    audrvUpdate(&g_audio.drv);
     audrenStartAudioRenderer();
 
-    audio_state.initialized = true;
-    printf("Audio initialized\n");
+    g_audio.audren_init = true;
+    g_audio.initialized = true;
+    printf("Switch audio initialized\n");
     return 0;
 }
 
 /* Shutdown audio */
 void audio_shutdown(void)
 {
-    if (!audio_state.initialized) return;
+    if (!g_audio.initialized) return;
 
-    printf("Shutting down audio...\n");
-
+    printf("Shutting down Switch audio...\n");
     audio_stop();
 
-    /* Cleanup audren */
-    audrvClose(&audio_state.drv);
-    audrenExit();
-
-    if (audio_state.mem_pool) {
-        free(audio_state.mem_pool);
-        audio_state.mem_pool = NULL;
+    if (g_audio.audren_init) {
+        audrvClose(&g_audio.drv);
+        audrenExit();
+        g_audio.audren_init = false;
     }
 
-    ring_free(&audio_state.ring);
+    if (g_audio.mem_pool) {
+        free(g_audio.mem_pool);
+        g_audio.mem_pool = NULL;
+    }
 
-    audio_state.initialized = false;
-    printf("Audio shutdown complete\n");
+    if (g_audio.decode_buf) {
+        free(g_audio.decode_buf);
+        g_audio.decode_buf = NULL;
+    }
+
+    g_audio.initialized = false;
+    printf("Switch audio shutdown complete\n");
 }
 
-/* Start playing audio stream from URL */
-int audio_play_stream(const char *url)
+/* Load audio file */
+int audio_load(const char *path)
 {
-    if (!audio_state.initialized) {
-        if (audio_init() != 0) return -1;
-    }
+    if (!g_audio.initialized && audio_init() != 0)
+        return -1;
 
-    /* Stop any current playback */
     audio_stop();
 
-    printf("Starting audio stream: %s\n", url);
+    printf("Loading audio: %s\n", path);
 
-    strncpy(audio_state.url, url, MAX_URL_LENGTH - 1);
-    audio_state.position_ms = 0;
-    audio_state.duration_ms = 0;
-    audio_state.buffering = true;
-    audio_state.stop_requested = false;
-    audio_state.thread_running = true;
-
-    /* Clear ring buffer */
-    mutexLock(&audio_state.ring.mutex);
-    audio_state.ring.read_pos = 0;
-    audio_state.ring.write_pos = 0;
-    audio_state.ring.available = 0;
-    mutexUnlock(&audio_state.ring.mutex);
-
-    /* Initialize wave buffers */
-    for (int i = 0; i < NUM_AUDIO_BUFFERS; i++) {
-        audio_state.wave_bufs[i].data_raw = audio_state.sample_buffers[i];
-        audio_state.wave_bufs[i].size = AUDIO_BUFFER_SIZE;
-        audio_state.wave_bufs[i].start_sample_offset = 0;
-        audio_state.wave_bufs[i].end_sample_offset = AUDIO_BUFFER_FRAMES;
+    g_audio.codec = detect_codec(path);
+    if (g_audio.codec == CODEC_NONE) {
+        printf("Unknown audio format: %s\n", path);
+        return -1;
     }
 
-    /* Set up voice for playback */
-    audrvVoiceInit(&audio_state.drv, 0, AUDIO_CHANNELS, PcmFormat_Int16, AUDIO_SAMPLE_RATE);
-    audrvVoiceSetDestinationMix(&audio_state.drv, 0, AUDREN_FINAL_MIX_ID);
-
-    /* Set channel volumes */
-    audrvVoiceSetMixFactor(&audio_state.drv, 0, 1.0f, 0, 0);
-    audrvVoiceSetMixFactor(&audio_state.drv, 0, 1.0f, 1, 1);
-
-    /* Start streaming thread */
-    Result rc = threadCreate(&audio_state.stream_thread, stream_thread_func, NULL,
-                             NULL, 0x10000, 0x2B, -2);
-    if (R_SUCCEEDED(rc)) {
-        threadStart(&audio_state.stream_thread);
+    bool ok = false;
+    switch (g_audio.codec) {
+        case CODEC_WAV:
+            if (drwav_init_file(&g_audio.wav, path, NULL)) {
+                g_audio.sample_rate = g_audio.wav.sampleRate;
+                g_audio.channels = g_audio.wav.channels;
+                g_audio.total_frames = g_audio.wav.totalPCMFrameCount;
+                ok = true;
+            }
+            break;
+        case CODEC_MP3:
+            if (drmp3_init_file(&g_audio.mp3, path, NULL)) {
+                g_audio.sample_rate = g_audio.mp3.sampleRate;
+                g_audio.channels = g_audio.mp3.channels;
+                g_audio.total_frames = drmp3_get_pcm_frame_count(&g_audio.mp3);
+                ok = true;
+            }
+            break;
+        default:
+            break;
     }
 
-    /* Start voice playback */
-    audrvVoiceStart(&audio_state.drv, 0);
+    if (!ok) {
+        printf("Failed to open: %s\n", path);
+        g_audio.codec = CODEC_NONE;
+        return -1;
+    }
 
-    audio_state.playing = true;
-    audio_state.paused = false;
+    strncpy(g_audio.path, path, sizeof(g_audio.path) - 1);
+    g_audio.duration = (double)g_audio.total_frames / g_audio.sample_rate;
+    g_audio.current_frame = 0;
+    g_audio.position = 0;
+
+    printf("Loaded: %s (%s, %uHz, %uch, %.1fs)\n",
+        path,
+        g_audio.codec == CODEC_WAV ? "WAV" : "MP3",
+        g_audio.sample_rate,
+        g_audio.channels,
+        g_audio.duration);
 
     return 0;
 }
 
-/* Play audio from local file */
-int audio_play_file(const char *path)
+/* Start playback */
+int audio_play(void)
 {
-    char file_url[MAX_URL_LENGTH];
-    snprintf(file_url, sizeof(file_url), "file://%s", path);
-    return audio_play_stream(file_url);
+    if (g_audio.codec == CODEC_NONE) return -1;
+
+    if (g_audio.playing) {
+        if (g_audio.paused) {
+            audio_resume();
+        }
+        return 0;
+    }
+
+    /* Initialize wave buffers */
+    for (int i = 0; i < NUM_AUDIO_BUFFERS; i++) {
+        g_audio.wave_bufs[i].data_raw = g_audio.sample_buffers[i];
+        g_audio.wave_bufs[i].size = AUDIO_BUFFER_SIZE;
+        g_audio.wave_bufs[i].start_sample_offset = 0;
+        g_audio.wave_bufs[i].end_sample_offset = AUDIO_BUFFER_FRAMES;
+        g_audio.wave_bufs[i].state = AudioDriverWaveBufState_Free;
+    }
+
+    /* Set up voice */
+    int voice_chans = (g_audio.channels > 2) ? 2 : g_audio.channels;
+    audrvVoiceInit(&g_audio.drv, 0, voice_chans, PcmFormat_Int16, g_audio.sample_rate);
+    audrvVoiceSetDestinationMix(&g_audio.drv, 0, AUDREN_FINAL_MIX_ID);
+    audrvVoiceSetMixFactor(&g_audio.drv, 0, g_audio.volume_scale, 0, 0);
+    if (voice_chans == 2) {
+        audrvVoiceSetMixFactor(&g_audio.drv, 0, g_audio.volume_scale, 1, 1);
+    }
+
+    /* Pre-fill first two buffers */
+    fill_audio_buffer(0);
+    fill_audio_buffer(1);
+    audrvVoiceAddWaveBuf(&g_audio.drv, 0, &g_audio.wave_bufs[0]);
+    audrvVoiceAddWaveBuf(&g_audio.drv, 0, &g_audio.wave_bufs[1]);
+
+    /* Start playback */
+    audrvVoiceStart(&g_audio.drv, 0);
+    audrvUpdate(&g_audio.drv);
+
+    g_audio.playing = true;
+    g_audio.paused = false;
+    g_audio.current_buffer = 2;
+
+    printf("Audio playback started\n");
+    return 0;
 }
 
-/* Stop audio playback */
+/* Stop playback */
 void audio_stop(void)
 {
-    if (!audio_state.playing) return;
+    if (g_audio.playing && g_audio.audren_init) {
+        audrvVoiceStop(&g_audio.drv, 0);
+        audrvUpdate(&g_audio.drv);
+    }
 
-    printf("Stopping audio...\n");
+    /* Close codec */
+    switch (g_audio.codec) {
+        case CODEC_WAV: drwav_uninit(&g_audio.wav); break;
+        case CODEC_MP3: drmp3_uninit(&g_audio.mp3); break;
+        default: break;
+    }
 
-    audio_state.stop_requested = true;
-    audio_state.thread_running = false;
-
-    /* Wait for thread to finish */
-    threadWaitForExit(&audio_state.stream_thread);
-    threadClose(&audio_state.stream_thread);
-
-    /* Stop voice */
-    audrvVoiceStop(&audio_state.drv, 0);
-
-    audio_state.playing = false;
-    audio_state.paused = false;
-    audio_state.position_ms = 0;
-    audio_state.url[0] = '\0';
+    g_audio.playing = false;
+    g_audio.paused = false;
+    g_audio.codec = CODEC_NONE;
+    g_audio.position = 0;
+    g_audio.current_frame = 0;
+    g_audio.path[0] = '\0';
 
     printf("Audio stopped\n");
 }
 
-/* Pause audio */
+/* Pause */
 void audio_pause(void)
 {
-    if (audio_state.playing && !audio_state.paused) {
-        audrvVoiceSetPaused(&audio_state.drv, 0, true);
-        audio_state.paused = true;
+    if (g_audio.playing && !g_audio.paused) {
+        audrvVoiceSetPaused(&g_audio.drv, 0, true);
+        audrvUpdate(&g_audio.drv);
+        g_audio.paused = true;
         printf("Audio paused\n");
     }
 }
 
-/* Resume audio */
+/* Resume */
 void audio_resume(void)
 {
-    if (audio_state.playing && audio_state.paused) {
-        audrvVoiceSetPaused(&audio_state.drv, 0, false);
-        audio_state.paused = false;
+    if (g_audio.playing && g_audio.paused) {
+        audrvVoiceSetPaused(&g_audio.drv, 0, false);
+        audrvUpdate(&g_audio.drv);
+        g_audio.paused = false;
         printf("Audio resumed\n");
     }
 }
 
-/* Seek relative to current position */
-void audio_seek(int offset_ms)
+/* Seek to position in seconds */
+void audio_seek(double seconds)
 {
-    if (!audio_state.playing) return;
+    if (!g_audio.playing || g_audio.sample_rate == 0) return;
 
-    int new_pos = (int)audio_state.position_ms + offset_ms;
-    if (new_pos < 0) new_pos = 0;
-    if (audio_state.duration_ms > 0 && new_pos > (int)audio_state.duration_ms) {
-        new_pos = audio_state.duration_ms;
+    if (seconds < 0) seconds = 0;
+    if (seconds > g_audio.duration) seconds = g_audio.duration;
+
+    uint64_t frame = (uint64_t)(seconds * g_audio.sample_rate);
+    bool ok = false;
+
+    switch (g_audio.codec) {
+        case CODEC_WAV: ok = drwav_seek_to_pcm_frame(&g_audio.wav, frame); break;
+        case CODEC_MP3: ok = drmp3_seek_to_pcm_frame(&g_audio.mp3, frame); break;
+        default: break;
     }
 
-    audio_state.position_ms = (uint32_t)new_pos;
-    printf("Audio seek to %u ms\n", audio_state.position_ms);
-}
-
-/* Seek to absolute position */
-void audio_seek_absolute(uint32_t position_ms)
-{
-    if (!audio_state.playing) return;
-
-    if (audio_state.duration_ms > 0 && position_ms > audio_state.duration_ms) {
-        position_ms = audio_state.duration_ms;
+    if (ok) {
+        g_audio.current_frame = frame;
+        g_audio.position = seconds;
+        printf("Audio seek to %.1fs\n", seconds);
     }
-
-    audio_state.position_ms = position_ms;
-    printf("Audio seek to %u ms\n", position_ms);
 }
 
 /* Set volume (0-100) */
 void audio_set_volume(int vol)
 {
-    audio_state.volume = CLAMP(vol, 0, 100);
-    audio_state.volume_scale = audio_state.volume / 100.0f;
+    g_audio.volume = (vol < 0) ? 0 : (vol > 100) ? 100 : vol;
+    g_audio.volume_scale = g_audio.volume / 100.0f;
 
-    /* Update voice volume */
-    if (audio_state.initialized) {
-        audrvVoiceSetMixFactor(&audio_state.drv, 0, audio_state.volume_scale, 0, 0);
-        audrvVoiceSetMixFactor(&audio_state.drv, 0, audio_state.volume_scale, 1, 1);
+    if (g_audio.audren_init && g_audio.playing) {
+        audrvVoiceSetMixFactor(&g_audio.drv, 0, g_audio.volume_scale, 0, 0);
+        audrvVoiceSetMixFactor(&g_audio.drv, 0, g_audio.volume_scale, 1, 1);
+        audrvUpdate(&g_audio.drv);
     }
 }
 
-/* Set audio track */
-void audio_set_track(int track)
-{
-    (void)track;
-    /* For future: switch audio track */
-}
-
-/* Update audio (called each frame) */
+/* Update - call every frame */
 void audio_update(void)
 {
-    if (!audio_state.initialized || !audio_state.playing) return;
+    if (!g_audio.initialized || !g_audio.playing || g_audio.paused) return;
+
+    /* Update position */
+    if (g_audio.sample_rate > 0) {
+        g_audio.position = (double)g_audio.current_frame / g_audio.sample_rate;
+    }
+
+    /* Check for end of playback */
+    if (g_audio.current_frame >= g_audio.total_frames) {
+        g_audio.playing = false;
+        printf("Audio playback complete\n");
+        return;
+    }
 
     /* Update audio driver */
-    audrvUpdate(&audio_state.drv);
+    audrvUpdate(&g_audio.drv);
 
-    /* Fill and queue buffers as needed */
+    /* Refill buffers as needed */
     for (int i = 0; i < NUM_AUDIO_BUFFERS; i++) {
-        AudioDriverWaveBuf *buf = &audio_state.wave_bufs[i];
+        AudioDriverWaveBuf *buf = &g_audio.wave_bufs[i];
 
         if (buf->state == AudioDriverWaveBufState_Free ||
             buf->state == AudioDriverWaveBufState_Done) {
 
-            /* Fill this buffer */
             fill_audio_buffer(i);
-
-            /* Queue it for playback */
-            audrvVoiceAddWaveBuf(&audio_state.drv, 0, buf);
-            audrvUpdate(&audio_state.drv);
+            audrvVoiceAddWaveBuf(&g_audio.drv, 0, buf);
         }
     }
 
-    /* Update position */
-    if (!audio_state.paused && !audio_state.buffering) {
-        /* Approximate position based on played samples */
-        uint64_t played = audrvVoiceGetPlayedSampleCount(&audio_state.drv, 0);
-        audio_state.position_ms = (uint32_t)((played * 1000) / audio_state.sample_rate);
+    audrvUpdate(&g_audio.drv);
+}
+
+/* Query functions */
+bool audio_is_playing(void) { return g_audio.playing && !g_audio.paused; }
+double audio_get_position(void) { return g_audio.position; }
+double audio_get_duration(void) { return g_audio.duration; }
+int audio_get_volume(void) { return g_audio.volume; }
+
+/* Compatibility wrappers */
+int audio_load_wav(const char *path, playback_state_t *state)
+{
+    int r = audio_load(path);
+    if (r == 0 && state) {
+        state->duration = g_audio.duration;
+        state->current_time = 0;
+        state->is_playing = false;
+        state->is_paused = false;
+        state->format.sample_rate = g_audio.sample_rate;
+        state->format.channels = g_audio.channels;
+        state->format.bits_per_sample = 16;
     }
+    return r;
+}
 
-    /* Check for end of stream */
-    if (audio_state.duration_ms > 0 && audio_state.position_ms >= audio_state.duration_ms) {
-        audio_state.playing = false;
-        printf("Audio playback complete\n");
+int audio_load_mp3(const char *path, playback_state_t *state)
+{
+    return audio_load_wav(path, state);
+}
+
+int audio_play_ex(playback_state_t *state)
+{
+    int r = audio_play();
+    if (r == 0 && state) {
+        state->is_playing = true;
+        state->is_paused = false;
+    }
+    return r;
+}
+
+void audio_stop_ex(playback_state_t *state)
+{
+    audio_stop();
+    if (state) {
+        state->is_playing = false;
+        state->is_paused = false;
+        state->current_time = 0;
     }
 }
 
-/* Check if audio is playing */
-bool audio_is_playing(void)
+void audio_pause_ex(playback_state_t *state)
 {
-    return audio_state.playing && !audio_state.paused;
+    audio_pause();
+    if (state) state->is_paused = true;
 }
 
-/* Check if buffering */
-bool audio_is_buffering(void)
+void audio_resume_ex(playback_state_t *state)
 {
-    return audio_state.buffering;
-}
-
-/* Get current position in milliseconds */
-uint32_t audio_get_position(void)
-{
-    return audio_state.position_ms;
-}
-
-/* Get duration in milliseconds */
-uint32_t audio_get_duration(void)
-{
-    return audio_state.duration_ms;
-}
-
-/* Get buffer fill percentage */
-int audio_get_buffer_percent(void)
-{
-    return ring_percent(&audio_state.ring);
+    audio_resume();
+    if (state) state->is_paused = false;
 }
