@@ -1,107 +1,102 @@
 @echo off
-REM Nedflix PS3 Build Script for Windows
-REM
-REM TECHNICAL DEMO / NOVELTY PORT
-REM One-click build with automatic toolchain installation.
-REM
+REM ============================================
+REM Nedflix PlayStation 3 - Windows Build Script
+REM One-click build using PSL1GHT
+REM ============================================
 
 setlocal enabledelayedexpansion
 
-echo ======================================
-echo   Nedflix for PlayStation 3
-echo   TECHNICAL DEMO / NOVELTY PORT
-echo ======================================
+echo.
+echo ============================================
+echo   Nedflix PlayStation 3 Build (Windows)
+echo ============================================
 echo.
 
-REM Check for WSL first (preferred)
-where wsl >nul 2>&1
-if %errorlevel%==0 (
-    set "BUILD_ENV=WSL"
-    echo Found WSL - using Linux build environment
-    goto check_toolchain
-)
+REM Check for PS3DEV in common locations
+set "PS3DEV="
+if exist "C:\ps3dev" set "PS3DEV=C:\ps3dev"
+if exist "D:\ps3dev" set "PS3DEV=D:\ps3dev"
+if exist "%USERPROFILE%\ps3dev" set "PS3DEV=%USERPROFILE%\ps3dev"
 
-REM Check for MSYS2
+REM Check MSYS2 locations
 set "MSYS_PATH="
-if exist "C:\msys64\msys2_shell.cmd" set "MSYS_PATH=C:\msys64"
-if exist "C:\msys32\msys2_shell.cmd" set "MSYS_PATH=C:\msys32"
-
-if not "%MSYS_PATH%"=="" (
-    set "BUILD_ENV=MSYS2"
-    echo Found MSYS2 at: %MSYS_PATH%
-    goto check_toolchain
+if exist "C:\msys64\usr\local\ps3dev" (
+    set "MSYS_PATH=C:\msys64"
+    if not defined PS3DEV set "PS3DEV=C:\msys64\usr\local\ps3dev"
+)
+if exist "C:\msys64\opt\ps3dev" (
+    set "MSYS_PATH=C:\msys64"
+    if not defined PS3DEV set "PS3DEV=C:\msys64\opt\ps3dev"
 )
 
-REM No build environment - offer to install WSL
-echo No build environment found.
-echo.
-choice /C YN /M "Install WSL (Windows Subsystem for Linux) automatically"
-if !errorlevel! equ 2 (
-    echo.
-    echo Please install WSL manually: wsl --install
-    pause
-    exit /b 1
+REM Check WSL
+set "USE_WSL=0"
+where wsl >nul 2>&1
+if !errorlevel! equ 0 (
+    wsl bash -c "test -d /usr/local/ps3dev" 2>nul && (
+        set "USE_WSL=1"
+        echo [INFO] Found PS3 toolchain in WSL
+    )
 )
-echo.
-echo Installing WSL...
-wsl --install
-echo.
-echo WSL installation started. Please restart your computer,
-echo then run this script again.
-pause
-exit /b 0
 
-:check_toolchain
-REM Check if PS3 toolchain is installed
-set "TOOLCHAIN_OK=0"
-if "%BUILD_ENV%"=="WSL" (
-    wsl bash -c "test -f /usr/local/ps3dev/ppu/bin/ppu-gcc" 2>nul && set "TOOLCHAIN_OK=1"
-    if "!TOOLCHAIN_OK!"=="0" wsl bash -c "test -f $PS3DEV/ppu/bin/ppu-gcc" 2>nul && set "TOOLCHAIN_OK=1"
+if not defined PS3DEV (
+    if "!USE_WSL!"=="0" (
+        echo ========================================
+        echo  PS3 Toolchain Not Found
+        echo ========================================
+        echo.
+        echo The PSL1GHT PS3 toolchain needs to be installed.
+        echo.
+        echo Options:
+        echo   1. Use WSL (recommended for Windows 10/11)
+        echo   2. Use MSYS2
+        echo.
+        echo For WSL installation:
+        echo   1. Open PowerShell as Admin and run: wsl --install
+        echo   2. After restart, open Ubuntu and run:
+        echo      sudo apt update
+        echo      sudo apt install build-essential git autoconf automake
+        echo      git clone https://github.com/ps3dev/ps3toolchain
+        echo      cd ps3toolchain
+        echo      sudo ./toolchain.sh
+        echo.
+        echo For MSYS2:
+        echo   1. Install MSYS2 from https://www.msys2.org/
+        echo   2. Open MSYS2 and follow similar steps
+        echo.
+        choice /C YN /M "Open PS3 toolchain GitHub page"
+        if !errorlevel! equ 1 (
+            start https://github.com/ps3dev/ps3toolchain
+        )
+        echo.
+        pause
+        exit /b 1
+    )
+)
+
+if "!USE_WSL!"=="1" (
+    echo [OK] Using WSL with PS3 toolchain
 ) else (
-    if exist "%MSYS_PATH%\usr\local\ps3dev\ppu\bin\ppu-gcc.exe" set "TOOLCHAIN_OK=1"
+    echo [OK] PS3DEV: %PS3DEV%
 )
 
-if "!TOOLCHAIN_OK!"=="0" (
-    echo.
-    echo ========================================
-    echo  PS3 Toolchain Not Found
-    echo ========================================
-    echo.
-    echo The ps3toolchain needs to be installed.
-    echo This will download and compile the toolchain (takes 60-90 minutes^).
-    echo.
-    choice /C YN /M "Install PS3 toolchain automatically"
-    if !errorlevel! equ 2 (
-        echo.
-        echo Please install ps3toolchain manually.
-        pause
-        exit /b 1
+REM Check for PSL1GHT
+if defined PS3DEV (
+    set "PSL1GHT=%PS3DEV%"
+    if not exist "%PS3DEV%\ppu\bin\ppu-gcc.exe" (
+        if not exist "%PS3DEV%\ppu\bin\powerpc64-ps3-elf-gcc.exe" (
+            echo [ERROR] PPU compiler not found in %PS3DEV%
+            echo Please ensure ps3toolchain completed successfully.
+            pause
+            exit /b 1
+        )
     )
-    echo.
-    echo Installing PS3 toolchain...
-    echo This will take a while. Please be patient.
-    echo.
-
-    if "%BUILD_ENV%"=="WSL" (
-        wsl bash -c "sudo apt-get update && sudo apt-get install -y build-essential git autoconf automake bison flex libelf-dev libtool pkg-config texinfo libgmp-dev libmpfr-dev libmpc-dev zlib1g-dev libssl-dev python3 wget && export PS3DEV=/usr/local/ps3dev && export PSL1GHT=$PS3DEV && export PATH=$PS3DEV/bin:$PS3DEV/ppu/bin:$PS3DEV/spu/bin:$PATH && cd ~ && git clone https://github.com/ps3dev/ps3toolchain.git 2>/dev/null || true && cd ~/ps3toolchain && sudo -E ./toolchain.sh"
-    ) else (
-        "%MSYS_PATH%\usr\bin\bash.exe" -lc "pacman -Syu --noconfirm && pacman -S --noconfirm --needed base-devel git autoconf automake bison flex libelf libtool pkg-config texinfo gmp-devel mpfr-devel mpc-devel zlib-devel openssl-devel python3 wget && export PS3DEV=/usr/local/ps3dev && export PSL1GHT=$PS3DEV && export PATH=$PS3DEV/bin:$PS3DEV/ppu/bin:$PS3DEV/spu/bin:$PATH && cd ~ && git clone https://github.com/ps3dev/ps3toolchain.git 2>/dev/null || true && cd ~/ps3toolchain && ./toolchain.sh"
-    )
-
-    if !errorlevel! neq 0 (
-        echo.
-        echo ERROR: Toolchain installation failed.
-        echo Check the output above for errors.
-        pause
-        exit /b 1
-    )
-    echo.
-    echo Toolchain installed successfully!
-    echo.
+    echo [OK] PSL1GHT found
 )
+
+echo.
 
 :menu
-echo.
 echo Select build option:
 echo   1. Build SELF/ELF
 echo   2. Clean build
@@ -118,23 +113,61 @@ goto menu
 
 :build
 echo.
-echo Building Nedflix for PS3...
-if "%BUILD_ENV%"=="WSL" (
-    REM Convert Windows path to WSL format and build
-    set "SCRIPT_DIR=%~dp0"
-    set "SCRIPT_DIR=!SCRIPT_DIR:~0,-1!"
-    for /f "usebackq tokens=*" %%i in (`wsl wslpath -u "!SCRIPT_DIR!"`) do set "WSL_DIR=%%i"
-    wsl bash -c "cd '!WSL_DIR!' && ./build.sh"
+echo [INFO] Building Nedflix for PlayStation 3...
+echo.
+
+if "!USE_WSL!"=="1" (
+    REM Build using WSL
+    set "WIN_PATH=%~dp0"
+    set "WIN_PATH=!WIN_PATH:\=/!"
+    for /f "usebackq tokens=*" %%i in (`wsl wslpath -u "!WIN_PATH!"`) do set "WSL_PATH=%%i"
+    wsl bash -c "cd '!WSL_PATH!' && export PS3DEV=/usr/local/ps3dev && export PSL1GHT=$PS3DEV && export PATH=$PS3DEV/bin:$PS3DEV/ppu/bin:$PS3DEV/spu/bin:$PATH && make"
 ) else (
-    "%MSYS_PATH%\usr\bin\bash.exe" -lc "cd '%~dp0' && ./build.sh"
+    REM Build natively with MSYS2
+    set "PATH=%PS3DEV%\bin;%PS3DEV%\ppu\bin;%PS3DEV%\spu\bin;%PATH%"
+
+    REM Find make
+    where make >nul 2>&1
+    if !errorlevel! neq 0 (
+        if defined MSYS_PATH (
+            set "PATH=%MSYS_PATH%\usr\bin;%PATH%"
+        ) else (
+            echo [ERROR] 'make' not found. Please install MSYS2.
+            pause
+            goto menu
+        )
+    )
+
+    cd /d "%~dp0"
+    make
 )
+
 if exist "%~dp0nedflix.self" (
     echo.
-    echo Build successful!
-    echo Output: nedflix.self, nedflix.elf
+    echo ============================================
+    echo   Build successful!
+    echo ============================================
+    echo.
+    echo Output: nedflix.self
+    for %%A in (nedflix.self) do echo Size: %%~zA bytes
+    echo.
+    echo Installation:
+    echo   1. Copy nedflix.self to your PS3 via FTP or USB
+    echo   2. Rename to EBOOT.BIN and place in:
+    echo      /dev_hdd0/game/NEDFLIX01/USRDIR/EBOOT.BIN
+    echo   3. Requires CFW or HEN
+    echo.
+) else if exist "%~dp0EBOOT.BIN" (
+    echo.
+    echo ============================================
+    echo   Build successful!
+    echo ============================================
+    echo.
+    echo Output: EBOOT.BIN
+    for %%A in (EBOOT.BIN) do echo Size: %%~zA bytes
 ) else (
     echo.
-    echo Build may have failed. Check output above.
+    echo [ERROR] Build failed - check output above.
 )
 echo.
 pause
@@ -142,16 +175,23 @@ goto menu
 
 :clean
 echo.
-echo Cleaning build...
-if "%BUILD_ENV%"=="WSL" (
-    REM Convert Windows path to WSL format and clean
-    set "SCRIPT_DIR=%~dp0"
-    set "SCRIPT_DIR=!SCRIPT_DIR:~0,-1!"
-    for /f "usebackq tokens=*" %%i in (`wsl wslpath -u "!SCRIPT_DIR!"`) do set "WSL_DIR=%%i"
-    wsl bash -c "cd '!WSL_DIR!' && ./build.sh clean"
+echo [INFO] Cleaning build directory...
+
+if "!USE_WSL!"=="1" (
+    set "WIN_PATH=%~dp0"
+    set "WIN_PATH=!WIN_PATH:\=/!"
+    for /f "usebackq tokens=*" %%i in (`wsl wslpath -u "!WIN_PATH!"`) do set "WSL_PATH=%%i"
+    wsl bash -c "cd '!WSL_PATH!' && make clean"
 ) else (
-    "%MSYS_PATH%\usr\bin\bash.exe" -lc "cd '%~dp0' && ./build.sh clean"
+    cd /d "%~dp0"
+    if defined MSYS_PATH set "PATH=%MSYS_PATH%\usr\bin;%PATH%"
+    make clean 2>nul
 )
+
+if exist "%~dp0nedflix.self" del "%~dp0nedflix.self"
+if exist "%~dp0nedflix.elf" del "%~dp0nedflix.elf"
+if exist "%~dp0EBOOT.BIN" del "%~dp0EBOOT.BIN"
+
 echo Clean complete.
 echo.
 pause
@@ -162,28 +202,27 @@ echo.
 echo Nedflix PS3 Build Script
 echo.
 echo Prerequisites:
-echo   - WSL or MSYS2
-echo   - ps3toolchain
-echo   - PSL1GHT SDK
+echo   - ps3toolchain (PSL1GHT SDK)
+echo   - GitHub: https://github.com/ps3dev/ps3toolchain
 echo.
-echo Installation (in WSL/Linux):
-echo   git clone https://github.com/ps3dev/ps3toolchain
-echo   cd ps3toolchain
-echo   sudo ./toolchain.sh
+echo Recommended Setup (WSL):
+echo   1. Install WSL: wsl --install
+echo   2. Open Ubuntu terminal
+echo   3. sudo apt update
+echo   4. sudo apt install build-essential git autoconf
+echo   5. git clone https://github.com/ps3dev/ps3toolchain
+echo   6. cd ps3toolchain ^&^& sudo ./toolchain.sh
 echo.
-echo   git clone https://github.com/ps3dev/PSL1GHT
-echo   cd PSL1GHT
-echo   make install
-echo.
-echo Environment:
-echo   export PS3DEV=/usr/local/ps3dev
-echo   export PSL1GHT=$PS3DEV/psl1ght
-echo   export PATH=$PS3DEV/bin:$PS3DEV/ppu/bin:$PATH
+echo Features:
+echo   - Audio playback with multi-format support
+echo   - Video streaming
+echo   - Network support
+echo   - Full UI with controller navigation
+echo   - Favorites and watch history
 echo.
 echo Deployment:
-echo   1. Copy nedflix.self to PS3 via FTP or USB
-echo   2. Place in /dev_hdd0/game/NEDF00001/USRDIR/EBOOT.BIN
-echo   3. Requires CFW or HEN
+echo   - Requires PS3 with CFW or HEN
+echo   - Use FTP or USB to copy files
 echo.
 pause
 goto menu

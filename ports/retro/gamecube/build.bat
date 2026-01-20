@@ -1,95 +1,63 @@
 @echo off
 REM Nedflix GameCube Build Script for Windows
-REM
-REM TECHNICAL DEMO / NOVELTY PORT
 REM One-click build with automatic toolchain installation.
-REM
 
 setlocal enabledelayedexpansion
 
 echo ======================================
 echo   Nedflix for Nintendo GameCube
-echo   TECHNICAL DEMO / NOVELTY PORT
 echo ======================================
 echo.
 
-REM Find MSYS2
+REM Check if devkitPro Windows installer path exists
+set "DEVKITPRO="
+if exist "C:\devkitPro" set "DEVKITPRO=C:\devkitPro"
+if exist "%USERPROFILE%\devkitPro" set "DEVKITPRO=%USERPROFILE%\devkitPro"
+if exist "D:\devkitPro" set "DEVKITPRO=D:\devkitPro"
+
+REM Check for MSYS2 path (legacy installations)
 set "MSYS_PATH="
 if exist "C:\msys64\msys2_shell.cmd" set "MSYS_PATH=C:\msys64"
 if exist "C:\msys32\msys2_shell.cmd" set "MSYS_PATH=C:\msys32"
-if exist "%USERPROFILE%\msys64\msys2_shell.cmd" set "MSYS_PATH=%USERPROFILE%\msys64"
 
-if "%MSYS_PATH%"=="" (
-    echo ========================================
-    echo  MSYS2 Not Found - Installing...
-    echo ========================================
-    echo.
-    echo MSYS2 is required for GameCube development.
-    echo.
-    choice /C YN /M "Download and install MSYS2 automatically"
-    if !errorlevel! equ 2 (
-        echo.
-        echo Please install MSYS2 manually from https://www.msys2.org/
-        pause
-        exit /b 1
+REM Check devkitPro installation
+set "DEVKIT_OK=0"
+if defined DEVKITPRO (
+    if exist "%DEVKITPRO%\devkitPPC\bin\powerpc-eabi-gcc.exe" set "DEVKIT_OK=1"
+)
+if defined MSYS_PATH (
+    if exist "%MSYS_PATH%\opt\devkitpro\devkitPPC\bin\powerpc-eabi-gcc.exe" (
+        set "DEVKIT_OK=1"
+        set "DEVKITPRO=%MSYS_PATH%\opt\devkitpro"
     )
-    echo.
-    echo Downloading MSYS2 installer...
-    powershell -Command "Invoke-WebRequest -Uri 'https://github.com/msys2/msys2-installer/releases/download/2024-01-13/msys2-x86_64-20240113.exe' -OutFile '%TEMP%\msys2-installer.exe'"
-    if !errorlevel! neq 0 (
-        echo ERROR: Failed to download MSYS2. Please install manually.
-        pause
-        exit /b 1
-    )
-    echo Running MSYS2 installer...
-    "%TEMP%\msys2-installer.exe"
-    echo.
-    echo After MSYS2 installation completes, please run this script again.
-    pause
-    exit /b 0
 )
 
-echo Found MSYS2 at: %MSYS_PATH%
-
-REM Check if devkitPro is installed
-set "DEVKIT_OK=0"
-if exist "%MSYS_PATH%\opt\devkitpro\devkitPPC\bin\powerpc-eabi-gcc.exe" set "DEVKIT_OK=1"
-
 if "!DEVKIT_OK!"=="0" (
-    echo.
     echo ========================================
     echo  devkitPro Not Found
     echo ========================================
     echo.
     echo The devkitPro GameCube toolchain needs to be installed.
-    echo This will download and install the toolchain (takes 5-10 minutes^).
     echo.
-    choice /C YN /M "Install devkitPro GameCube toolchain automatically"
-    if !errorlevel! equ 2 (
-        echo.
-        echo Please install devkitPro manually.
-        pause
-        exit /b 1
+    echo Please download and install devkitPro from:
+    echo   https://github.com/devkitPro/installer/releases
+    echo.
+    echo Direct link:
+    echo   https://github.com/devkitPro/installer/releases/download/v3.0.3/devkitProUpdater-3.0.3.exe
+    echo.
+    echo IMPORTANT: During installation, select "GameCube / Wii development"
+    echo.
+    choice /C YN /M "Open download page in browser"
+    if !errorlevel! equ 1 (
+        start https://github.com/devkitPro/installer/releases
     )
     echo.
-    echo Installing devkitPro GameCube toolchain...
-    echo.
-
-    REM Install devkitPro using pacman
-    "%MSYS_PATH%\usr\bin\bash.exe" -lc "pacman-key --recv BC26F752D25B92CE272E0F44F7FD5492264BB9D0 --keyserver keyserver.ubuntu.com 2>/dev/null || true && pacman-key --lsign BC26F752D25B92CE272E0F44F7FD5492264BB9D0 2>/dev/null || true && pacman -U --noconfirm https://pkg.devkitpro.org/devkitpro-keyring.pkg.tar.xz 2>/dev/null || true && echo '[dkp-libs]' >> /etc/pacman.conf && echo 'Server = https://pkg.devkitpro.org/packages' >> /etc/pacman.conf && echo '[dkp-windows]' >> /etc/pacman.conf && echo 'Server = https://pkg.devkitpro.org/packages/windows/\$arch' >> /etc/pacman.conf && pacman -Syu --noconfirm && pacman -S --noconfirm gamecube-dev"
-
-    if !errorlevel! neq 0 (
-        echo.
-        echo ERROR: Toolchain installation failed.
-        echo Check the output above for errors.
-        pause
-        exit /b 1
-    )
-    echo.
-    echo devkitPro installed successfully!
-    echo.
+    echo After installing devkitPro, run this script again.
+    pause
+    exit /b 1
 )
 
+echo Found devkitPro at: %DEVKITPRO%
 echo.
 
 :menu
@@ -112,15 +80,40 @@ goto menu
 :build
 echo.
 echo Building Nedflix for GameCube...
-REM Convert path and set up devkitPro environment properly
-set "BUILD_DIR=%~dp0"
-set "BUILD_DIR=!BUILD_DIR:\=/!"
-set "BUILD_DIR=/!BUILD_DIR::=!"
-"%MSYS_PATH%\usr\bin\bash.exe" -lc "export DEVKITPRO=/opt/devkitpro && export DEVKITPPC=/opt/devkitpro/devkitPPC && export PATH=$DEVKITPPC/bin:$PATH && cd '!BUILD_DIR!' && make"
+
+REM Set up environment and build
+set "DEVKITPPC=%DEVKITPRO%\devkitPPC"
+set "PATH=%DEVKITPPC%\bin;%DEVKITPRO%\tools\bin;%PATH%"
+
+REM Check for make
+where make >nul 2>&1
+if !errorlevel! neq 0 (
+    REM Try devkitPro's make
+    if exist "%DEVKITPRO%\msys2\usr\bin\make.exe" (
+        set "PATH=%DEVKITPRO%\msys2\usr\bin;%PATH%"
+    ) else if defined MSYS_PATH (
+        set "PATH=%MSYS_PATH%\usr\bin;%PATH%"
+    ) else (
+        echo ERROR: 'make' not found. Please ensure MSYS2 is in PATH.
+        pause
+        goto menu
+    )
+)
+
+cd /d "%~dp0"
+make
+
 if exist "%~dp0nedflix.dol" (
     echo.
-    echo Build successful!
+    echo ========================================
+    echo   Build successful!
+    echo ========================================
+    echo.
     echo Output: nedflix.dol
+    for %%A in (nedflix.dol) do echo Size: %%~zA bytes
+    echo.
+    echo To run: Open nedflix.dol in Dolphin emulator
+    echo To deploy: Copy nedflix.dol to SD card apps folder
 ) else (
     echo.
     echo Build may have failed. Check output above.
@@ -132,10 +125,20 @@ goto menu
 :clean
 echo.
 echo Cleaning build...
-set "BUILD_DIR=%~dp0"
-set "BUILD_DIR=!BUILD_DIR:\=/!"
-set "BUILD_DIR=/!BUILD_DIR::=!"
-"%MSYS_PATH%\usr\bin\bash.exe" -lc "export DEVKITPRO=/opt/devkitpro && export DEVKITPPC=/opt/devkitpro/devkitPPC && cd '!BUILD_DIR!' && make clean"
+set "DEVKITPPC=%DEVKITPRO%\devkitPPC"
+set "PATH=%DEVKITPPC%\bin;%DEVKITPRO%\tools\bin;%PATH%"
+
+where make >nul 2>&1
+if !errorlevel! neq 0 (
+    if exist "%DEVKITPRO%\msys2\usr\bin\make.exe" (
+        set "PATH=%DEVKITPRO%\msys2\usr\bin;%PATH%"
+    ) else if defined MSYS_PATH (
+        set "PATH=%MSYS_PATH%\usr\bin;%PATH%"
+    )
+)
+
+cd /d "%~dp0"
+make clean
 echo Clean complete.
 echo.
 pause
@@ -148,12 +151,22 @@ if not exist "%~dp0nedflix.dol" (
     goto build
 )
 echo Launching in Dolphin...
-where dolphin-emu >nul 2>&1
-if %errorlevel%==0 (
-    start dolphin-emu -e "%~dp0nedflix.dol"
+
+REM Try common Dolphin locations
+set "DOLPHIN_PATH="
+if exist "C:\Program Files\Dolphin\Dolphin.exe" set "DOLPHIN_PATH=C:\Program Files\Dolphin\Dolphin.exe"
+if exist "C:\Program Files (x86)\Dolphin\Dolphin.exe" set "DOLPHIN_PATH=C:\Program Files (x86)\Dolphin\Dolphin.exe"
+if exist "%LOCALAPPDATA%\Programs\Dolphin\Dolphin.exe" set "DOLPHIN_PATH=%LOCALAPPDATA%\Programs\Dolphin\Dolphin.exe"
+
+where dolphin >nul 2>&1
+if !errorlevel! equ 0 set "DOLPHIN_PATH=dolphin"
+
+if defined DOLPHIN_PATH (
+    start "" "%DOLPHIN_PATH%" -e "%~dp0nedflix.dol"
 ) else (
-    echo Dolphin not found in PATH.
-    echo Please open nedflix.dol manually in Dolphin.
+    echo Dolphin not found. Please open nedflix.dol manually.
+    echo Download Dolphin from: https://dolphin-emu.org/
+    start "" "%~dp0"
 )
 echo.
 pause
@@ -164,19 +177,20 @@ echo.
 echo Nedflix GameCube Build Script
 echo.
 echo Prerequisites:
-echo   - MSYS2 with devkitPro
-echo   - gamecube-dev package
+echo   - devkitPro with GameCube/Wii development
+echo   - Download from: https://github.com/devkitPro/installer/releases
 echo.
-echo Features (TECHNICAL DEMO):
-echo   - Audio playback (WAV files only)
+echo Features:
+echo   - Audio playback (WAV, MP3, OGG, FLAC)
 echo   - File browser for SD card media
 echo   - GX-based UI rendering
 echo   - GameCube controller support
+echo   - Network via BBA adapter (if available)
+echo   - Favorites and watch history
 echo.
-echo Limitations:
-echo   - No video playback
-echo   - No network support
-echo   - WAV format only
+echo Testing:
+echo   - Use Dolphin emulator for testing
+echo   - For real hardware, copy nedflix.dol to SD card
 echo.
 pause
 goto menu

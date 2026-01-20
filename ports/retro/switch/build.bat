@@ -12,40 +12,54 @@ echo   Nedflix Nintendo Switch Build (Windows)
 echo ============================================
 echo.
 
-REM Check for devkitPro
-if not defined DEVKITPRO (
-    echo [INFO] DEVKITPRO not set, checking default locations...
+REM Check for devkitPro in common locations
+set "DEVKITPRO="
+if exist "C:\devkitPro" set "DEVKITPRO=C:\devkitPro"
+if exist "D:\devkitPro" set "DEVKITPRO=D:\devkitPro"
+if exist "%USERPROFILE%\devkitPro" set "DEVKITPRO=%USERPROFILE%\devkitPro"
 
-    if exist "C:\devkitPro" (
-        set "DEVKITPRO=C:\devkitPro"
-    ) else if exist "D:\devkitPro" (
-        set "DEVKITPRO=D:\devkitPro"
-    ) else if exist "%USERPROFILE%\devkitPro" (
-        set "DEVKITPRO=%USERPROFILE%\devkitPro"
-    ) else (
-        echo [ERROR] devkitPro not found!
-        echo.
-        echo Please install devkitPro from: https://devkitpro.org/wiki/Getting_Started
-        echo.
-        echo After installation, either:
-        echo   1. Run this script from the devkitPro MSYS2 terminal, or
-        echo   2. Set DEVKITPRO environment variable to your installation path
-        echo.
-        pause
-        exit /b 1
+REM Check for MSYS2 installation (legacy)
+set "MSYS_PATH="
+if exist "C:\msys64\opt\devkitpro" (
+    set "MSYS_PATH=C:\msys64"
+    if not defined DEVKITPRO set "DEVKITPRO=C:\msys64\opt\devkitpro"
+)
+
+if not defined DEVKITPRO (
+    echo ========================================
+    echo  devkitPro Not Found
+    echo ========================================
+    echo.
+    echo The devkitPro Nintendo Switch toolchain needs to be installed.
+    echo.
+    echo Please download and install devkitPro from:
+    echo   https://github.com/devkitPro/installer/releases
+    echo.
+    echo Direct link:
+    echo   https://github.com/devkitPro/installer/releases/download/v3.0.3/devkitProUpdater-3.0.3.exe
+    echo.
+    echo IMPORTANT: During installation, select "Switch development"
+    echo.
+    choice /C YN /M "Open download page in browser"
+    if !errorlevel! equ 1 (
+        start https://github.com/devkitPro/installer/releases
     )
+    echo.
+    echo After installing devkitPro, run this script again.
+    pause
+    exit /b 1
 )
 
 echo [OK] DevkitPro: %DEVKITPRO%
 
 REM Set devkitA64
-if not defined DEVKITA64 (
-    set "DEVKITA64=%DEVKITPRO%\devkitA64"
-)
+set "DEVKITA64=%DEVKITPRO%\devkitA64"
 
-if not exist "%DEVKITA64%" (
+if not exist "%DEVKITA64%\bin\aarch64-none-elf-gcc.exe" (
     echo [ERROR] devkitA64 not found at %DEVKITA64%
-    echo Please install with: pacman -S switch-dev
+    echo.
+    echo Please run the devkitPro updater and select "Switch development"
+    echo   https://github.com/devkitPro/installer/releases
     pause
     exit /b 1
 )
@@ -54,9 +68,10 @@ echo [OK] DevkitA64: %DEVKITA64%
 
 REM Check for libnx
 set "LIBNX=%DEVKITPRO%\libnx"
-if not exist "%LIBNX%" (
+if not exist "%LIBNX%\include\switch.h" (
     echo [ERROR] libnx not found at %LIBNX%
-    echo Please install with: pacman -S libnx
+    echo.
+    echo Please run the devkitPro updater and select "Switch development"
     pause
     exit /b 1
 )
@@ -67,63 +82,48 @@ echo.
 REM Set PATH
 set "PATH=%DEVKITA64%\bin;%DEVKITPRO%\tools\bin;%PATH%"
 
+REM Check for make
+where make >nul 2>&1
+if !errorlevel! neq 0 (
+    if exist "%DEVKITPRO%\msys2\usr\bin\make.exe" (
+        set "PATH=%DEVKITPRO%\msys2\usr\bin;%PATH%"
+    ) else if defined MSYS_PATH (
+        set "PATH=%MSYS_PATH%\usr\bin;%PATH%"
+    ) else (
+        echo [ERROR] 'make' not found.
+        echo Please ensure MSYS2 is installed with devkitPro.
+        pause
+        exit /b 1
+    )
+)
+
+:menu
+echo Select build option:
+echo   1. Build NRO file
+echo   2. Clean build
+echo   3. Help
+echo   4. Exit
+echo.
+set /p choice="Enter choice (1-4): "
+
+if "%choice%"=="1" goto build
+if "%choice%"=="2" goto clean
+if "%choice%"=="3" goto help
+if "%choice%"=="4" exit /b 0
+goto menu
+
+:build
+echo.
+echo [INFO] Building Nedflix for Nintendo Switch...
+echo.
+
 REM Create directories
 if not exist "build" mkdir build
 if not exist "romfs" mkdir romfs
 
-REM Parse arguments
-set CLEAN=0
-set VERBOSE=0
+cd /d "%~dp0"
+make
 
-:parse_args
-if "%~1"=="" goto done_args
-if /i "%~1"=="clean" set CLEAN=1
-if /i "%~1"=="-v" set VERBOSE=1
-if /i "%~1"=="--verbose" set VERBOSE=1
-if /i "%~1"=="-h" goto show_help
-if /i "%~1"=="--help" goto show_help
-shift
-goto parse_args
-
-:show_help
-echo Usage: build.bat [clean] [-v] [-h]
-echo.
-echo Options:
-echo   clean       Clean build directory before building
-echo   -v          Verbose output
-echo   -h          Show this help
-exit /b 0
-
-:done_args
-
-REM Clean if requested
-if %CLEAN%==1 (
-    echo [INFO] Cleaning build directory...
-    if exist "build" rd /s /q "build"
-    if exist "nedflix.nro" del "nedflix.nro"
-    if exist "nedflix.nacp" del "nedflix.nacp"
-    if exist "nedflix.elf" del "nedflix.elf"
-    mkdir build
-)
-
-REM Build
-echo [INFO] Building...
-echo.
-
-if %VERBOSE%==1 (
-    make V=1
-) else (
-    make
-)
-
-if errorlevel 1 (
-    echo.
-    echo [ERROR] Build failed!
-    pause
-    exit /b 1
-)
-
-REM Check output
 if exist "nedflix.nro" (
     echo.
     echo ============================================
@@ -138,12 +138,54 @@ if exist "nedflix.nro" (
     echo   2. Place in: /switch/nedflix/nedflix.nro
     echo   3. Launch from Homebrew Menu
     echo.
+    echo For CFW users (Atmosphere, etc.):
+    echo   - Works with Homebrew Menu
+    echo   - Requires title override or album applet
 ) else (
     echo.
-    echo [ERROR] Build failed - no output file!
-    pause
-    exit /b 1
+    echo [ERROR] Build failed - check output above.
 )
-
+echo.
 pause
-exit /b 0
+goto menu
+
+:clean
+echo.
+echo [INFO] Cleaning build directory...
+cd /d "%~dp0"
+
+if exist "build" rd /s /q "build"
+if exist "nedflix.nro" del "nedflix.nro"
+if exist "nedflix.nacp" del "nedflix.nacp"
+if exist "nedflix.elf" del "nedflix.elf"
+
+make clean 2>nul
+
+echo Clean complete.
+echo.
+pause
+goto menu
+
+:help
+echo.
+echo Nedflix Nintendo Switch Build Script
+echo.
+echo Prerequisites:
+echo   - devkitPro with Switch development tools
+echo   - Download from: https://github.com/devkitPro/installer/releases
+echo   - Select "Switch development" during installation
+echo.
+echo Features:
+echo   - Audio playback (WAV, MP3, OGG, FLAC)
+echo   - Video playback (MPEG1)
+echo   - Network streaming support
+echo   - Touch screen and controller input
+echo   - Docked and handheld modes
+echo   - Favorites and watch history
+echo.
+echo Testing:
+echo   - Use Yuzu or Ryujinx emulator for testing
+echo   - For real hardware, copy .nro to SD card
+echo.
+pause
+goto menu
