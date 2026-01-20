@@ -1,191 +1,80 @@
 @echo off
-REM ============================================
-REM Nedflix Nintendo Switch - Windows Build Script
-REM One-click build using devkitPro
-REM ============================================
-
+REM Nedflix Nintendo Switch - TRUE One-Click Windows Build
 setlocal enabledelayedexpansion
 
-echo.
 echo ============================================
-echo   Nedflix Nintendo Switch Build (Windows)
+echo   Nedflix for Nintendo Switch
+echo   One-Click Build
 echo ============================================
 echo.
 
-REM Check for devkitPro in common locations
+REM Find devkitPro
 set "DEVKITPRO="
-if exist "C:\devkitPro" set "DEVKITPRO=C:\devkitPro"
-if exist "D:\devkitPro" set "DEVKITPRO=D:\devkitPro"
-if exist "%USERPROFILE%\devkitPro" set "DEVKITPRO=%USERPROFILE%\devkitPro"
-
-REM Check for MSYS2 installation (legacy)
-set "MSYS_PATH="
-if exist "C:\msys64\opt\devkitpro" (
-    set "MSYS_PATH=C:\msys64"
-    if not defined DEVKITPRO set "DEVKITPRO=C:\msys64\opt\devkitpro"
-)
+if exist "C:\devkitPro\devkitA64" set "DEVKITPRO=C:\devkitPro"
+if exist "D:\devkitPro\devkitA64" set "DEVKITPRO=D:\devkitPro"
+if exist "%USERPROFILE%\devkitPro\devkitA64" set "DEVKITPRO=%USERPROFILE%\devkitPro"
+if exist "C:\msys64\opt\devkitpro\devkitA64" set "DEVKITPRO=C:\msys64\opt\devkitpro"
 
 if not defined DEVKITPRO (
-    echo ========================================
-    echo  devkitPro Not Found
-    echo ========================================
+    echo [INFO] devkitPro not found. Installing automatically...
     echo.
-    echo The devkitPro Nintendo Switch toolchain needs to be installed.
-    echo.
-    echo Please download and install devkitPro from:
-    echo   https://github.com/devkitPro/installer/releases
-    echo.
-    echo Direct link:
-    echo   https://github.com/devkitPro/installer/releases/download/v3.0.3/devkitProUpdater-3.0.3.exe
-    echo.
-    echo IMPORTANT: During installation, select "Switch development"
-    echo.
-    choice /C YN /M "Open download page in browser"
-    if !errorlevel! equ 1 (
-        start https://github.com/devkitPro/installer/releases
-    )
-    echo.
-    echo After installing devkitPro, run this script again.
-    pause
-    exit /b 1
-)
 
-echo [OK] DevkitPro: %DEVKITPRO%
-
-REM Set devkitA64
-set "DEVKITA64=%DEVKITPRO%\devkitA64"
-
-if not exist "%DEVKITA64%\bin\aarch64-none-elf-gcc.exe" (
-    echo [ERROR] devkitA64 not found at %DEVKITA64%
-    echo.
-    echo Please run the devkitPro updater and select "Switch development"
-    echo   https://github.com/devkitPro/installer/releases
-    pause
-    exit /b 1
-)
-
-echo [OK] DevkitA64: %DEVKITA64%
-
-REM Check for libnx
-set "LIBNX=%DEVKITPRO%\libnx"
-if not exist "%LIBNX%\include\switch.h" (
-    echo [ERROR] libnx not found at %LIBNX%
-    echo.
-    echo Please run the devkitPro updater and select "Switch development"
-    pause
-    exit /b 1
-)
-
-echo [OK] libnx: %LIBNX%
-echo.
-
-REM Set PATH
-set "PATH=%DEVKITA64%\bin;%DEVKITPRO%\tools\bin;%PATH%"
-
-REM Check for make
-where make >nul 2>&1
-if !errorlevel! neq 0 (
-    if exist "%DEVKITPRO%\msys2\usr\bin\make.exe" (
-        set "PATH=%DEVKITPRO%\msys2\usr\bin;%PATH%"
-    ) else if defined MSYS_PATH (
-        set "PATH=%MSYS_PATH%\usr\bin;%PATH%"
-    ) else (
-        echo [ERROR] 'make' not found.
-        echo Please ensure MSYS2 is installed with devkitPro.
+    REM Download installer
+    echo [1/3] Downloading devkitPro installer...
+    powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://github.com/devkitPro/installer/releases/download/v3.0.3/devkitProUpdater-3.0.3.exe' -OutFile '%TEMP%\devkitpro.exe'}" 2>nul
+    if not exist "%TEMP%\devkitpro.exe" (
+        echo [ERROR] Download failed. Please check your internet connection.
         pause
         exit /b 1
     )
+
+    REM Run installer silently
+    echo [2/3] Installing devkitPro (this takes 5-10 minutes)...
+    "%TEMP%\devkitpro.exe" /S /D=C:\devkitPro
+
+    REM Wait for installation
+    echo [INFO] Waiting for installation to complete...
+    :wait_install
+    if not exist "C:\devkitPro\devkitA64\bin\aarch64-none-elf-gcc.exe" (
+        timeout /t 5 /nobreak >nul
+        goto wait_install
+    )
+
+    set "DEVKITPRO=C:\devkitPro"
+    echo [3/3] Installation complete!
+    echo.
 )
 
-:menu
-echo Select build option:
-echo   1. Build NRO file
-echo   2. Clean build
-echo   3. Help
-echo   4. Exit
-echo.
-set /p choice="Enter choice (1-4): "
+echo [OK] devkitPro: %DEVKITPRO%
 
-if "%choice%"=="1" goto build
-if "%choice%"=="2" goto clean
-if "%choice%"=="3" goto help
-if "%choice%"=="4" exit /b 0
-goto menu
-
-:build
-echo.
-echo [INFO] Building Nedflix for Nintendo Switch...
-echo.
+REM Set environment
+set "DEVKITA64=%DEVKITPRO%\devkitA64"
+set "PATH=%DEVKITA64%\bin;%DEVKITPRO%\tools\bin;%DEVKITPRO%\msys2\usr\bin;%PATH%"
 
 REM Create directories
 if not exist "build" mkdir build
 if not exist "romfs" mkdir romfs
 
+REM Build
+echo.
+echo [INFO] Building...
 cd /d "%~dp0"
-make
+make -j%NUMBER_OF_PROCESSORS%
 
-if exist "nedflix.nro" (
+if exist "%~dp0nedflix.nro" (
     echo.
     echo ============================================
-    echo   Build successful!
+    echo   BUILD SUCCESSFUL
     echo ============================================
-    echo.
-    echo Output: nedflix.nro
+    echo Output: %~dp0nedflix.nro
     for %%A in (nedflix.nro) do echo Size: %%~zA bytes
     echo.
-    echo Installation:
-    echo   1. Copy nedflix.nro to your Switch SD card
-    echo   2. Place in: /switch/nedflix/nedflix.nro
-    echo   3. Launch from Homebrew Menu
-    echo.
-    echo For CFW users (Atmosphere, etc.):
-    echo   - Works with Homebrew Menu
-    echo   - Requires title override or album applet
+    echo To deploy: Copy to SD card /switch/nedflix/
+    echo To test: Use Yuzu or Ryujinx emulator
 ) else (
     echo.
-    echo [ERROR] Build failed - check output above.
+    echo [ERROR] Build failed. Check errors above.
 )
+
 echo.
 pause
-goto menu
-
-:clean
-echo.
-echo [INFO] Cleaning build directory...
-cd /d "%~dp0"
-
-if exist "build" rd /s /q "build"
-if exist "nedflix.nro" del "nedflix.nro"
-if exist "nedflix.nacp" del "nedflix.nacp"
-if exist "nedflix.elf" del "nedflix.elf"
-
-make clean 2>nul
-
-echo Clean complete.
-echo.
-pause
-goto menu
-
-:help
-echo.
-echo Nedflix Nintendo Switch Build Script
-echo.
-echo Prerequisites:
-echo   - devkitPro with Switch development tools
-echo   - Download from: https://github.com/devkitPro/installer/releases
-echo   - Select "Switch development" during installation
-echo.
-echo Features:
-echo   - Audio playback (WAV, MP3, OGG, FLAC)
-echo   - Video playback (MPEG1)
-echo   - Network streaming support
-echo   - Touch screen and controller input
-echo   - Docked and handheld modes
-echo   - Favorites and watch history
-echo.
-echo Testing:
-echo   - Use Yuzu or Ryujinx emulator for testing
-echo   - For real hardware, copy .nro to SD card
-echo.
-pause
-goto menu
