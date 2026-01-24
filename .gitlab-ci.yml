@@ -21,19 +21,27 @@ variables:
 # Templates
 # =============================================================================
 
-.desktop-base:
-  before_script:
-    - |
-      # Ensure Node.js binaries are in PATH (for macOS homebrew installs)
-      export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
-    - cd desktop
-    - npm install
+# Base template for desktop builds - override before_script per platform
+.desktop-cache:
   cache:
     key: desktop-$CI_JOB_NAME
     paths:
       - desktop/node_modules/
       - .cache/electron/
       - .cache/electron-builder/
+
+.desktop-base-unix:
+  extends: .desktop-cache
+  before_script:
+    - export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
+    - cd desktop
+    - npm install
+
+.desktop-base-windows:
+  extends: .desktop-cache
+  before_script:
+    - cd desktop
+    - npm install
 
 .web-base:
   before_script:
@@ -88,7 +96,7 @@ lint-desktop:
   stage: test
   tags:
     - linux
-  extends: .desktop-base
+  extends: .desktop-base-unix
   script:
     - echo "Validating desktop package configuration..."
     - node -e "require('./package.json')"
@@ -148,7 +156,7 @@ build-windows-x64:
   stage: build-desktop
   tags:
     - windows
-  extends: .desktop-base
+  extends: .desktop-base-windows
   script:
     - npx electron-builder --win --x64 --publish never
   artifacts:
@@ -168,7 +176,7 @@ build-windows-x86:
   stage: build-desktop
   tags:
     - windows
-  extends: .desktop-base
+  extends: .desktop-base-windows
   script:
     - npx electron-builder --win --ia32 --publish never
   artifacts:
@@ -184,7 +192,7 @@ build-windows-portable:
   stage: build-desktop
   tags:
     - windows
-  extends: .desktop-base
+  extends: .desktop-base-windows
   script:
     - npx electron-builder --win portable --publish never
   artifacts:
@@ -204,7 +212,7 @@ build-linux-x64:
   stage: build-desktop
   tags:
     - linux
-  extends: .desktop-base
+  extends: .desktop-base-unix
   script:
     - npx electron-builder --linux --x64 --publish never
   artifacts:
@@ -225,7 +233,7 @@ build-linux-arm64:
   stage: build-desktop
   tags:
     - linux
-  extends: .desktop-base
+  extends: .desktop-base-unix
   script:
     - npx electron-builder --linux --arm64 --publish never
   artifacts:
@@ -242,7 +250,7 @@ build-linux-deb:
   stage: build-desktop
   tags:
     - linux
-  extends: .desktop-base
+  extends: .desktop-base-unix
   script:
     - npx electron-builder --linux deb --x64 --publish never
   artifacts:
@@ -258,7 +266,7 @@ build-linux-appimage:
   stage: build-desktop
   tags:
     - linux
-  extends: .desktop-base
+  extends: .desktop-base-unix
   script:
     - npx electron-builder --linux AppImage --x64 --publish never
   artifacts:
@@ -278,7 +286,7 @@ build-macos-x64:
   stage: build-desktop
   tags:
     - macos
-  extends: .desktop-base
+  extends: .desktop-base-unix
   script:
     - ./node_modules/.bin/electron-builder --mac --x64 --publish never
   artifacts:
@@ -299,7 +307,7 @@ build-macos-arm64:
   tags:
     - macos
     - arm64
-  extends: .desktop-base
+  extends: .desktop-base-unix
   script:
     - ./node_modules/.bin/electron-builder --mac --arm64 --publish never
   artifacts:
@@ -316,7 +324,7 @@ build-macos-universal:
   stage: build-desktop
   tags:
     - macos
-  extends: .desktop-base
+  extends: .desktop-base-unix
   script:
     - ./node_modules/.bin/electron-builder --mac --universal --publish never
   artifacts:
@@ -788,7 +796,7 @@ build-all-local:
   stage: build-desktop
   tags:
     - linux
-  extends: .desktop-base
+  extends: .desktop-base-unix
   script:
     - echo "Building Linux desktop targets..."
     - npx electron-builder --linux --x64 --publish never || echo "Linux build completed or skipped"
@@ -832,7 +840,7 @@ nightly-build:
   stage: build-desktop
   tags:
     - linux
-  extends: .desktop-base
+  extends: .desktop-base-unix
   script:
     - npx electron-builder --linux --x64 --publish never
   artifacts:
