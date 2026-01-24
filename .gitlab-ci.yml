@@ -897,10 +897,6 @@ deploy-desktop-macos:
   needs:
     - job: build-desktop-macos-x64
       artifacts: true
-      optional: true
-    - job: build-desktop-macos-universal
-      artifacts: true
-      optional: true
   script:
     - mkdir -p /tmp/releases
     - mount_smbfs //root:gitlab@192.168.100.22/releases /tmp/releases || true
@@ -919,10 +915,6 @@ deploy-mobile-android:
   needs:
     - job: build-android-release
       artifacts: true
-      optional: true
-    - job: build-android-bundle
-      artifacts: true
-      optional: true
   script:
     - mkdir -p /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/mobile/android
     - cp -r android/app/build/outputs/apk/release/*.apk /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/mobile/android/ 2>/dev/null || true
@@ -939,10 +931,6 @@ deploy-tv-android:
   needs:
     - job: build-androidtv-client-release
       artifacts: true
-      optional: true
-    - job: build-androidtv-desktop-release
-      artifacts: true
-      optional: true
   script:
     - mkdir -p /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/tv/androidtv
     - cp -r androidtv/app/build/outputs/apk/*/release/*.apk /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/tv/androidtv/ 2>/dev/null || true
