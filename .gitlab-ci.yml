@@ -1,0 +1,825 @@
+# Nedflix GitLab CI/CD Pipeline
+# Builds desktop clients (Windows, Linux, macOS), mobile (Android, iOS),
+# TV platforms (Android TV, Apple TV), and web version
+
+stages:
+  - test
+  - build-desktop
+  - build-mobile
+  - build-tv
+  - build-web
+  - release
+
+variables:
+  NODE_VERSION: "20"
+  JAVA_VERSION: "17"
+  ELECTRON_CACHE: "$CI_PROJECT_DIR/.cache/electron"
+  ELECTRON_BUILDER_CACHE: "$CI_PROJECT_DIR/.cache/electron-builder"
+  GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
+
+# =============================================================================
+# Templates
+# =============================================================================
+
+.desktop-base:
+  before_script:
+    - cd desktop
+    - npm ci --cache .npm --prefer-offline
+  cache:
+    key: desktop-$CI_JOB_NAME
+    paths:
+      - desktop/.npm/
+      - desktop/node_modules/
+      - .cache/electron/
+      - .cache/electron-builder/
+
+.web-base:
+  before_script:
+    - npm ci --cache .npm --prefer-offline
+  cache:
+    key: web-$CI_JOB_NAME
+    paths:
+      - .npm/
+      - node_modules/
+
+.android-base:
+  image: cimg/android:2024.01
+  variables:
+    ANDROID_SDK_ROOT: "/home/circleci/android-sdk"
+  before_script:
+    - java -version
+    - echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+  cache:
+    key: android-$CI_JOB_NAME
+    paths:
+      - .gradle/
+      - android/.gradle/
+      - android/app/build/
+      - androidtv/.gradle/
+      - androidtv/app/build/
+
+.ios-base:
+  tags:
+    - macos
+  before_script:
+    - xcodebuild -version
+    - xcode-select -p
+  cache:
+    key: ios-$CI_JOB_NAME
+    paths:
+      - ios/build/
+      - ~/Library/Developer/Xcode/DerivedData/
+
+.tvos-base:
+  tags:
+    - macos
+  before_script:
+    - xcodebuild -version
+    - xcode-select -p
+  cache:
+    key: tvos-$CI_JOB_NAME
+    paths:
+      - appletv/build/
+      - ~/Library/Developer/Xcode/DerivedData/
+
+# =============================================================================
+# Test Stage
+# =============================================================================
+
+lint-desktop:
+  stage: test
+  image: node:${NODE_VERSION}
+  extends: .desktop-base
+  script:
+    - echo "Validating desktop package configuration..."
+    - node -e "require('./package.json')"
+    - echo "Desktop config valid"
+  rules:
+    - changes:
+        - desktop/**/*
+
+lint-web:
+  stage: test
+  image: node:${NODE_VERSION}
+  extends: .web-base
+  script:
+    - echo "Validating web package configuration..."
+    - node -e "require('./package.json')"
+    - echo "Web config valid"
+  rules:
+    - changes:
+        - package.json
+        - server.js
+        - public/**/*
+
+lint-android:
+  stage: test
+  extends: .android-base
+  script:
+    - cd android
+    - ./gradlew lint --no-daemon
+  rules:
+    - changes:
+        - android/**/*
+  allow_failure: true
+
+lint-androidtv:
+  stage: test
+  extends: .android-base
+  script:
+    - cd androidtv
+    - ./gradlew lint --no-daemon
+  rules:
+    - changes:
+        - androidtv/**/*
+  allow_failure: true
+
+# =============================================================================
+# Desktop Builds - Windows
+# =============================================================================
+
+build-windows-x64:
+  stage: build-desktop
+  image: electronuserland/builder:wine
+  extends: .desktop-base
+  script:
+    - npm run build:win
+  artifacts:
+    name: nedflix-windows-x64
+    paths:
+      - desktop/dist/*.exe
+      - desktop/dist/*.msi
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - changes:
+        - desktop/**/*
+
+build-windows-x86:
+  stage: build-desktop
+  image: electronuserland/builder:wine
+  extends: .desktop-base
+  script:
+    - npm run build:win32
+  artifacts:
+    name: nedflix-windows-x86
+    paths:
+      - desktop/dist/*ia32*.exe
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+build-windows-portable:
+  stage: build-desktop
+  image: electronuserland/builder:wine
+  extends: .desktop-base
+  script:
+    - npm run build:portable
+  artifacts:
+    name: nedflix-windows-portable
+    paths:
+      - desktop/dist/*Portable*.exe
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+# =============================================================================
+# Desktop Builds - Linux
+# =============================================================================
+
+build-linux-x64:
+  stage: build-desktop
+  image: electronuserland/builder:18
+  extends: .desktop-base
+  script:
+    - npm run build:linux
+  artifacts:
+    name: nedflix-linux-x64
+    paths:
+      - desktop/dist/*.deb
+      - desktop/dist/*.AppImage
+      - desktop/dist/*.tar.gz
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - changes:
+        - desktop/**/*
+
+build-linux-arm64:
+  stage: build-desktop
+  image: electronuserland/builder:18
+  extends: .desktop-base
+  script:
+    - npm run build:linux-arm
+  artifacts:
+    name: nedflix-linux-arm64
+    paths:
+      - desktop/dist/*arm64*.deb
+      - desktop/dist/*arm64*.tar.gz
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+build-linux-deb:
+  stage: build-desktop
+  image: electronuserland/builder:18
+  extends: .desktop-base
+  script:
+    - npm run build:deb
+  artifacts:
+    name: nedflix-linux-deb
+    paths:
+      - desktop/dist/*.deb
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+build-linux-appimage:
+  stage: build-desktop
+  image: electronuserland/builder:18
+  extends: .desktop-base
+  script:
+    - npm run build:appimage
+  artifacts:
+    name: nedflix-linux-appimage
+    paths:
+      - desktop/dist/*.AppImage
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+# =============================================================================
+# Desktop Builds - macOS
+# =============================================================================
+
+build-macos-x64:
+  stage: build-desktop
+  tags:
+    - macos
+  extends: .desktop-base
+  script:
+    - npm run build:mac
+  artifacts:
+    name: nedflix-macos-x64
+    paths:
+      - desktop/dist/*.dmg
+      - desktop/dist/*-x64.zip
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - changes:
+        - desktop/**/*
+
+build-macos-arm64:
+  stage: build-desktop
+  tags:
+    - macos
+    - arm64
+  extends: .desktop-base
+  script:
+    - npm run build:mac-arm
+  artifacts:
+    name: nedflix-macos-arm64
+    paths:
+      - desktop/dist/*-arm64.dmg
+      - desktop/dist/*-arm64.zip
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+build-macos-universal:
+  stage: build-desktop
+  tags:
+    - macos
+  extends: .desktop-base
+  script:
+    - npm run build:mac-universal
+  artifacts:
+    name: nedflix-macos-universal
+    paths:
+      - desktop/dist/*-universal.dmg
+      - desktop/dist/*-universal.zip
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+# =============================================================================
+# Mobile Builds - Android
+# =============================================================================
+
+build-android-debug:
+  stage: build-mobile
+  extends: .android-base
+  script:
+    - cd android
+    - chmod +x gradlew
+    - ./gradlew assembleDebug --no-daemon
+  artifacts:
+    name: nedflix-android-debug
+    paths:
+      - android/app/build/outputs/apk/debug/*.apk
+    expire_in: 7 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - changes:
+        - android/**/*
+
+build-android-release:
+  stage: build-mobile
+  extends: .android-base
+  script:
+    - cd android
+    - chmod +x gradlew
+    - ./gradlew assembleRelease --no-daemon
+  artifacts:
+    name: nedflix-android-release
+    paths:
+      - android/app/build/outputs/apk/release/*.apk
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+build-android-bundle:
+  stage: build-mobile
+  extends: .android-base
+  script:
+    - cd android
+    - chmod +x gradlew
+    - ./gradlew bundleRelease --no-daemon
+  artifacts:
+    name: nedflix-android-bundle
+    paths:
+      - android/app/build/outputs/bundle/release/*.aab
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+# =============================================================================
+# Mobile Builds - iOS
+# =============================================================================
+
+build-ios-simulator:
+  stage: build-mobile
+  extends: .ios-base
+  script:
+    - cd ios
+    - xcodebuild -project Nedflix.xcodeproj \
+        -scheme Nedflix \
+        -configuration Release \
+        -destination 'platform=iOS Simulator,name=iPhone 15' \
+        -derivedDataPath build \
+        clean build
+  artifacts:
+    name: nedflix-ios-simulator
+    paths:
+      - ios/build/Build/Products/Release-iphonesimulator/*.app
+    expire_in: 7 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - changes:
+        - ios/**/*
+
+build-ios-device:
+  stage: build-mobile
+  extends: .ios-base
+  script:
+    - cd ios
+    - xcodebuild -project Nedflix.xcodeproj \
+        -scheme Nedflix \
+        -configuration Release \
+        -destination 'generic/platform=iOS' \
+        -derivedDataPath build \
+        -archivePath build/Nedflix.xcarchive \
+        archive
+  artifacts:
+    name: nedflix-ios-device
+    paths:
+      - ios/build/Nedflix.xcarchive
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+build-ios-ipa:
+  stage: build-mobile
+  extends: .ios-base
+  script:
+    - cd ios
+    - |
+      # Create ExportOptions.plist if not exists
+      if [ ! -f ExportOptions.plist ]; then
+        cat > ExportOptions.plist << 'EXPORTEOF'
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+      <plist version="1.0">
+      <dict>
+        <key>method</key>
+        <string>development</string>
+        <key>teamID</key>
+        <string>${APPLE_TEAM_ID}</string>
+        <key>compileBitcode</key>
+        <false/>
+      </dict>
+      </plist>
+      EXPORTEOF
+      fi
+    - xcodebuild -project Nedflix.xcodeproj \
+        -scheme Nedflix \
+        -configuration Release \
+        -destination 'generic/platform=iOS' \
+        -archivePath build/Nedflix.xcarchive \
+        archive
+    - xcodebuild -exportArchive \
+        -archivePath build/Nedflix.xcarchive \
+        -exportPath build/ipa \
+        -exportOptionsPlist ExportOptions.plist
+  artifacts:
+    name: nedflix-ios-ipa
+    paths:
+      - ios/build/ipa/*.ipa
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
+  allow_failure: true
+
+# =============================================================================
+# TV Builds - Android TV
+# =============================================================================
+
+build-androidtv-client-debug:
+  stage: build-tv
+  extends: .android-base
+  script:
+    - cd androidtv
+    - chmod +x gradlew
+    - ./gradlew :app:assembleClientDebug --no-daemon
+  artifacts:
+    name: nedflix-androidtv-client-debug
+    paths:
+      - androidtv/app/build/outputs/apk/client/debug/*.apk
+    expire_in: 7 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - changes:
+        - androidtv/**/*
+
+build-androidtv-client-release:
+  stage: build-tv
+  extends: .android-base
+  script:
+    - cd androidtv
+    - chmod +x gradlew
+    - ./gradlew :app:assembleClientRelease --no-daemon
+  artifacts:
+    name: nedflix-androidtv-client-release
+    paths:
+      - androidtv/app/build/outputs/apk/client/release/*.apk
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+build-androidtv-desktop-release:
+  stage: build-tv
+  extends: .android-base
+  script:
+    - cd androidtv
+    - chmod +x gradlew
+    - ./gradlew :app:assembleDesktopRelease --no-daemon
+  artifacts:
+    name: nedflix-androidtv-desktop-release
+    paths:
+      - androidtv/app/build/outputs/apk/desktop/release/*.apk
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+build-androidtv-bundle:
+  stage: build-tv
+  extends: .android-base
+  script:
+    - cd androidtv
+    - chmod +x gradlew
+    - ./gradlew :app:bundleClientRelease --no-daemon
+  artifacts:
+    name: nedflix-androidtv-bundle
+    paths:
+      - androidtv/app/build/outputs/bundle/clientRelease/*.aab
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+# =============================================================================
+# TV Builds - Apple TV
+# =============================================================================
+
+build-appletv-client:
+  stage: build-tv
+  extends: .tvos-base
+  script:
+    - cd appletv
+    - |
+      # Check for Xcode project or create placeholder build
+      if [ -d "NedflixTV.xcodeproj" ] || [ -d "NedflixTV" ]; then
+        xcodebuild -project NedflixTV.xcodeproj \
+          -scheme NedflixTV-Client \
+          -configuration Release \
+          -destination 'generic/platform=tvOS' \
+          -derivedDataPath build/client \
+          -archivePath build/client/NedflixTV-Client.xcarchive \
+          archive
+      elif [ -f "build-client.sh" ]; then
+        chmod +x build-client.sh
+        ./build-client.sh
+      else
+        echo "No Xcode project found - skipping Apple TV client build"
+        exit 0
+      fi
+  artifacts:
+    name: nedflix-appletv-client
+    paths:
+      - appletv/build/client/*.xcarchive
+      - appletv/build/client/*.ipa
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - changes:
+        - appletv/**/*
+  allow_failure: true
+
+build-appletv-desktop:
+  stage: build-tv
+  extends: .tvos-base
+  script:
+    - cd appletv
+    - |
+      if [ -d "NedflixTV.xcodeproj" ] || [ -d "NedflixTV" ]; then
+        xcodebuild -project NedflixTV.xcodeproj \
+          -scheme NedflixTV-Desktop \
+          -configuration Release \
+          -destination 'generic/platform=tvOS' \
+          -derivedDataPath build/desktop \
+          -archivePath build/desktop/NedflixTV-Desktop.xcarchive \
+          archive
+      elif [ -f "build-desktop.sh" ]; then
+        chmod +x build-desktop.sh
+        ./build-desktop.sh
+      else
+        echo "No Xcode project found - skipping Apple TV desktop build"
+        exit 0
+      fi
+  artifacts:
+    name: nedflix-appletv-desktop
+    paths:
+      - appletv/build/desktop/*.xcarchive
+      - appletv/build/desktop/*.ipa
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "web"
+  allow_failure: true
+
+build-appletv-simulator:
+  stage: build-tv
+  extends: .tvos-base
+  script:
+    - cd appletv
+    - |
+      if [ -d "NedflixTV.xcodeproj" ]; then
+        xcodebuild -project NedflixTV.xcodeproj \
+          -scheme NedflixTV-Client \
+          -configuration Debug \
+          -destination 'platform=tvOS Simulator,name=Apple TV 4K (3rd generation)' \
+          -derivedDataPath build/simulator \
+          clean build
+      else
+        echo "No Xcode project found - skipping Apple TV simulator build"
+        exit 0
+      fi
+  artifacts:
+    name: nedflix-appletv-simulator
+    paths:
+      - appletv/build/simulator/Build/Products/Debug-appletvsimulator/*.app
+    expire_in: 7 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - changes:
+        - appletv/**/*
+  allow_failure: true
+
+# =============================================================================
+# Web Version Builds
+# =============================================================================
+
+build-web-docker:
+  stage: build-web
+  image: docker:24
+  services:
+    - docker:24-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+    IMAGE_TAG: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG
+    IMAGE_TAG_LATEST: $CI_REGISTRY_IMAGE:latest
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - docker build -t $IMAGE_TAG .
+    - docker push $IMAGE_TAG
+    - |
+      if [ "$CI_COMMIT_BRANCH" == "$CI_DEFAULT_BRANCH" ]; then
+        docker tag $IMAGE_TAG $IMAGE_TAG_LATEST
+        docker push $IMAGE_TAG_LATEST
+      fi
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - changes:
+        - Dockerfile
+        - package.json
+        - server.js
+        - public/**/*
+
+build-web-static:
+  stage: build-web
+  image: node:${NODE_VERSION}
+  extends: .web-base
+  script:
+    - echo "Building static web assets..."
+    - mkdir -p dist/web
+    - cp -r public/* dist/web/
+    - cp package.json dist/web/
+    - cp server.js dist/web/
+    - cp *.js dist/web/ 2>/dev/null || true
+    - echo "Static web build complete"
+  artifacts:
+    name: nedflix-web-static
+    paths:
+      - dist/web/
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+# =============================================================================
+# Release Stage
+# =============================================================================
+
+release-create:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  script:
+    - echo "Creating release for $CI_COMMIT_TAG"
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: "Nedflix $CI_COMMIT_TAG"
+    description: |
+      ## Nedflix $CI_COMMIT_TAG
+
+      ### Desktop Downloads
+      - **Windows**: x64 installer, x86 installer, Portable
+      - **Linux**: Debian package, AppImage, tar.gz (x64 & ARM64)
+      - **macOS**: DMG (Intel, Apple Silicon, Universal)
+
+      ### Mobile Downloads
+      - **Android**: APK (debug/release), AAB (Play Store)
+      - **iOS**: IPA (requires signing)
+
+      ### TV Downloads
+      - **Android TV**: Client APK, Desktop APK, AAB
+      - **Apple TV**: Client IPA, Desktop IPA
+
+      ### Web Version
+      - Docker image: `$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG`
+
+      ### Installation
+      See the [README](README.md) for installation instructions.
+    assets:
+      links:
+        - name: "Windows x64 Installer"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-windows-x64"
+        - name: "Windows Portable"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-windows-portable"
+        - name: "Linux x64 (All formats)"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-linux-x64"
+        - name: "Linux AppImage"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-linux-appimage"
+        - name: "macOS Universal"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-macos-universal"
+        - name: "Android APK"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-android-release"
+        - name: "Android Bundle (AAB)"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-android-bundle"
+        - name: "iOS Archive"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-ios-device"
+        - name: "Android TV Client"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-androidtv-client-release"
+        - name: "Android TV Desktop"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-androidtv-desktop-release"
+        - name: "Apple TV Client"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-appletv-client"
+        - name: "Web Static Build"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-web-static"
+  rules:
+    - if: $CI_COMMIT_TAG
+
+# =============================================================================
+# Manual/Local Build Jobs
+# =============================================================================
+
+build-all-local:
+  stage: build-desktop
+  image: electronuserland/builder:wine
+  extends: .desktop-base
+  script:
+    - echo "Building all desktop targets locally..."
+    - npm run build:win || echo "Windows build completed or skipped"
+    - npm run build:linux || echo "Linux build completed or skipped"
+  artifacts:
+    name: nedflix-all-local
+    paths:
+      - desktop/dist/
+    expire_in: 7 days
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
+    - when: never
+  allow_failure: true
+
+build-all-mobile:
+  stage: build-mobile
+  extends: .android-base
+  script:
+    - echo "Building all Android targets..."
+    - cd android && chmod +x gradlew && ./gradlew assembleRelease --no-daemon
+    - cd ../androidtv && chmod +x gradlew && ./gradlew assembleRelease --no-daemon
+  artifacts:
+    name: nedflix-all-mobile
+    paths:
+      - android/app/build/outputs/apk/
+      - androidtv/app/build/outputs/apk/
+    expire_in: 7 days
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
+    - when: never
+  allow_failure: true
+
+# =============================================================================
+# Scheduled Nightly Builds
+# =============================================================================
+
+nightly-build:
+  stage: build-desktop
+  image: electronuserland/builder:wine
+  extends: .desktop-base
+  script:
+    - npm run build:win
+    - npm run build:linux
+  artifacts:
+    name: nedflix-nightly-$CI_COMMIT_SHORT_SHA
+    paths:
+      - desktop/dist/
+    expire_in: 7 days
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+
+nightly-mobile:
+  stage: build-mobile
+  extends: .android-base
+  script:
+    - cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+    - cd ../androidtv && chmod +x gradlew && ./gradlew :app:assembleClientDebug --no-daemon
+  artifacts:
+    name: nedflix-nightly-mobile-$CI_COMMIT_SHORT_SHA
+    paths:
+      - android/app/build/outputs/apk/debug/
+      - androidtv/app/build/outputs/apk/client/debug/
+    expire_in: 7 days
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"

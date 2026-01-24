@@ -1,6 +1,6 @@
 # Nedflix Desktop
 
-A standalone Windows desktop application for personal video streaming without authentication.
+A cross-platform desktop application for personal video streaming without authentication. Supports Windows, Linux, and macOS.
 
 ## Features
 
@@ -43,28 +43,48 @@ A standalone Windows desktop application for personal video streaming without au
 
 Set the `NEDFLIX_MEDIA_PATHS` environment variable to configure your media directories:
 
+**Windows:**
 ```
 NEDFLIX_MEDIA_PATHS=C:\Videos;D:\Movies;D:\TV Shows
 ```
 
-Multiple paths are separated by semicolons.
+**Linux/macOS:**
+```bash
+export NEDFLIX_MEDIA_PATHS="/home/user/Videos:/mnt/movies:/mnt/tv"
+```
+
+Paths are separated by semicolons (Windows) or colons (Linux/macOS).
 
 ### Default Paths
 
-If no environment variable is set, these default paths are used:
+If no environment variable is set, platform-specific defaults are used:
+
+**Windows:**
 - `C:\Videos`
 - `D:\Movies`
 - `D:\TV Shows`
+
+**Linux:**
+- `$HOME/Videos`
+- `/mnt/media`
+
+**macOS:**
+- `$HOME/Movies`
+- `/Volumes/Media`
 
 ## Building
 
 ### Prerequisites
 
-- Node.js 18 or later
-- Windows 10 or later (for building Windows installers)
+- Node.js 20 or later
+- Platform-specific requirements:
+  - **Windows**: Windows 10 or later
+  - **Linux**: Debian-based, Fedora, Arch, or openSUSE
+  - **macOS**: macOS 10.15 (Catalina) or later
 
-### Quick Build (Windows)
+### Quick Build
 
+#### Windows
 1. Double-click `build.bat`
 2. Select build option:
    - **1**: Windows Installer (x64)
@@ -72,22 +92,43 @@ If no environment variable is set, these default paths are used:
    - **3**: Portable Version
    - **4**: Build All
 
-### Manual Build
+#### Linux
+```bash
+chmod +x build.sh
+./build.sh
+```
+Select from: Debian Package, AppImage, tar.gz Archive
+
+#### macOS
+```bash
+chmod +x build.sh
+./build.sh
+```
+Select from: Intel DMG, Apple Silicon DMG, Universal DMG
+
+### Manual Build Commands
 
 ```bash
 # Install dependencies
 npm install
 
-# Build Windows x64 installer
-npm run build:win
+# --- Windows ---
+npm run build:win          # x64 installer
+npm run build:win32        # x86 installer
+npm run build:portable     # Portable version
 
-# Build Windows x86 installer
-npm run build:win32
+# --- Linux ---
+npm run build:linux        # All Linux formats
+npm run build:deb          # Debian package (x64)
+npm run build:appimage     # AppImage (x64)
+npm run build:linux-arm    # ARM64 builds
 
-# Build portable version
-npm run build:portable
+# --- macOS ---
+npm run build:mac          # Intel (x64) DMG
+npm run build:mac-arm      # Apple Silicon (ARM64) DMG
+npm run build:mac-universal # Universal binary DMG
 
-# Build all targets
+# Build all platforms (requires platform-specific environment)
 npm run build
 ```
 
@@ -104,23 +145,43 @@ npm start
 ## Output
 
 Built files are placed in the `dist` folder:
-- `Nedflix Setup x.x.x.exe` - Windows installer
+
+**Windows:**
+- `Nedflix Setup x.x.x.exe` - Windows installer (x64)
+- `Nedflix Setup x.x.x-ia32.exe` - Windows installer (x86)
 - `Nedflix-Portable-x.x.x.exe` - Portable executable
+
+**Linux:**
+- `nedflix_x.x.x_amd64.deb` - Debian package (x64)
+- `nedflix_x.x.x_arm64.deb` - Debian package (ARM64)
+- `Nedflix-x.x.x-x64.AppImage` - AppImage
+- `nedflix-x.x.x-x64.tar.gz` - tar.gz archive
+
+**macOS:**
+- `Nedflix-x.x.x-x64.dmg` - Intel disk image
+- `Nedflix-x.x.x-arm64.dmg` - Apple Silicon disk image
+- `Nedflix-x.x.x-universal.dmg` - Universal binary disk image
 
 ## Project Structure
 
 ```
 desktop/
-├── main.js          # Electron main process
-├── preload.js       # Secure API bridge
-├── package.json     # Build configuration
-├── build.bat        # Windows build script
+├── main.js              # Electron main process
+├── preload.js           # Secure API bridge
+├── package.json         # Build configuration
+├── build.bat            # Windows build script
+├── build.sh             # Linux/macOS build script
+├── build/
+│   ├── icon.ico         # Windows icon
+│   ├── icon.icns        # macOS icon
+│   ├── icons/           # Linux icons
+│   └── entitlements.mac.plist  # macOS entitlements
 ├── public/
-│   ├── index.html   # Desktop UI
-│   ├── styles.css   # Styling
-│   ├── app.js       # Application logic
-│   └── gamepad.js   # Controller support
-└── dist/            # Build output (generated)
+│   ├── index.html       # Desktop UI
+│   ├── styles.css       # Styling
+│   ├── app.js           # Application logic
+│   └── gamepad.js       # Controller support
+└── dist/                # Build output (generated)
 ```
 
 ## License

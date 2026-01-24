@@ -16,6 +16,9 @@
     "build:linux-arm": "electron-builder --linux --arm64",
     "build:deb": "electron-builder --linux deb --x64",
     "build:appimage": "electron-builder --linux AppImage --x64",
+    "build:mac": "electron-builder --mac --x64",
+    "build:mac-arm": "electron-builder --mac --arm64",
+    "build:mac-universal": "electron-builder --mac --universal",
     "pack": "electron-builder --dir"
   },
   "dependencies": {
@@ -102,6 +105,46 @@
     },
     "portable": {
       "artifactName": "Nedflix-Portable-${version}.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64", "universal"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64", "universal"]
+        }
+      ],
+      "icon": "build/icon.icns",
+      "category": "public.app-category.video",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "minimumSystemVersion": "10.15",
+      "darkModeSupport": true,
+      "artifactName": "Nedflix-${version}-${arch}.${ext}"
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 400
+      },
+      "artifactName": "Nedflix-${version}-${arch}.dmg"
     }
   }
 }
