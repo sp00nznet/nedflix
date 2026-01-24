@@ -53,7 +53,26 @@ variables:
 
 .android-base:
   before_script:
-    - java -version || echo "Java not found - please install JDK 17+"
+    - |
+      if ! command -v java >/dev/null 2>&1; then
+        echo "ERROR: Java not found. Please install JDK 17+ on this runner."
+        echo "For Debian/Ubuntu: sudo apt install openjdk-17-jdk"
+        exit 1
+      fi
+    - java -version
+    - |
+      if [ -z "$ANDROID_HOME" ] && [ -z "$ANDROID_SDK_ROOT" ]; then
+        echo "WARNING: ANDROID_HOME/ANDROID_SDK_ROOT not set"
+        # Try common locations
+        for sdk_path in ~/Android/Sdk /opt/android-sdk /usr/local/android-sdk; do
+          if [ -d "$sdk_path" ]; then
+            export ANDROID_HOME="$sdk_path"
+            export ANDROID_SDK_ROOT="$sdk_path"
+            echo "Found Android SDK at $sdk_path"
+            break
+          fi
+        done
+      fi
     - echo "ANDROID_HOME=$ANDROID_HOME"
   cache:
     key: android-$CI_JOB_NAME
@@ -63,11 +82,18 @@ variables:
       - android/app/build/
       - androidtv/.gradle/
       - androidtv/app/build/
+  allow_failure: true
 
 .ios-base:
   tags:
     - macos
   before_script:
+    - |
+      if ! command -v xcodebuild >/dev/null 2>&1; then
+        echo "ERROR: Xcode not found. Please install Xcode from the Mac App Store."
+        echo "Command Line Tools alone are not sufficient for iOS builds."
+        exit 1
+      fi
     - xcodebuild -version
     - xcode-select -p
   cache:
@@ -75,11 +101,18 @@ variables:
     paths:
       - ios/build/
       - ~/Library/Developer/Xcode/DerivedData/
+  allow_failure: true
 
 .tvos-base:
   tags:
     - macos
   before_script:
+    - |
+      if ! command -v xcodebuild >/dev/null 2>&1; then
+        echo "ERROR: Xcode not found. Please install Xcode from the Mac App Store."
+        echo "Command Line Tools alone are not sufficient for tvOS builds."
+        exit 1
+      fi
     - xcodebuild -version
     - xcode-select -p
   cache:
@@ -87,6 +120,7 @@ variables:
     paths:
       - appletv/build/
       - ~/Library/Developer/Xcode/DerivedData/
+  allow_failure: true
 
 # =============================================================================
 # Test Stage
@@ -127,12 +161,12 @@ lint-android:
   extends: .android-base
   script:
     - cd android
-    - chmod +x gradlew
+    - chmod +x gradlew setup-gradle-wrapper.sh
+    - ./setup-gradle-wrapper.sh
     - ./gradlew lint --no-daemon
   rules:
     - changes:
         - android/**/*
-  allow_failure: true
 
 lint-androidtv:
   stage: test
@@ -141,12 +175,12 @@ lint-androidtv:
   extends: .android-base
   script:
     - cd androidtv
-    - chmod +x gradlew
+    - chmod +x gradlew setup-gradle-wrapper.sh
+    - ./setup-gradle-wrapper.sh
     - ./gradlew lint --no-daemon
   rules:
     - changes:
         - androidtv/**/*
-  allow_failure: true
 
 # =============================================================================
 # Desktop Builds - Windows (native Windows runner)
@@ -348,7 +382,8 @@ build-android-debug:
   extends: .android-base
   script:
     - cd android
-    - chmod +x gradlew
+    - chmod +x gradlew setup-gradle-wrapper.sh
+    - ./setup-gradle-wrapper.sh
     - ./gradlew assembleDebug --no-daemon
   artifacts:
     name: nedflix-android-debug
@@ -368,7 +403,8 @@ build-android-release:
   extends: .android-base
   script:
     - cd android
-    - chmod +x gradlew
+    - chmod +x gradlew setup-gradle-wrapper.sh
+    - ./setup-gradle-wrapper.sh
     - ./gradlew assembleRelease --no-daemon
   artifacts:
     name: nedflix-android-release
@@ -386,7 +422,8 @@ build-android-bundle:
   extends: .android-base
   script:
     - cd android
-    - chmod +x gradlew
+    - chmod +x gradlew setup-gradle-wrapper.sh
+    - ./setup-gradle-wrapper.sh
     - ./gradlew bundleRelease --no-daemon
   artifacts:
     name: nedflix-android-bundle
@@ -499,7 +536,8 @@ build-androidtv-client-debug:
   extends: .android-base
   script:
     - cd androidtv
-    - chmod +x gradlew
+    - chmod +x gradlew setup-gradle-wrapper.sh
+    - ./setup-gradle-wrapper.sh
     - ./gradlew :app:assembleClientDebug --no-daemon
   artifacts:
     name: nedflix-androidtv-client-debug
@@ -519,7 +557,8 @@ build-androidtv-client-release:
   extends: .android-base
   script:
     - cd androidtv
-    - chmod +x gradlew
+    - chmod +x gradlew setup-gradle-wrapper.sh
+    - ./setup-gradle-wrapper.sh
     - ./gradlew :app:assembleClientRelease --no-daemon
   artifacts:
     name: nedflix-androidtv-client-release
@@ -537,7 +576,8 @@ build-androidtv-desktop-release:
   extends: .android-base
   script:
     - cd androidtv
-    - chmod +x gradlew
+    - chmod +x gradlew setup-gradle-wrapper.sh
+    - ./setup-gradle-wrapper.sh
     - ./gradlew :app:assembleDesktopRelease --no-daemon
   artifacts:
     name: nedflix-androidtv-desktop-release
@@ -555,7 +595,8 @@ build-androidtv-bundle:
   extends: .android-base
   script:
     - cd androidtv
-    - chmod +x gradlew
+    - chmod +x gradlew setup-gradle-wrapper.sh
+    - ./setup-gradle-wrapper.sh
     - ./gradlew :app:bundleClientRelease --no-daemon
   artifacts:
     name: nedflix-androidtv-bundle
@@ -818,8 +859,8 @@ build-all-mobile:
   extends: .android-base
   script:
     - echo "Building all Android targets..."
-    - cd android && chmod +x gradlew && ./gradlew assembleRelease --no-daemon
-    - cd ../androidtv && chmod +x gradlew && ./gradlew assembleRelease --no-daemon
+    - cd android && chmod +x gradlew setup-gradle-wrapper.sh && ./setup-gradle-wrapper.sh && ./gradlew assembleRelease --no-daemon
+    - cd ../androidtv && chmod +x gradlew setup-gradle-wrapper.sh && ./setup-gradle-wrapper.sh && ./gradlew assembleRelease --no-daemon
   artifacts:
     name: nedflix-all-mobile
     paths:
@@ -857,8 +898,8 @@ nightly-mobile:
     - linux
   extends: .android-base
   script:
-    - cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
-    - cd ../androidtv && chmod +x gradlew && ./gradlew :app:assembleClientDebug --no-daemon
+    - cd android && chmod +x gradlew setup-gradle-wrapper.sh && ./setup-gradle-wrapper.sh && ./gradlew assembleDebug --no-daemon
+    - cd ../androidtv && chmod +x gradlew setup-gradle-wrapper.sh && ./setup-gradle-wrapper.sh && ./gradlew :app:assembleClientDebug --no-daemon
   artifacts:
     name: nedflix-nightly-mobile-$CI_COMMIT_SHORT_SHA
     paths:
