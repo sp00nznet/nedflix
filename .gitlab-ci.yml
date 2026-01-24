@@ -897,7 +897,13 @@ deploy-desktop-macos:
   needs:
     - job: build-desktop-macos-x64
       artifacts: true
+      optional: true
   script:
+    - |
+      if [ ! -d "desktop/dist" ] || [ -z "$(ls desktop/dist/*.dmg 2>/dev/null)" ]; then
+        echo "No macOS build artifacts found - skipping deploy"
+        exit 0
+      fi
     - mkdir -p /tmp/releases
     - mount_smbfs //root:gitlab@192.168.100.22/releases /tmp/releases || true
     - mkdir -p /tmp/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/desktop/macos
@@ -915,7 +921,13 @@ deploy-mobile-android:
   needs:
     - job: build-android-release
       artifacts: true
+      optional: true
   script:
+    - |
+      if [ ! -d "android/app/build/outputs/apk/release" ]; then
+        echo "No Android build artifacts found - skipping deploy"
+        exit 0
+      fi
     - mkdir -p /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/mobile/android
     - cp -r android/app/build/outputs/apk/release/*.apk /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/mobile/android/ 2>/dev/null || true
     - cp -r android/app/build/outputs/bundle/release/*.aab /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/mobile/android/ 2>/dev/null || true
@@ -931,7 +943,13 @@ deploy-tv-android:
   needs:
     - job: build-androidtv-client-release
       artifacts: true
+      optional: true
   script:
+    - |
+      if [ ! -d "androidtv/app/build/outputs/apk" ]; then
+        echo "No Android TV build artifacts found - skipping deploy"
+        exit 0
+      fi
     - mkdir -p /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/tv/androidtv
     - cp -r androidtv/app/build/outputs/apk/*/release/*.apk /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/tv/androidtv/ 2>/dev/null || true
   rules:
