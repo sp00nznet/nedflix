@@ -935,7 +935,7 @@ deploy-tv-android:
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
-# Manual deploy for androidtv-debug-now
+# Auto-runs after androidtv-debug-now completes
 deploy-tv-android-manual:
   stage: deploy
   tags:
@@ -946,7 +946,6 @@ deploy-tv-android-manual:
   script:
     - mkdir -p /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/tv/androidtv
     - cp -r androidtv/app/build/outputs/apk/debug/*.apk /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/tv/androidtv/
-  when: manual
 
 deploy-web:
   stage: deploy
