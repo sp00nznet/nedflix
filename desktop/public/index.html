@@ -148,6 +148,26 @@
                         </div>
                     </section>
 
+                    <!-- Remote Servers Section -->
+                    <section class="settings-section">
+                        <h3>Remote Servers</h3>
+                        <p class="setting-description">Connect to remote Nedflix servers to access their media libraries</p>
+                        <div class="setting-item">
+                            <div class="media-path-input-container">
+                                <input type="text" id="remote-server-input" class="setting-input" placeholder="http://192.168.1.100:3000">
+                                <button type="button" id="add-remote-server-btn" class="add-path-btn" title="Add server">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="remote-servers-list" class="media-paths-list">
+                            <!-- Servers will be populated here -->
+                        </div>
+                    </section>
+
                     <!-- Media Paths Section -->
                     <section class="settings-section">
                         <h3>Media Paths</h3>

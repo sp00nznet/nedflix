@@ -7,6 +7,9 @@
 let currentPath = '';
 let libraries = [];
 let mediaPaths = [];
+let remoteServers = [];
+let currentSource = 'local';  // 'local' or 'remote'
+let currentServerUrl = null;  // URL of current remote server (if browsing remote)
 let settings = {
     theme: 'dark',
     streaming: {
@@ -50,17 +53,37 @@ async function init() {
     await loadLibraries();
     setupEventListeners();
     setupMediaPaths();
+    setupRemoteServers();
 }
 
-// Load libraries from API
+// Load libraries from API (local + remote)
 async function loadLibraries() {
     try {
-        const response = await fetch('/api/libraries');
-        libraries = await response.json();
+        // Fetch combined libraries (local + remote)
+        const response = await fetch('/api/all-libraries');
+        const data = await response.json();
+
+        // Tag local libraries with source
+        const localLibs = (data.local || []).map(lib => ({
+            ...lib,
+            source: 'local'
+        }));
+
+        // Remote libraries already tagged
+        const remoteLibs = data.remote || [];
+
+        libraries = [...localLibs, ...remoteLibs];
         renderLibraries();
     } catch (error) {
         console.error('Failed to load libraries:', error);
-        libraryCards.innerHTML = '<p class="error-state">Failed to load media libraries</p>';
+        // Fall back to local only
+        try {
+            const response = await fetch('/api/libraries');
+            libraries = (await response.json()).map(lib => ({ ...lib, source: 'local' }));
+            renderLibraries();
+        } catch {
+            libraryCards.innerHTML = '<p class="error-state">Failed to load media libraries</p>';
+        }
     }
 }
 
@@ -71,16 +94,35 @@ function renderLibraries() {
     libraries.forEach(lib => {
         const card = document.createElement('button');
         card.className = 'library-card';
+        if (lib.source === 'remote') {
+            card.className += ' remote-library';
+        }
         card.dataset.path = lib.path;
+        card.dataset.source = lib.source || 'local';
+        if (lib.serverUrl) {
+            card.dataset.serverUrl = lib.serverUrl;
+        }
+
+        const remoteBadge = lib.source === 'remote'
+            ? `<span class="remote-badge" title="${escapeHtml(lib.serverUrl || 'Remote')}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="2" y1="12" x2="22" y2="12"></line>
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                </svg>
+               </span>`
+            : '';
+
         card.innerHTML = `
             <div class="library-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
                 </svg>
+                ${remoteBadge}
             </div>
             <span class="library-name">${escapeHtml(lib.name)}</span>
         `;
-        card.addEventListener('click', () => openLibrary(lib.path));
+        card.addEventListener('click', () => openLibrary(lib.path, lib.source, lib.serverUrl));
         libraryCards.appendChild(card);
     });
 }
@@ -194,9 +236,165 @@ async function removeMediaPath(index) {
     await loadLibraries();
 }
 
+// ==================== Remote Server Management ====================
+
+// Setup remote servers display in settings
+async function setupRemoteServers() {
+    const serversList = document.getElementById('remote-servers-list');
+    const addServerBtn = document.getElementById('add-remote-server-btn');
+    const serverInput = document.getElementById('remote-server-input');
+
+    if (!serversList) return;
+
+    // Load servers from API
+    try {
+        const response = await fetch('/api/remote-servers');
+        remoteServers = await response.json();
+    } catch (error) {
+        console.error('Failed to load remote servers:', error);
+        remoteServers = [];
+    }
+
+    renderRemoteServers();
+
+    // Add server button handler
+    if (addServerBtn && serverInput) {
+        addServerBtn.addEventListener('click', () => addRemoteServer());
+        serverInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addRemoteServer();
+            }
+        });
+    }
+}
+
+// Render remote servers list
+function renderRemoteServers() {
+    const serversList = document.getElementById('remote-servers-list');
+    if (!serversList) return;
+
+    if (remoteServers.length === 0) {
+        serversList.innerHTML = '<div class="media-paths-empty">No remote servers configured. Add a server URL above.</div>';
+        return;
+    }
+
+    serversList.innerHTML = remoteServers.map((server, index) => {
+        const statusClass = server.status?.reachable ? 'status-online' : 'status-offline';
+        const statusText = server.status?.reachable ? 'Online' : 'Offline';
+
+        return `
+            <div class="media-path-item remote-server-item" data-index="${index}">
+                <div class="path-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                </div>
+                <div class="server-info">
+                    <span class="path-text">${escapeHtml(server.name || server.url)}</span>
+                    <span class="server-url">${escapeHtml(server.url)}</span>
+                </div>
+                <span class="server-status ${statusClass}">${statusText}</span>
+                <button type="button" class="remove-path-btn" data-url="${escapeHtml(server.url)}" title="Remove server">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+        `;
+    }).join('');
+
+    // Add remove button handlers
+    serversList.querySelectorAll('.remove-path-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const url = btn.dataset.url;
+            removeRemoteServer(url);
+        });
+    });
+}
+
+// Add a new remote server
+async function addRemoteServer() {
+    const serverInput = document.getElementById('remote-server-input');
+    if (!serverInput) return;
+
+    let serverUrl = serverInput.value.trim();
+    if (!serverUrl) return;
+
+    // Add http:// if no protocol specified
+    if (!serverUrl.startsWith('http://') && !serverUrl.startsWith('https://')) {
+        serverUrl = 'http://' + serverUrl;
+    }
+
+    // Validate URL
+    try {
+        new URL(serverUrl);
+    } catch {
+        alert('Invalid server URL');
+        return;
+    }
+
+    // Check for duplicates
+    const normalizedUrl = serverUrl.replace(/\/+$/, '');
+    if (remoteServers.some(s => s.url === normalizedUrl)) {
+        serverInput.value = '';
+        return;
+    }
+
+    // Add server via API
+    try {
+        const response = await fetch('/api/remote-servers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: serverUrl })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            remoteServers = data.servers;
+            serverInput.value = '';
+            renderRemoteServers();
+            await loadLibraries();
+        } else {
+            alert(data.error || 'Failed to add server');
+        }
+    } catch (error) {
+        console.error('Failed to add remote server:', error);
+        alert('Failed to add server: ' + error.message);
+    }
+}
+
+// Remove a remote server
+async function removeRemoteServer(url) {
+    try {
+        const response = await fetch('/api/remote-servers', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            remoteServers = data.servers;
+            renderRemoteServers();
+            await loadLibraries();
+        }
+    } catch (error) {
+        console.error('Failed to remove remote server:', error);
+    }
+}
+
+// ==================== End Remote Server Management ====================
+
 // Open a library
-function openLibrary(path) {
+function openLibrary(path, source = 'local', serverUrl = null) {
     currentPath = path;
+    currentSource = source;
+    currentServerUrl = serverUrl;
     librarySelector.style.display = 'none';
     mainContent.style.display = 'grid';
     loadDirectory(path);
@@ -225,16 +423,36 @@ async function loadDirectory(path) {
     parentBtn.disabled = true;
 
     try {
-        const response = await fetch(`/api/browse?path=${encodeURIComponent(path)}`);
-        const data = await response.json();
+        let response, data;
+
+        if (currentSource === 'remote' && currentServerUrl) {
+            // Fetch from remote server via proxy
+            response = await fetch(`/api/remote/browse?serverUrl=${encodeURIComponent(currentServerUrl)}&path=${encodeURIComponent(path)}`);
+        } else {
+            // Fetch from local
+            response = await fetch(`/api/browse?path=${encodeURIComponent(path)}`);
+        }
+
+        data = await response.json();
 
         if (!response.ok) {
             throw new Error(data.error || 'Failed to load directory');
         }
 
         currentPath = data.currentPath;
-        currentPathEl.textContent = currentPath;
+        currentPathEl.textContent = currentSource === 'remote'
+            ? `[Remote] ${currentPath}`
+            : currentPath;
         parentBtn.disabled = !data.canGoUp;
+
+        // Tag items with source info for playback
+        if (data.items) {
+            data.items = data.items.map(item => ({
+                ...item,
+                source: currentSource,
+                serverUrl: currentServerUrl
+            }));
+        }
 
         renderFileList(data.items, data.parentPath);
     } catch (error) {
@@ -332,7 +550,16 @@ function handleFileClick(item) {
 // Play video
 function playVideo(item) {
     videoName.textContent = item.name;
-    videoPlayer.src = `/api/video?path=${encodeURIComponent(item.path)}`;
+
+    // Determine the video URL based on source
+    let videoUrl;
+    if (item.source === 'remote' && item.serverUrl) {
+        videoUrl = `/api/remote/video?serverUrl=${encodeURIComponent(item.serverUrl)}&path=${encodeURIComponent(item.path)}`;
+    } else {
+        videoUrl = `/api/video?path=${encodeURIComponent(item.path)}`;
+    }
+
+    videoPlayer.src = videoUrl;
     videoPlayer.classList.add('active');
     videoPlaceholder.classList.add('hidden');
     mainContent.classList.add('video-playing');
@@ -354,7 +581,16 @@ function playVideo(item) {
 // Play audio
 function playAudio(item) {
     videoName.textContent = item.name;
-    videoPlayer.src = `/api/audio?path=${encodeURIComponent(item.path)}`;
+
+    // Determine the audio URL based on source
+    let audioUrl;
+    if (item.source === 'remote' && item.serverUrl) {
+        audioUrl = `/api/remote/audio?serverUrl=${encodeURIComponent(item.serverUrl)}&path=${encodeURIComponent(item.path)}`;
+    } else {
+        audioUrl = `/api/audio?path=${encodeURIComponent(item.path)}`;
+    }
+
+    videoPlayer.src = audioUrl;
     videoPlayer.classList.add('active');
     videoPlaceholder.classList.add('hidden');
     mainContent.classList.add('video-playing');

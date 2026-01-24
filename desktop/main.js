@@ -26,6 +26,9 @@ let ersatztvSettings = {
     url: ''  // e.g., 'http://192.168.1.100:8409'
 };
 
+// Remote Nedflix server settings
+let remoteServers = [];  // Array of {url, name, enabled}
+
 // IPTV cache
 let iptvChannelsCache = null;
 let iptvEpgCache = null;
@@ -40,6 +43,7 @@ function loadConfig() {
             mediaPaths = config.mediaPaths || [];
             iptvSettings = config.iptv || { playlistUrl: '', epgUrl: '' };
             ersatztvSettings = config.ersatztv || { url: '' };
+            remoteServers = config.remoteServers || [];
         }
     } catch (error) {
         console.error('Failed to load config:', error);
@@ -74,7 +78,8 @@ function saveConfig() {
         fs.writeFileSync(CONFIG_FILE, JSON.stringify({
             mediaPaths,
             iptv: iptvSettings,
-            ersatztv: ersatztvSettings
+            ersatztv: ersatztvSettings,
+            remoteServers
         }, null, 2));
     } catch (error) {
         console.error('Failed to save config:', error);
@@ -268,6 +273,100 @@ function getChannelsByGroup(channels) {
         groups[group].push(channel);
     }
     return groups;
+}
+
+// ==================== Remote Server Helper Functions ====================
+
+/**
+ * Make request to a remote Nedflix server
+ */
+function remoteServerRequest(serverUrl, endpoint, options = {}) {
+    return new Promise((resolve, reject) => {
+        const url = new URL(endpoint, serverUrl);
+        const client = url.protocol === 'https:' ? https : http;
+
+        const reqOptions = {
+            hostname: url.hostname,
+            port: url.port,
+            path: url.pathname + url.search,
+            method: options.method || 'GET',
+            timeout: options.timeout || 10000,
+            headers: {
+                'User-Agent': 'Nedflix-Desktop/1.0',
+                ...options.headers
+            }
+        };
+
+        const req = client.request(reqOptions, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    resolve({
+                        status: res.statusCode,
+                        data: JSON.parse(data),
+                        headers: res.headers
+                    });
+                } catch {
+                    resolve({
+                        status: res.statusCode,
+                        data: data,
+                        headers: res.headers
+                    });
+                }
+            });
+        });
+
+        req.on('error', reject);
+        req.on('timeout', () => {
+            req.destroy();
+            reject(new Error('Request timeout'));
+        });
+
+        if (options.body) {
+            req.write(JSON.stringify(options.body));
+        }
+        req.end();
+    });
+}
+
+/**
+ * Check if a remote server is reachable
+ */
+async function checkRemoteServer(serverUrl) {
+    try {
+        const response = await remoteServerRequest(serverUrl, '/api/user', { timeout: 5000 });
+        return {
+            reachable: response.status === 200,
+            authenticated: response.data?.authenticated || false,
+            user: response.data?.user || null
+        };
+    } catch (error) {
+        return {
+            reachable: false,
+            error: error.message
+        };
+    }
+}
+
+/**
+ * Fetch libraries from a remote server
+ */
+async function fetchRemoteLibraries(serverUrl) {
+    try {
+        const response = await remoteServerRequest(serverUrl, '/api/libraries');
+        if (response.status === 200 && Array.isArray(response.data)) {
+            return response.data.map(lib => ({
+                ...lib,
+                source: 'remote',
+                serverUrl: serverUrl
+            }));
+        }
+        return [];
+    } catch (error) {
+        console.error(`Failed to fetch libraries from ${serverUrl}:`, error.message);
+        return [];
+    }
 }
 
 // ==================== ErsatzTV Helper Functions ====================
@@ -677,6 +776,197 @@ function createServer() {
         res.json({ success: true, settings: ersatztvSettings });
     });
 
+    // ==================== Remote Server API Endpoints ====================
+
+    // API: Get all remote servers
+    expressApp.get('/api/remote-servers', (req, res) => {
+        res.json(remoteServers);
+    });
+
+    // API: Add/update remote server
+    expressApp.post('/api/remote-servers', async (req, res) => {
+        const { url, name, enabled = true } = req.body;
+
+        if (!url) {
+            return res.status(400).json({ error: 'Server URL is required' });
+        }
+
+        // Normalize URL (remove trailing slash)
+        const normalizedUrl = url.replace(/\/+$/, '');
+
+        // Check if server already exists
+        const existingIndex = remoteServers.findIndex(s => s.url === normalizedUrl);
+
+        const serverConfig = {
+            url: normalizedUrl,
+            name: name || new URL(normalizedUrl).hostname,
+            enabled
+        };
+
+        // Verify server is reachable
+        const status = await checkRemoteServer(normalizedUrl);
+        serverConfig.status = status;
+
+        if (existingIndex >= 0) {
+            remoteServers[existingIndex] = serverConfig;
+        } else {
+            remoteServers.push(serverConfig);
+        }
+
+        saveConfig();
+        res.json({ success: true, server: serverConfig, servers: remoteServers });
+    });
+
+    // API: Remove remote server
+    expressApp.delete('/api/remote-servers', (req, res) => {
+        const { url } = req.body;
+        const normalizedUrl = url.replace(/\/+$/, '');
+        remoteServers = remoteServers.filter(s => s.url !== normalizedUrl);
+        saveConfig();
+        res.json({ success: true, servers: remoteServers });
+    });
+
+    // API: Check remote server status
+    expressApp.get('/api/remote-servers/status', async (req, res) => {
+        const results = await Promise.all(
+            remoteServers.map(async (server) => {
+                const status = await checkRemoteServer(server.url);
+                return { ...server, status };
+            })
+        );
+        res.json(results);
+    });
+
+    // API: Get combined libraries (local + all enabled remote servers)
+    expressApp.get('/api/all-libraries', async (req, res) => {
+        try {
+            // Local libraries
+            const localLibraries = mediaPaths.map(p => ({
+                path: p,
+                name: path.basename(p),
+                source: 'local'
+            })).filter(lib => {
+                try {
+                    return fs.existsSync(lib.path) && fs.statSync(lib.path).isDirectory();
+                } catch {
+                    return false;
+                }
+            });
+
+            // Remote libraries from all enabled servers
+            const enabledServers = remoteServers.filter(s => s.enabled);
+            const remoteLibrariesArrays = await Promise.all(
+                enabledServers.map(server => fetchRemoteLibraries(server.url))
+            );
+            const remoteLibraries = remoteLibrariesArrays.flat();
+
+            res.json({
+                local: localLibraries,
+                remote: remoteLibraries,
+                combined: [...localLibraries, ...remoteLibraries]
+            });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    // API: Proxy browse request to remote server
+    expressApp.get('/api/remote/browse', async (req, res) => {
+        const { serverUrl, path: remotePath } = req.query;
+
+        if (!serverUrl || !remotePath) {
+            return res.status(400).json({ error: 'serverUrl and path are required' });
+        }
+
+        try {
+            const response = await remoteServerRequest(
+                serverUrl,
+                `/api/browse?path=${encodeURIComponent(remotePath)}`
+            );
+
+            if (response.status === 200) {
+                // Tag items with source info
+                const data = response.data;
+                if (data.items) {
+                    data.items = data.items.map(item => ({
+                        ...item,
+                        source: 'remote',
+                        serverUrl
+                    }));
+                }
+                data.source = 'remote';
+                data.serverUrl = serverUrl;
+                res.json(data);
+            } else {
+                res.status(response.status).json(response.data);
+            }
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    // API: Proxy video stream from remote server
+    expressApp.get('/api/remote/video', (req, res) => {
+        const { serverUrl, path: remotePath } = req.query;
+
+        if (!serverUrl || !remotePath) {
+            return res.status(400).send('serverUrl and path are required');
+        }
+
+        const url = new URL(`/api/video?path=${encodeURIComponent(remotePath)}`, serverUrl);
+        const client = url.protocol === 'https:' ? https : http;
+
+        const proxyReq = client.get(url.href, {
+            headers: {
+                'User-Agent': 'Nedflix-Desktop/1.0',
+                ...(req.headers.range ? { Range: req.headers.range } : {})
+            }
+        }, (proxyRes) => {
+            // Copy response headers
+            res.writeHead(proxyRes.statusCode, proxyRes.headers);
+            proxyRes.pipe(res);
+        });
+
+        proxyReq.on('error', (err) => {
+            console.error('Remote video proxy error:', err.message);
+            res.status(500).send('Failed to proxy video stream');
+        });
+
+        req.on('close', () => {
+            proxyReq.destroy();
+        });
+    });
+
+    // API: Proxy audio stream from remote server
+    expressApp.get('/api/remote/audio', (req, res) => {
+        const { serverUrl, path: remotePath } = req.query;
+
+        if (!serverUrl || !remotePath) {
+            return res.status(400).send('serverUrl and path are required');
+        }
+
+        const url = new URL(`/api/audio?path=${encodeURIComponent(remotePath)}`, serverUrl);
+        const client = url.protocol === 'https:' ? https : http;
+
+        const proxyReq = client.get(url.href, {
+            headers: {
+                'User-Agent': 'Nedflix-Desktop/1.0'
+            }
+        }, (proxyRes) => {
+            res.writeHead(proxyRes.statusCode, proxyRes.headers);
+            proxyRes.pipe(res);
+        });
+
+        proxyReq.on('error', (err) => {
+            console.error('Remote audio proxy error:', err.message);
+            res.status(500).send('Failed to proxy audio stream');
+        });
+
+        req.on('close', () => {
+            proxyReq.destroy();
+        });
+    });
+
     // Serve index for SPA
     expressApp.get('*', (req, res) => {
         res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -822,4 +1112,14 @@ ipcMain.handle('set-ersatztv-settings', (event, settings) => {
     ersatztvSettings = { ...ersatztvSettings, ...settings };
     saveConfig();
     return { success: true, settings: ersatztvSettings };
+});
+
+ipcMain.handle('get-remote-servers', () => {
+    return remoteServers;
+});
+
+ipcMain.handle('set-remote-servers', (event, servers) => {
+    remoteServers = servers || [];
+    saveConfig();
+    return { success: true, servers: remoteServers };
 });
