@@ -935,6 +935,19 @@ deploy-tv-android:
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
+# Manual deploy for androidtv-debug-now
+deploy-tv-android-manual:
+  stage: deploy
+  tags:
+    - linux
+  needs:
+    - job: androidtv-debug-now
+      artifacts: true
+  script:
+    - mkdir -p /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/tv/androidtv
+    - cp -r androidtv/app/build/outputs/apk/debug/*.apk /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/tv/androidtv/
+  when: manual
+
 deploy-web:
   stage: deploy
   tags:
