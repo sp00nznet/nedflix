@@ -880,10 +880,10 @@ deploy-desktop-windows:
       artifacts: true
       optional: true
   script:
-    - 'net use R: \\192.168.100.22\releases gitlab /user:root'
-    - 'mkdir R:\%CI_PROJECT_NAME%\%CI_COMMIT_REF_NAME%\desktop\windows'
-    - 'xcopy /E /I /Y desktop\dist\*.exe R:\%CI_PROJECT_NAME%\%CI_COMMIT_REF_NAME%\desktop\windows\'
-    - 'xcopy /E /I /Y desktop\dist\*.msi R:\%CI_PROJECT_NAME%\%CI_COMMIT_REF_NAME%\desktop\windows\'
+    - 'net use R: /delete 2>$null; net use R: \\192.168.100.22\releases gitlab /user:root'
+    - 'New-Item -ItemType Directory -Force -Path R:\$env:CI_PROJECT_NAME\$env:CI_COMMIT_REF_NAME\desktop\windows'
+    - 'Copy-Item -Path desktop\dist\*.exe -Destination R:\$env:CI_PROJECT_NAME\$env:CI_COMMIT_REF_NAME\desktop\windows\ -Force'
+    - 'Copy-Item -Path desktop\dist\*.msi -Destination R:\$env:CI_PROJECT_NAME\$env:CI_COMMIT_REF_NAME\desktop\windows\ -Force -ErrorAction SilentlyContinue'
     - 'net use R: /delete'
   rules:
     - if: $CI_COMMIT_TAG
