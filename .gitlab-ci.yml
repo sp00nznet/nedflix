@@ -599,7 +599,7 @@ build-ios-ipa:
 # TV Builds - Android TV (requires JDK 17+ and Android SDK on runner)
 # =============================================================================
 
-build-androidtv-client-debug:
+build-androidtv-debug:
   stage: build-tv
   tags:
     - linux
@@ -608,11 +608,11 @@ build-androidtv-client-debug:
     - cd androidtv
     - chmod +x gradlew setup-gradle-wrapper.sh
     - ./setup-gradle-wrapper.sh
-    - ./gradlew :app:assembleClientDebug --no-daemon
+    - ./gradlew assembleDebug --no-daemon
   artifacts:
-    name: nedflix-androidtv-client-debug
+    name: nedflix-androidtv-debug
     paths:
-      - androidtv/app/build/outputs/apk/client/debug/*.apk
+      - androidtv/app/build/outputs/apk/debug/*.apk
     expire_in: 7 days
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -620,7 +620,7 @@ build-androidtv-client-debug:
     - changes:
         - androidtv/**/*
 
-build-androidtv-client-release:
+build-androidtv-release:
   stage: build-tv
   tags:
     - linux
@@ -629,30 +629,11 @@ build-androidtv-client-release:
     - cd androidtv
     - chmod +x gradlew setup-gradle-wrapper.sh
     - ./setup-gradle-wrapper.sh
-    - ./gradlew :app:assembleClientRelease --no-daemon
+    - ./gradlew assembleRelease --no-daemon
   artifacts:
-    name: nedflix-androidtv-client-release
+    name: nedflix-androidtv-release
     paths:
-      - androidtv/app/build/outputs/apk/client/release/*.apk
-    expire_in: 30 days
-  rules:
-    - if: $CI_COMMIT_TAG
-    - if: $CI_PIPELINE_SOURCE == "web"
-
-build-androidtv-desktop-release:
-  stage: build-tv
-  tags:
-    - linux
-  extends: .android-base
-  script:
-    - cd androidtv
-    - chmod +x gradlew setup-gradle-wrapper.sh
-    - ./setup-gradle-wrapper.sh
-    - ./gradlew :app:assembleDesktopRelease --no-daemon
-  artifacts:
-    name: nedflix-androidtv-desktop-release
-    paths:
-      - androidtv/app/build/outputs/apk/desktop/release/*.apk
+      - androidtv/app/build/outputs/apk/release/*.apk
     expire_in: 30 days
   rules:
     - if: $CI_COMMIT_TAG
@@ -667,11 +648,11 @@ build-androidtv-bundle:
     - cd androidtv
     - chmod +x gradlew setup-gradle-wrapper.sh
     - ./setup-gradle-wrapper.sh
-    - ./gradlew :app:bundleClientRelease --no-daemon
+    - ./gradlew bundleRelease --no-daemon
   artifacts:
     name: nedflix-androidtv-bundle
     paths:
-      - androidtv/app/build/outputs/bundle/clientRelease/*.aab
+      - androidtv/app/build/outputs/bundle/release/*.aab
     expire_in: 30 days
   rules:
     - if: $CI_COMMIT_TAG
@@ -914,34 +895,31 @@ deploy-desktop-macos:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   allow_failure: true
 
-# NOTE: Android deploy jobs disabled until Android builds are working reliably
-# Uncomment when build-android-release and build-androidtv-client-release are stable
-#
-# deploy-mobile-android:
-#   stage: deploy
-#   tags:
-#     - linux
-#   needs:
-#     - job: build-android-release
-#       artifacts: true
-#   script:
-#     - mkdir -p /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/mobile/android
-#     - cp -r android/app/build/outputs/apk/release/*.apk /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/mobile/android/
-#   rules:
-#     - if: $CI_COMMIT_TAG
-#
-# deploy-tv-android:
-#   stage: deploy
-#   tags:
-#     - linux
-#   needs:
-#     - job: build-androidtv-client-release
-#       artifacts: true
-#   script:
-#     - mkdir -p /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/tv/androidtv
-#     - cp -r androidtv/app/build/outputs/apk/*/release/*.apk /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/tv/androidtv/
-#   rules:
-#     - if: $CI_COMMIT_TAG
+deploy-mobile-android:
+  stage: deploy
+  tags:
+    - linux
+  needs:
+    - job: build-android-debug
+      artifacts: true
+  script:
+    - mkdir -p /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/mobile/android
+    - cp -r android/app/build/outputs/apk/debug/*.apk /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/mobile/android/
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+deploy-tv-android:
+  stage: deploy
+  tags:
+    - linux
+  needs:
+    - job: build-androidtv-debug
+      artifacts: true
+  script:
+    - mkdir -p /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/tv/androidtv
+    - cp -r androidtv/app/build/outputs/apk/debug/*.apk /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/tv/androidtv/
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 deploy-web:
   stage: deploy
@@ -1024,10 +1002,8 @@ release-create:
           url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-android-bundle"
         - name: "iOS Archive"
           url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-ios-device"
-        - name: "Android TV Client"
-          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-androidtv-client-release"
-        - name: "Android TV Desktop"
-          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-androidtv-desktop-release"
+        - name: "Android TV"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-androidtv-release"
         - name: "Apple TV Client"
           url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-appletv-client"
         - name: "Web Static Build"
@@ -1105,12 +1081,12 @@ nightly-mobile:
   extends: .android-base
   script:
     - cd android && chmod +x gradlew setup-gradle-wrapper.sh && ./setup-gradle-wrapper.sh && ./gradlew assembleDebug --no-daemon
-    - cd ../androidtv && chmod +x gradlew setup-gradle-wrapper.sh && ./setup-gradle-wrapper.sh && ./gradlew :app:assembleClientDebug --no-daemon
+    - cd ../androidtv && chmod +x gradlew setup-gradle-wrapper.sh && ./setup-gradle-wrapper.sh && ./gradlew assembleDebug --no-daemon
   artifacts:
     name: nedflix-nightly-mobile-$CI_COMMIT_SHORT_SHA
     paths:
       - android/app/build/outputs/apk/debug/
-      - androidtv/app/build/outputs/apk/client/debug/
+      - androidtv/app/build/outputs/apk/debug/
     expire_in: 7 days
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
