@@ -138,14 +138,13 @@ lint-androidtv:
   allow_failure: true
 
 # =============================================================================
-# Desktop Builds - Windows (requires Docker executor with Wine)
+# Desktop Builds - Windows (native Windows runner)
 # =============================================================================
 
 build-windows-x64:
   stage: build-desktop
-  image: electronuserland/builder:wine
   tags:
-    - docker
+    - windows
   extends: .desktop-base
   script:
     - npm run build:win
@@ -164,9 +163,8 @@ build-windows-x64:
 
 build-windows-x86:
   stage: build-desktop
-  image: electronuserland/builder:wine
   tags:
-    - docker
+    - windows
   extends: .desktop-base
   script:
     - npm run build:win32
@@ -181,9 +179,8 @@ build-windows-x86:
 
 build-windows-portable:
   stage: build-desktop
-  image: electronuserland/builder:wine
   tags:
-    - docker
+    - windows
   extends: .desktop-base
   script:
     - npm run build:portable
