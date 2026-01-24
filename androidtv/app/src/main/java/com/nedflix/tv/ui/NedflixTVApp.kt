@@ -6,6 +6,7 @@
 package com.nedflix.tv.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -380,11 +381,11 @@ fun MediaCard(
         modifier = Modifier
             .width(260.dp)
             .onFocusChanged { isFocused = it.isFocused }
-            .focusable(),
+            .focusable()
+            .clickable { onClick() },
         colors = CardDefaults.cardColors(
             containerColor = if (isFocused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A)
-        ),
-        onClick = onClick
+        )
     ) {
         Column {
             // Thumbnail
