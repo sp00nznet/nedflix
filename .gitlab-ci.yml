@@ -23,6 +23,9 @@ variables:
 
 .desktop-base:
   before_script:
+    - |
+      # Ensure Node.js binaries are in PATH (for macOS homebrew installs)
+      export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
     - cd desktop
     - npm install
   cache:
@@ -277,7 +280,7 @@ build-macos-x64:
     - macos
   extends: .desktop-base
   script:
-    - npx electron-builder --mac --x64 --publish never
+    - ./node_modules/.bin/electron-builder --mac --x64 --publish never
   artifacts:
     name: nedflix-macos-x64
     paths:
@@ -298,7 +301,7 @@ build-macos-arm64:
     - arm64
   extends: .desktop-base
   script:
-    - npx electron-builder --mac --arm64 --publish never
+    - ./node_modules/.bin/electron-builder --mac --arm64 --publish never
   artifacts:
     name: nedflix-macos-arm64
     paths:
@@ -315,7 +318,7 @@ build-macos-universal:
     - macos
   extends: .desktop-base
   script:
-    - npx electron-builder --mac --universal --publish never
+    - ./node_modules/.bin/electron-builder --mac --universal --publish never
   artifacts:
     name: nedflix-macos-universal
     paths:
