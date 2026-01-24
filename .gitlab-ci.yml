@@ -4,6 +4,7 @@
 
 stages:
   - test
+  - build-server
   - build-desktop
   - build-mobile
   - build-tv
@@ -48,6 +49,14 @@ variables:
     - npm install
   cache:
     key: web-$CI_JOB_NAME
+    paths:
+      - node_modules/
+
+.server-base:
+  before_script:
+    - npm install --production
+  cache:
+    key: server-$CI_JOB_NAME
     paths:
       - node_modules/
 
@@ -183,10 +192,68 @@ lint-androidtv:
         - androidtv/**/*
 
 # =============================================================================
-# Desktop Builds - Windows (native Windows runner)
+# Server Builds - Linux Headless Server
 # =============================================================================
 
-build-windows-x64:
+build-server-linux:
+  stage: build-server
+  tags:
+    - linux
+  extends: .server-base
+  script:
+    - chmod +x server/build.sh
+    - ./server/build.sh
+  artifacts:
+    name: nedflix-server-linux
+    paths:
+      - dist/nedflix-server-*.tar.gz
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - changes:
+        - server.js
+        - package.json
+        - public/**/*
+        - server/**/*
+
+build-server-docker:
+  stage: build-server
+  tags:
+    - docker
+  image: docker:24
+  services:
+    - docker:24-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+    IMAGE_TAG: $CI_REGISTRY_IMAGE/server:$CI_COMMIT_REF_SLUG
+    IMAGE_TAG_LATEST: $CI_REGISTRY_IMAGE/server:latest
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - docker build -t $IMAGE_TAG -f Dockerfile .
+    - docker push $IMAGE_TAG
+    - |
+      if [ "$CI_COMMIT_BRANCH" == "$CI_DEFAULT_BRANCH" ]; then
+        docker tag $IMAGE_TAG $IMAGE_TAG_LATEST
+        docker push $IMAGE_TAG_LATEST
+      fi
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - changes:
+        - Dockerfile
+        - server.js
+        - package.json
+        - public/**/*
+
+# =============================================================================
+# Desktop Client Builds - Windows (Standalone + Remote Server Support)
+# =============================================================================
+
+build-desktop-windows-x64:
   stage: build-desktop
   tags:
     - windows
@@ -206,7 +273,7 @@ build-windows-x64:
     - changes:
         - desktop/**/*
 
-build-windows-x86:
+build-desktop-windows-x86:
   stage: build-desktop
   tags:
     - windows
@@ -214,7 +281,7 @@ build-windows-x86:
   script:
     - npx electron-builder --win --ia32 --publish never
   artifacts:
-    name: nedflix-windows-x86
+    name: nedflix-desktop-windows-x86
     paths:
       - desktop/dist/*ia32*.exe
     expire_in: 30 days
@@ -222,7 +289,7 @@ build-windows-x86:
     - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "web"
 
-build-windows-portable:
+build-desktop-windows-portable:
   stage: build-desktop
   tags:
     - windows
@@ -230,7 +297,7 @@ build-windows-portable:
   script:
     - npx electron-builder --win portable --publish never
   artifacts:
-    name: nedflix-windows-portable
+    name: nedflix-desktop-windows-portable
     paths:
       - desktop/dist/*Portable*.exe
     expire_in: 30 days
@@ -239,10 +306,10 @@ build-windows-portable:
     - if: $CI_PIPELINE_SOURCE == "web"
 
 # =============================================================================
-# Desktop Builds - Linux (shell executor on Debian)
+# Desktop Client Builds - Linux (Standalone + Remote Server Support)
 # =============================================================================
 
-build-linux-x64:
+build-desktop-linux-x64:
   stage: build-desktop
   tags:
     - linux
@@ -250,7 +317,7 @@ build-linux-x64:
   script:
     - npx electron-builder --linux --x64 --publish never
   artifacts:
-    name: nedflix-linux-x64
+    name: nedflix-desktop-linux-x64
     paths:
       - desktop/dist/*.deb
       - desktop/dist/*.AppImage
@@ -263,7 +330,7 @@ build-linux-x64:
     - changes:
         - desktop/**/*
 
-build-linux-arm64:
+build-desktop-linux-arm64:
   stage: build-desktop
   tags:
     - linux
@@ -280,7 +347,7 @@ build-linux-arm64:
     - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "web"
 
-build-linux-deb:
+build-desktop-linux-deb:
   stage: build-desktop
   tags:
     - linux
@@ -296,7 +363,7 @@ build-linux-deb:
     - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "web"
 
-build-linux-appimage:
+build-desktop-linux-appimage:
   stage: build-desktop
   tags:
     - linux
@@ -313,10 +380,10 @@ build-linux-appimage:
     - if: $CI_PIPELINE_SOURCE == "web"
 
 # =============================================================================
-# Desktop Builds - macOS
+# Desktop Client Builds - macOS (Standalone + Remote Server Support)
 # =============================================================================
 
-build-macos-x64:
+build-desktop-macos-x64:
   stage: build-desktop
   tags:
     - macos
@@ -336,7 +403,7 @@ build-macos-x64:
     - changes:
         - desktop/**/*
 
-build-macos-arm64:
+build-desktop-macos-arm64:
   stage: build-desktop
   tags:
     - macos
@@ -354,7 +421,7 @@ build-macos-arm64:
     - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "web"
 
-build-macos-universal:
+build-desktop-macos-universal:
   stage: build-desktop
   tags:
     - macos
@@ -782,7 +849,11 @@ release-create:
     description: |
       ## Nedflix $CI_COMMIT_TAG
 
-      ### Desktop Downloads
+      ### Server (Headless)
+      - **Linux**: Headless server tar.gz with systemd service installer
+      - **Docker**: `$CI_REGISTRY_IMAGE/server:$CI_COMMIT_TAG`
+
+      ### Desktop Client (Standalone + Remote)
       - **Windows**: x64 installer, x86 installer, Portable
       - **Linux**: Debian package, AppImage, tar.gz (x64 & ARM64)
       - **macOS**: DMG (Intel, Apple Silicon, Universal)
@@ -802,16 +873,18 @@ release-create:
       See the [README](README.md) for installation instructions.
     assets:
       links:
-        - name: "Windows x64 Installer"
-          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-windows-x64"
-        - name: "Windows Portable"
-          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-windows-portable"
-        - name: "Linux x64 (All formats)"
-          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-linux-x64"
-        - name: "Linux AppImage"
-          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-linux-appimage"
-        - name: "macOS Universal"
-          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-macos-universal"
+        - name: "Linux Server (Headless)"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-server-linux"
+        - name: "Windows Desktop x64"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-desktop-windows-x64"
+        - name: "Windows Desktop Portable"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-desktop-windows-portable"
+        - name: "Linux Desktop x64"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-desktop-linux-x64"
+        - name: "Linux Desktop AppImage"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-desktop-linux-appimage"
+        - name: "macOS Desktop Universal"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-desktop-macos-universal"
         - name: "Android APK"
           url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=build-android-release"
         - name: "Android Bundle (AAB)"
