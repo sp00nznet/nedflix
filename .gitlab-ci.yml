@@ -880,14 +880,15 @@ deploy-desktop-windows:
       artifacts: true
       optional: true
   script:
-    - net use R: \\192.168.100.22\releases gitlab /user:root
-    - if not exist "R:\%CI_PROJECT_NAME%\%CI_COMMIT_REF_NAME%\desktop\windows" mkdir "R:\%CI_PROJECT_NAME%\%CI_COMMIT_REF_NAME%\desktop\windows"
-    - xcopy /E /I /Y desktop\dist\*.exe "R:\%CI_PROJECT_NAME%\%CI_COMMIT_REF_NAME%\desktop\windows\"
-    - xcopy /E /I /Y desktop\dist\*.msi "R:\%CI_PROJECT_NAME%\%CI_COMMIT_REF_NAME%\desktop\windows\" 2>nul || echo "No MSI files"
-    - net use R: /delete
+    - 'net use R: \\192.168.100.22\releases gitlab /user:root'
+    - 'mkdir R:\%CI_PROJECT_NAME%\%CI_COMMIT_REF_NAME%\desktop\windows'
+    - 'xcopy /E /I /Y desktop\dist\*.exe R:\%CI_PROJECT_NAME%\%CI_COMMIT_REF_NAME%\desktop\windows\'
+    - 'xcopy /E /I /Y desktop\dist\*.msi R:\%CI_PROJECT_NAME%\%CI_COMMIT_REF_NAME%\desktop\windows\'
+    - 'net use R: /delete'
   rules:
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  allow_failure: true
 
 deploy-desktop-macos:
   stage: deploy
