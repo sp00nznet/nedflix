@@ -609,6 +609,20 @@ build-androidtv-debug:
     - chmod +x gradlew setup-gradle-wrapper.sh
     - ./setup-gradle-wrapper.sh
     - ./gradlew assembleDebug --no-daemon --stacktrace
+
+# Manual trigger - runs immediately without waiting for other stages
+androidtv-debug-now:
+  stage: test
+  tags:
+    - linux
+  extends: .android-base
+  script:
+    - cd androidtv
+    - chmod +x gradlew setup-gradle-wrapper.sh
+    - ./setup-gradle-wrapper.sh
+    - ./gradlew assembleDebug --no-daemon --stacktrace
+  when: manual
+  allow_failure: true
   artifacts:
     name: nedflix-androidtv-debug
     paths:
