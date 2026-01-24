@@ -608,7 +608,7 @@ build-androidtv-debug:
     - cd androidtv
     - chmod +x gradlew setup-gradle-wrapper.sh
     - ./setup-gradle-wrapper.sh
-    - ./gradlew assembleDebug --no-daemon --stacktrace --info 2>&1 | tail -500
+    - ./gradlew assembleDebug --no-daemon --stacktrace
   artifacts:
     name: nedflix-androidtv-debug
     paths:
