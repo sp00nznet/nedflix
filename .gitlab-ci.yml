@@ -147,7 +147,7 @@ build-windows-x64:
     - windows
   extends: .desktop-base
   script:
-    - npm run build:win
+    - npx electron-builder --win --x64 --publish never
   artifacts:
     name: nedflix-windows-x64
     paths:
@@ -167,7 +167,7 @@ build-windows-x86:
     - windows
   extends: .desktop-base
   script:
-    - npm run build:win32
+    - npx electron-builder --win --ia32 --publish never
   artifacts:
     name: nedflix-windows-x86
     paths:
@@ -183,7 +183,7 @@ build-windows-portable:
     - windows
   extends: .desktop-base
   script:
-    - npm run build:portable
+    - npx electron-builder --win portable --publish never
   artifacts:
     name: nedflix-windows-portable
     paths:
@@ -203,7 +203,7 @@ build-linux-x64:
     - linux
   extends: .desktop-base
   script:
-    - npm run build:linux
+    - npx electron-builder --linux --x64 --publish never
   artifacts:
     name: nedflix-linux-x64
     paths:
@@ -224,7 +224,7 @@ build-linux-arm64:
     - linux
   extends: .desktop-base
   script:
-    - npm run build:linux-arm
+    - npx electron-builder --linux --arm64 --publish never
   artifacts:
     name: nedflix-linux-arm64
     paths:
@@ -241,7 +241,7 @@ build-linux-deb:
     - linux
   extends: .desktop-base
   script:
-    - npm run build:deb
+    - npx electron-builder --linux deb --x64 --publish never
   artifacts:
     name: nedflix-linux-deb
     paths:
@@ -257,7 +257,7 @@ build-linux-appimage:
     - linux
   extends: .desktop-base
   script:
-    - npm run build:appimage
+    - npx electron-builder --linux AppImage --x64 --publish never
   artifacts:
     name: nedflix-linux-appimage
     paths:
@@ -277,7 +277,7 @@ build-macos-x64:
     - macos
   extends: .desktop-base
   script:
-    - npm run build:mac
+    - npx electron-builder --mac --x64 --publish never
   artifacts:
     name: nedflix-macos-x64
     paths:
@@ -298,7 +298,7 @@ build-macos-arm64:
     - arm64
   extends: .desktop-base
   script:
-    - npm run build:mac-arm
+    - npx electron-builder --mac --arm64 --publish never
   artifacts:
     name: nedflix-macos-arm64
     paths:
@@ -315,7 +315,7 @@ build-macos-universal:
     - macos
   extends: .desktop-base
   script:
-    - npm run build:mac-universal
+    - npx electron-builder --mac --universal --publish never
   artifacts:
     name: nedflix-macos-universal
     paths:
@@ -788,7 +788,7 @@ build-all-local:
   extends: .desktop-base
   script:
     - echo "Building Linux desktop targets..."
-    - npm run build:linux || echo "Linux build completed or skipped"
+    - npx electron-builder --linux --x64 --publish never || echo "Linux build completed or skipped"
   artifacts:
     name: nedflix-all-local
     paths:
@@ -831,7 +831,7 @@ nightly-build:
     - linux
   extends: .desktop-base
   script:
-    - npm run build:linux
+    - npx electron-builder --linux --x64 --publish never
   artifacts:
     name: nedflix-nightly-$CI_COMMIT_SHORT_SHA
     paths:
