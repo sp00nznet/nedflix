@@ -609,6 +609,16 @@ build-androidtv-debug:
     - chmod +x gradlew setup-gradle-wrapper.sh
     - ./setup-gradle-wrapper.sh
     - ./gradlew assembleDebug --no-daemon --stacktrace
+  artifacts:
+    name: nedflix-androidtv-debug
+    paths:
+      - androidtv/app/build/outputs/apk/debug/*.apk
+    expire_in: 7 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - changes:
+        - androidtv/**/*
 
 # Manual trigger - runs immediately without waiting for other stages
 androidtv-debug-now:
