@@ -946,6 +946,7 @@ deploy-tv-android-manual:
   script:
     - mkdir -p /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/tv/androidtv
     - cp -r androidtv/app/build/outputs/apk/debug/*.apk /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/tv/androidtv/
+  when: on_success
 
 deploy-web:
   stage: deploy
