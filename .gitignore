@@ -38,3 +38,15 @@ mobile/ios/
 mobile/android/
 marquee-native/dist/
 users.db
+
+# Legacy port build artifacts (kept out of git)
+legacy/**/bin/
+legacy/**/obj/
+legacy/**/*.obj
+legacy/**/*.o
+legacy/**/*.d
+legacy/**/.depend
+legacy/**/*.iso
+legacy/**/*.exe
+legacy/**/.last_build_type
+xbox-original/

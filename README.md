@@ -1,18 +1,19 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/Nedflix-Personal%20Streaming-E50914?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9IndoaXRlIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwb2x5Z29uIHBvaW50cz0iNSAzIDE5IDEyIDUgMjEgNSAzIj48L3BvbHlnb24+PC9zdmc+" alt="Nedflix">
+  <img src="https://img.shields.io/badge/Nedflix-Personal%20Streaming-fb7159?style=for-the-badge" alt="Nedflix">
 </p>
 
 <h1 align="center">Nedflix</h1>
 
 <p align="center">
-  <strong>Your personal video streaming platform</strong><br>
-  Stream your media library with style - Web, Desktop, or Retro Consoles
+  <strong>Your personal media streaming platform</strong><br>
+  One interface — <strong>Marquee</strong> — across Web, Desktop, Mobile &amp; TV
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/node-%3E%3D14.0.0-brightgreen?style=flat-square" alt="Node">
+  <img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen?style=flat-square" alt="Node">
   <img src="https://img.shields.io/badge/docker-ready-blue?style=flat-square&logo=docker" alt="Docker">
   <img src="https://img.shields.io/badge/electron-desktop-47848F?style=flat-square&logo=electron" alt="Electron">
+  <img src="https://img.shields.io/badge/capacitor-mobile-119EFF?style=flat-square&logo=capacitor" alt="Capacitor">
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License">
 </p>
 
@@ -20,92 +21,90 @@
 
 ## Screenshots
 
-The **Marquee** interface — one redesigned UI shared across web, desktop, and mobile,
-built for both mouse and 10-foot gamepad navigation.
+The **Marquee** interface — one redesigned UI shared across every platform, built for both
+mouse and 10-foot gamepad navigation.
 
-| Home | Films | Series |
+<p align="center">
+  <img src="screenshots/01-home.png" alt="Home" width="900">
+</p>
+
+| Films | Series | Music |
 |:---:|:---:|:---:|
-| ![Home](screenshots/01-home.png) | ![Films](screenshots/02-movies.png) | ![Series](screenshots/03-series.png) |
-
-| Music | Audiobooks | Live TV |
-|:---:|:---:|:---:|
-| ![Music](screenshots/04-music.png) | ![Audiobooks](screenshots/05-books.png) | ![Live TV](screenshots/06-live.png) |
-
-| Settings |
-|:---:|
-| ![Settings](screenshots/07-settings.png) |
+| ![Films](screenshots/02-movies.png) | ![Series](screenshots/03-series.png) | ![Music](screenshots/04-music.png) |
+| **Audiobooks** | **Live TV** | **Settings** |
+| ![Audiobooks](screenshots/05-books.png) | ![Live TV](screenshots/06-live.png) | ![Settings](screenshots/07-settings.png) |
 
 > Artwork shows the design's gradient placeholders; real posters/art come from local image
-> files, embedded tags, or a metadata provider (TMDB/iTunes) at runtime.
+> files, embedded tags, or a metadata provider (TMDB / iTunes) at runtime.
 
 ---
 
 ## Features
 
-- **Multi-User Support** - User accounts with individual permissions and profiles
-- **Media Streaming** - Movies, TV Shows, Music, and Audiobooks with metadata
-- **Live TV (IPTV)** - M3U playlists with XMLTV EPG support
-- **Auto-Channels** - 24/7 streaming channels via [ErsatzTV](https://ersatztv.org/) integration
-- **Automatic Subtitles** - OpenSubtitles API integration
-- **Xbox Controller** - Full gamepad navigation (Desktop app)
-- **Audio Visualizer** - Multiple visualization modes for music playback
+- **Unified interface** — the Marquee UI runs on web, desktop, mobile, and TV from one codebase
+- **Multi-user & profiles** — accounts with permissions; per-profile resume & accent
+- **Everything in one place** — Movies, TV, Music, and Audiobooks with metadata
+- **Live TV (IPTV)** — M3U playlists with XMLTV EPG; auto-channels via [ErsatzTV](https://ersatztv.org/)
+- **Automatic subtitles** — OpenSubtitles integration
+- **Gamepad / 10-foot ready** — full controller + spatial focus navigation
+- **Audio visualizer** — multiple modes for music playback
 
 ---
 
 ## Quick Start
 
-### Docker (Web Server)
+### Docker (web server)
 
 ```bash
 git clone https://github.com/sp00nznet/nedflix.git
 cd nedflix
-cp .env.example .env
-# Edit .env with your credentials
-docker compose up -d
+cp .env.example .env          # edit with your credentials
+docker compose up -d          # builds the Marquee web UI into the image
 # Access at https://localhost:3443
 ```
 
-### Desktop App (Windows/Linux)
+### Web UI (development)
 
 ```bash
-cd nedflix/desktop
-
-# Windows
-build.bat
-
-# Linux
-chmod +x build.sh && ./build.sh
+cd web
+npm install
+npm run dev                   # http://localhost:5173, proxies the API to a running server
+npm run build                 # -> web/dist (served by the server / bundled into desktop & mobile)
 ```
 
-Output files are created in `desktop/dist/`.
+### Desktop (Windows / Linux / macOS)
+
+```bash
+cd desktop
+npm install
+npm start                     # run the app
+npm run build                 # package an installer into desktop/dist
+```
+
+### Mobile (Android / iOS)
+
+```bash
+cd mobile                     # Capacitor shell wrapping the web build
+npm install
+npm run add:ios && npm run add:android
+npm run ios   # / npm run android
+```
 
 ---
 
 ## Platforms
 
-### Modern Platforms
+| Platform | Directory | Stack | Notes |
+|----------|-----------|-------|-------|
+| **Web (Docker)** | `/` + `/web` | Node + React/Vite | Full features, PostgreSQL, ErsatzTV |
+| **Desktop** | `/desktop` | Electron | Windows/Linux/macOS, gamepad, system tray |
+| **Mobile** | `/mobile` | Capacitor + `/marquee-native` | iOS + Android wrap the web build |
+| **Android TV** | `/androidtv` | Android SDK | 10-foot UI |
+| **Apple TV** | `/appletv` | Swift / Xcode | 10-foot UI |
 
-| Platform | Directory | Build Script | Notes |
-|----------|-----------|--------------|-------|
-| **Web (Docker)** | `/` | `docker compose up` | Full features, PostgreSQL, ErsatzTV |
-| **Desktop** | `/desktop` | `build.bat` / `build.sh` | Windows/Linux, Xbox controller |
-| **Xbox Series X/S** | `/xbox` | `build.bat` / `build.ps1` | UWP app, Dev Mode required |
-| **iOS** | `/ios` | `build.sh` | macOS + Xcode required |
-| **Android** | `/android` | `build.sh` | Android SDK required |
-| **Apple TV** | `/appletv` | `build-*.sh` | macOS + Xcode required |
-| **Android TV** | `/androidtv` | `build-*.sh` | Android SDK required |
-
-### Retro Console Ports (Technical Demos)
-
-| Platform | Directory | Build Script | SDK | Notes |
-|----------|-----------|--------------|-----|-------|
-| **Dreamcast** | `/ports/retro/dreamcast` | `build.sh` | KallistiOS | Audio streaming focus |
-| **GameCube** | `/ports/retro/gamecube` | `build.sh` | devkitPPC | Audio playback only |
-| **Xbox Original** | `/ports/retro/xbox-original` | `build.sh` / `build.bat` | nxdk | Full client, softmod required |
-| **PlayStation 3** | `/ports/retro/ps3` | `build.sh` | PSL1GHT | Full HD client, CFW required |
-| **Xbox 360** | `/ports/retro/xbox360` | `build.sh` | libxenon | Full HD client, JTAG/RGH required |
-
-> **Note:** Retro console ports are experimental/novelty projects demonstrating homebrew development. They have hardware limitations and may require modified console firmware.
+All clients render the same **Marquee** UI (`/web`). Older/retired targets (Xbox, retro
+console homebrew) live in [`/legacy`](legacy/README.md). The original native iOS/Android
+apps, replaced by the Capacitor shell, are kept in `/archive`.
 
 ---
 
@@ -125,39 +124,32 @@ Output files are created in `desktop/dist/`.
 
 ## Configuration
 
-### Environment Variables (Docker)
+### Environment variables (Docker)
 
 | Variable | Description |
 |----------|-------------|
 | `SESSION_SECRET` | Session encryption key |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Local admin credentials |
-| `NFS_PATH` | Media library path |
+| `NFS_MOUNT_PATH` | Media library path |
 | `ERSATZTV_URL` | ErsatzTV API URL |
 | `GOOGLE_CLIENT_ID` | OAuth (optional) |
 | `OPENSUBTITLES_API_KEY` | Subtitles (optional) |
 | `OMDB_API_KEY` | Metadata (optional) |
 
-### Desktop Settings
+### Desktop settings
 
-Configure in the Settings panel:
-- **Media Paths** - Directories to scan
-- **IPTV** - M3U playlist and EPG URLs
-- **ErsatzTV** - Server URL for auto-channels
-- **Theme** - Dark/Light mode
-
-Config stored in:
-- Windows: `%APPDATA%/nedflix/nedflix-config.json`
-- Linux: `~/.config/nedflix/nedflix-config.json`
+Configure in the Settings panel: media folders, IPTV (M3U + XMLTV, URL or local file),
+ErsatzTV, artwork provider (TMDB key — optional), default audio/subtitle language, accent.
+Config is stored at `%APPDATA%/nedflix-desktop/` (Windows) or `~/.config/nedflix-desktop/` (Linux).
 
 ---
 
 ## Documentation
 
-See **[docs/SETUP.md](docs/SETUP.md)** for detailed instructions:
-- SSL certificates and OAuth setup
-- ErsatzTV channel configuration
-- User management
-- Troubleshooting
+- **[docs/SETUP.md](docs/SETUP.md)** — SSL, OAuth, ErsatzTV, user management, troubleshooting
+- **[web/README.md](web/README.md)** — the Marquee web app (structure, focus engine, API)
+- **[mobile/README.md](mobile/README.md)** — Capacitor build steps and native bridge
+- **[design/](design/)** — the original design handoff, specs, and prototypes
 
 ---
 
@@ -165,22 +157,19 @@ See **[docs/SETUP.md](docs/SETUP.md)** for detailed instructions:
 
 ```
 nedflix/
-├── server.js              # Express server
+├── server.js              # Express API + serves the Marquee web build (web/dist)
+├── marquee-service.js     # profiles, resume, music, audiobooks, library, favorites
+├── db.js, *-service.js    # database + media / metadata / iptv / ersatztv services
 ├── docker-compose.yml     # Docker orchestration
-├── public/                # Web UI
-├── desktop/               # Electron app (Windows/Linux)
-├── ios/                   # iOS app (Swift/UIKit)
-├── android/               # Android app (Kotlin/Compose)
-├── xbox/                  # Xbox Series X/S (UWP)
-├── appletv/               # Apple TV
-├── androidtv/             # Android TV
-├── ports/retro/           # Retro console ports
-│   ├── dreamcast/         # Sega Dreamcast (KallistiOS)
-│   ├── gamecube/          # Nintendo GameCube (devkitPPC)
-│   ├── xbox-original/     # Original Xbox (nxdk)
-│   ├── ps3/               # PlayStation 3 (PSL1GHT)
-│   └── xbox360/           # Xbox 360 (libxenon)
-└── docs/                  # Documentation
+├── web/                   # ★ Marquee UI — React + TypeScript + Vite (the single front-end)
+├── desktop/               # Electron shell (loads web/dist) + local-library API
+├── mobile/                # Capacitor shell (iOS + Android) wrapping web/dist
+├── marquee-native/        # native bridge plugin (background audio, lock-screen, cast…)
+├── androidtv/  appletv/   # TV apps
+├── public/                # legacy web client + server-rendered login
+├── archive/               # retired native iOS/Android apps
+├── legacy/                # Xbox + retro console ports (no longer targeted)
+└── docs/                  # documentation
 ```
 
 ---

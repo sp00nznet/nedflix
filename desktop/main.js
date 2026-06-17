@@ -4,7 +4,7 @@
  * Supports Windows and Linux
  */
 
-const { app, BrowserWindow, ipcMain, globalShortcut, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, dialog, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const express = require('express');
 const fs = require('fs');
@@ -1152,7 +1152,35 @@ function setupGamepadSupport() {
 }
 
 // App ready
+// System tray with the Marquee icon
+let tray = null;
+function createTray() {
+    try {
+        const img = nativeImage.createFromPath(path.join(__dirname, 'icon.png'));
+        if (img.isEmpty()) return; // no icon available — skip the tray rather than crash
+        tray = new Tray(process.platform === 'win32' ? img.resize({ width: 16, height: 16 }) : img);
+        tray.setToolTip('Marquee');
+        const show = () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } };
+        tray.setContextMenu(Menu.buildFromTemplate([
+            { label: 'Show Marquee', click: show },
+            { label: 'Hide', click: () => { if (mainWindow) mainWindow.hide(); } },
+            { type: 'separator' },
+            { label: 'Exit', click: () => app.quit() },
+        ]));
+        tray.on('click', () => {
+            if (!mainWindow) return;
+            if (mainWindow.isVisible() && mainWindow.isFocused()) mainWindow.hide();
+            else show();
+        });
+    } catch (e) {
+        console.error('Tray setup failed:', e.message);
+    }
+}
+
 app.whenReady().then(() => {
+    // Help Windows use the right taskbar icon / grouping
+    if (process.platform === 'win32') app.setAppUserModelId('com.nedflix.desktop');
+
     // Load configuration
     loadConfig();
 
@@ -1164,6 +1192,7 @@ app.whenReady().then(() => {
 
     createWindow();
     setupGamepadSupport();
+    createTray();
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
