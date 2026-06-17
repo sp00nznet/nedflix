@@ -1,0 +1,24 @@
+{
+  "name": "marquee-native",
+  "version": "0.1.0",
+  "description": "Native bridge for the Marquee media app (background audio, lock-screen controls, PiP, downloads, casting).",
+  "main": "dist/plugin.cjs.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/esm/index.d.ts",
+  "scripts": {
+    "build": "tsc && rollup -c rollup.config.js",
+    "watch": "tsc --watch"
+  },
+  "keywords": ["capacitor", "plugin", "media", "marquee"],
+  "capacitor": {
+    "ios": { "src": "ios" },
+    "android": { "src": "android" }
+  },
+  "peerDependencies": {
+    "@capacitor/core": "^6.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/core": "^6.0.0",
+    "typescript": "^5.4.0"
+  }
+}

@@ -16,6 +16,7 @@ const userService = require('./user-service');
 const mediaService = require('./media-service');
 const iptvService = require('./iptv-service');
 const ersatztvService = require('./ersatztv-service');
+const marqueeService = require('./marquee-service');
 
 const app = express();
 
@@ -860,7 +861,16 @@ const sessionUsers = new Map();
 
 // Middleware
 app.use(express.json());
-app.use(express.static('public'));
+
+// Serve the Marquee SPA build (web/dist) when present; fall back to the legacy public/
+// app otherwise. login.html + brand/images are still served from public by path.
+const WEB_DIST = path.join(__dirname, 'web', 'dist');
+const hasWebBuild = fs.existsSync(path.join(WEB_DIST, 'index.html'));
+if (hasWebBuild) {
+    console.log('🎬 Serving Marquee SPA from web/dist');
+    app.use(express.static(WEB_DIST, { index: false }));
+}
+app.use(express.static('public', { index: hasWebBuild ? false : 'index.html' }));
 
 // Security headers
 app.use((req, res, next) => {
@@ -2232,10 +2242,16 @@ app.get('/api/auth-providers', (req, res) => {
     res.json(providers);
 });
 
-// Redirect root to login if not authenticated
+// ==================== Marquee API (profiles, resume, music, audiobooks, favorites) ====================
+marqueeService.registerRoutes(app, { ensureAuthenticated, ensureAdmin });
+
+// Redirect root to login if not authenticated; otherwise serve the SPA shell.
 app.get('/', (req, res, next) => {
     if (!req.isAuthenticated()) {
         return res.redirect('/login.html');
+    }
+    if (hasWebBuild) {
+        return res.sendFile(path.join(WEB_DIST, 'index.html'));
     }
     next();
 });
@@ -2503,6 +2519,16 @@ app.post('/api/ersatztv/channels/:id/rebuild', ensureAdmin, async (req, res) => 
     }
 });
 
+// SPA fallback — Marquee deep links (/films, /title/:id, /watch/:id, …) resolve to the
+// SPA shell. Must stay after every /api + /auth route. Unauthenticated → login.
+app.get('*', (req, res, next) => {
+    if (!hasWebBuild) return next();
+    if (req.path.startsWith('/api') || req.path.startsWith('/auth')) return next();
+    if (req.path.includes('.')) return next(); // let static handle real asset files
+    if (!req.isAuthenticated()) return res.redirect('/login.html');
+    res.sendFile(path.join(WEB_DIST, 'index.html'));
+});
+
 // Start servers
 async function startServer() {
     // Initialize database first
@@ -2517,6 +2543,7 @@ async function startServer() {
     // Initialize services after database is ready
     await userService.init();
     await mediaService.init();
+    await marqueeService.ensureTables();
 
     const certsPath = path.join(__dirname, 'certs');
     const keyPath = path.join(certsPath, 'server.key');

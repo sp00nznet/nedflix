@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#08090d}
+body{font-family:'Schibsted Grotesk',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+</style>
+</helmet>
+<div style="--ac:#fb7159;min-height:100vh;background:#08090d;padding:42px 40px 70px">
+  <div style="max-width:1120px;margin:0 auto">
+    <div style="margin-bottom:32px">
+      <div style="font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.24em;color:var(--ac);margin-bottom:12px">SCREENS 04 · SETTINGS DEPTH</div>
+      <h1 style="margin:0 0 10px;font:700 38px/1 'Schibsted Grotesk';letter-spacing:-.03em;color:#f6f8fd">Settings sub-pages</h1>
+      <p style="margin:0;font:400 14px/1.6 'Schibsted Grotesk';color:#8c91a2;max-width:720px">The current Settings is one flat list. A server needs sectioned sub-pages — shown here with the section rail + three of the deeper panes (Users &amp; parental PINs, Server &amp; storage, Transcoding).</p>
+    </div>
+
+    <!-- SHELL with Users pane -->
+    <div style="border-radius:22px;overflow:hidden;border:1px solid rgba(236,239,247,.08);background:#0b0c11;display:grid;grid-template-columns:230px 1fr;margin-bottom:22px">
+      <!-- section rail -->
+      <div style="border-right:1px solid rgba(236,239,247,.07);padding:24px 16px">
+        <div style="font:700 18px 'Schibsted Grotesk';color:#f6f8fd;padding:0 10px 18px">Settings</div>
+        <div style="display:flex;flex-direction:column;gap:2px;font:600 13px 'Schibsted Grotesk'">
+          <div style="padding:10px 12px;border-radius:9px;color:#8c91a2">General</div>
+          <div style="padding:10px 12px;border-radius:9px;background:rgba(251,113,89,.1);color:var(--ac);box-shadow:inset 2px 0 0 var(--ac)">Users &amp; Profiles</div>
+          <div style="padding:10px 12px;border-radius:9px;color:#8c91a2">Libraries</div>
+          <div style="padding:10px 12px;border-radius:9px;color:#8c91a2">Live TV &amp; Channels</div>
+          <div style="padding:10px 12px;border-radius:9px;color:#8c91a2">Playback &amp; Subtitles</div>
+          <div style="padding:10px 12px;border-radius:9px;color:#8c91a2">Transcoding</div>
+          <div style="padding:10px 12px;border-radius:9px;color:#8c91a2">Network</div>
+          <div style="padding:10px 12px;border-radius:9px;color:#8c91a2">Server &amp; Storage</div>
+          <div style="padding:10px 12px;border-radius:9px;color:#8c91a2">About</div>
+        </div>
+      </div>
+      <!-- Users pane -->
+      <div style="padding:28px 32px">
+        <div style="font:700 22px 'Schibsted Grotesk';color:#f6f8fd;margin-bottom:4px">Users &amp; Profiles</div>
+        <div style="font:400 13px 'Schibsted Grotesk';color:#8c91a2;margin-bottom:24px">Accounts that can sign in to this server.</div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:30px">
+          <div style="display:flex;align-items:center;gap:14px;padding:13px 16px;border-radius:14px;border:1px solid rgba(236,239,247,.08);background:rgba(236,239,247,.02)"><div style="width:38px;height:38px;border-radius:50%;background:#fb7159;display:flex;align-items:center;justify-content:center;font:700 15px 'Schibsted Grotesk';color:#0b0c11">N</div><div style="flex:1"><div style="font:600 14px 'Schibsted Grotesk';color:#eceef4">Ned</div><div style="font:500 11px 'JetBrains Mono',monospace;color:#626878">ned@home</div></div><span style="font:600 10px 'JetBrains Mono',monospace;letter-spacing:.08em;color:var(--ac);padding:4px 9px;border:1px solid rgba(251,113,89,.4);border-radius:6px">ADMIN</span><span style="color:#626878">›</span></div>
+          <div style="display:flex;align-items:center;gap:14px;padding:13px 16px;border-radius:14px;border:1px solid rgba(236,239,247,.08);background:rgba(236,239,247,.02)"><div style="width:38px;height:38px;border-radius:50%;background:#7fb2d9;display:flex;align-items:center;justify-content:center;font:700 15px 'Schibsted Grotesk';color:#0b0c11">S</div><div style="flex:1"><div style="font:600 14px 'Schibsted Grotesk';color:#eceef4">Sam</div><div style="font:500 11px 'JetBrains Mono',monospace;color:#626878">sam@home</div></div><span style="font:600 10px 'JetBrains Mono',monospace;letter-spacing:.08em;color:#8c91a2;padding:4px 9px;border:1px solid rgba(236,239,247,.16);border-radius:6px">USER</span><span style="color:#626878">›</span></div>
+          <div style="display:flex;align-items:center;gap:14px;padding:13px 16px;border-radius:14px;border:1px solid rgba(236,239,247,.08);background:rgba(236,239,247,.02)"><div style="width:38px;height:38px;border-radius:50%;background:#8fce9b;display:flex;align-items:center;justify-content:center;font:700 15px 'Schibsted Grotesk';color:#0b0c11">K</div><div style="flex:1"><div style="font:600 14px 'Schibsted Grotesk';color:#eceef4">Kids</div><div style="font:500 11px 'JetBrains Mono',monospace;color:#626878">restricted profile</div></div><span style="font:600 10px 'JetBrains Mono',monospace;letter-spacing:.08em;color:#8fce9b;padding:4px 9px;border:1px solid rgba(143,206,155,.35);border-radius:6px">RESTRICTED</span><span style="color:#626878">›</span></div>
+          <button style="align-self:flex-start;display:flex;align-items:center;gap:8px;padding:11px 16px;border:1px dashed rgba(236,239,247,.2);border-radius:12px;background:none;color:#c1c6d3;font:600 13px 'Schibsted Grotesk';cursor:pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add user</button>
+        </div>
+        <div style="font:600 15px 'Schibsted Grotesk';color:#f6f8fd;margin-bottom:14px">Parental controls</div>
+        <div style="border-radius:14px;border:1px solid rgba(236,239,247,.08);background:rgba(236,239,247,.02);overflow:hidden">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid rgba(236,239,247,.06)"><div><div style="font:600 14px 'Schibsted Grotesk';color:#eceef4">Maximum rating · Kids</div><div style="font:400 12px 'Schibsted Grotesk';color:#626878;margin-top:2px">Hide anything above this rating</div></div><div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:9px;border:1px solid rgba(236,239,247,.14);background:rgba(16,18,26,.6);font:600 12px 'Schibsted Grotesk';color:#c1c6d3">Up to PG <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></div></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 18px"><div><div style="font:600 14px 'Schibsted Grotesk';color:#eceef4">Require PIN to exit Kids</div><div style="font:400 12px 'Schibsted Grotesk';color:#626878;margin-top:2px">A 4-digit PIN unlocks other profiles</div></div><div style="display:flex;align-items:center;gap:14px"><span style="display:flex;gap:6px"><span style="width:9px;height:9px;border-radius:50%;background:var(--ac)"></span><span style="width:9px;height:9px;border-radius:50%;background:var(--ac)"></span><span style="width:9px;height:9px;border-radius:50%;background:var(--ac)"></span><span style="width:9px;height:9px;border-radius:50%;background:var(--ac)"></span></span><div style="position:relative;width:44px;height:26px;border-radius:999px;background:var(--ac)"><span style="position:absolute;top:3px;left:21px;width:20px;height:20px;border-radius:50%;background:#0b0c11"></span></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Server & Storage + Transcoding -->
+    <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:22px">
+      <!-- server status -->
+      <div style="border-radius:18px;border:1px solid rgba(236,239,247,.08);background:#0b0c11;padding:24px 26px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px"><div style="font:700 18px 'Schibsted Grotesk';color:#f6f8fd">Server &amp; Storage</div><span style="display:flex;align-items:center;gap:7px;font:500 11px 'JetBrains Mono',monospace;color:#5fd0a0"><span style="width:7px;height:7px;border-radius:50%;background:#5fd0a0"></span>HEALTHY</span></div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px">
+          <div style="padding:13px;border-radius:12px;background:rgba(236,239,247,.03)"><div style="font:500 9px 'JetBrains Mono',monospace;color:#626878;margin-bottom:6px">VERSION</div><div style="font:600 15px 'Schibsted Grotesk';color:#eceef4">2.4.1</div></div>
+          <div style="padding:13px;border-radius:12px;background:rgba(236,239,247,.03)"><div style="font:500 9px 'JetBrains Mono',monospace;color:#626878;margin-bottom:6px">UPTIME</div><div style="font:600 15px 'Schibsted Grotesk';color:#eceef4">14d 6h</div></div>
+          <div style="padding:13px;border-radius:12px;background:rgba(236,239,247,.03)"><div style="font:500 9px 'JetBrains Mono',monospace;color:#626878;margin-bottom:6px">CPU</div><div style="font:600 15px 'Schibsted Grotesk';color:#eceef4">12%</div></div>
+          <div style="padding:13px;border-radius:12px;background:rgba(236,239,247,.03)"><div style="font:500 9px 'JetBrains Mono',monospace;color:#626878;margin-bottom:6px">RAM</div><div style="font:600 15px 'Schibsted Grotesk';color:#eceef4">3.2<span style="font:500 11px;color:#626878">/16G</span></div></div>
+        </div>
+        <div style="font:500 9px 'JetBrains Mono',monospace;letter-spacing:.14em;color:#626878;margin-bottom:12px">STORAGE · 3.8 TB / 8 TB</div>
+        <div style="display:flex;height:9px;border-radius:999px;overflow:hidden;margin-bottom:12px;background:rgba(236,239,247,.08)"><div style="width:26%;background:#fb7159"></div><div style="width:18%;background:#7fb2d9"></div><div style="width:4%;background:#8fce9b"></div><div style="width:1%;background:#e0b257"></div></div>
+        <div style="display:flex;gap:18px;flex-wrap:wrap;font:500 11px 'Schibsted Grotesk';color:#8c91a2"><span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:2px;background:#fb7159"></span>Films 2.1T</span><span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:2px;background:#7fb2d9"></span>Series 1.4T</span><span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:2px;background:#8fce9b"></span>Music 240G</span><span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:2px;background:#e0b257"></span>Books 38G</span></div>
+        <div style="margin-top:20px;padding-top:18px;border-top:1px solid rgba(236,239,247,.07)"><div style="font:500 9px 'JetBrains Mono',monospace;letter-spacing:.14em;color:#626878;margin-bottom:12px">ACTIVE NOW · 2 STREAMS</div>
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:9px"><div style="width:30px;height:30px;border-radius:50%;background:#7fb2d9;display:flex;align-items:center;justify-content:center;font:700 12px 'Schibsted Grotesk';color:#0b0c11">S</div><div style="flex:1"><div style="font:600 12px 'Schibsted Grotesk';color:#eceef4">Foxglove · S1 E2</div><div style="font:500 10px 'JetBrains Mono',monospace;color:#626878">Living Room · Direct play · 4K</div></div><span style="font:500 10px 'JetBrains Mono',monospace;color:#5fd0a0">DIRECT</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><div style="width:30px;height:30px;border-radius:50%;background:#fb7159;display:flex;align-items:center;justify-content:center;font:700 12px 'Schibsted Grotesk';color:#0b0c11">N</div><div style="flex:1"><div style="font:600 12px 'Schibsted Grotesk';color:#eceef4">Meridian</div><div style="font:500 10px 'JetBrains Mono',monospace;color:#626878">iPhone · Transcode 4K→1080p · HEVC</div></div><span style="font:500 10px 'JetBrains Mono',monospace;color:#e0b257">TRANSCODE</span></div>
+        </div>
+      </div>
+      <!-- transcoding -->
+      <div style="border-radius:18px;border:1px solid rgba(236,239,247,.08);background:#0b0c11;padding:24px 26px">
+        <div style="font:700 18px 'Schibsted Grotesk';color:#f6f8fd;margin-bottom:20px">Transcoding</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px"><div><div style="font:600 14px 'Schibsted Grotesk';color:#eceef4">Hardware acceleration</div><div style="font:400 12px 'Schibsted Grotesk';color:#626878;margin-top:2px">GPU-assisted transcode</div></div><div style="position:relative;width:44px;height:26px;border-radius:999px;background:var(--ac)"><span style="position:absolute;top:3px;left:21px;width:20px;height:20px;border-radius:50%;background:#0b0c11"></span></div></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 14px;border-radius:11px;background:rgba(236,239,247,.03);margin-bottom:18px"><span style="font:600 13px 'Schibsted Grotesk';color:#c1c6d3">Encoder</span><span style="font:600 12px 'JetBrains Mono',monospace;color:var(--ac)">NVENC (HEVC)</span></div>
+        <div style="font:500 9px 'JetBrains Mono',monospace;letter-spacing:.14em;color:#626878;margin-bottom:10px">REMOTE QUALITY LADDER</div>
+        <div style="display:flex;gap:8px;margin-bottom:20px"><span style="padding:7px 13px;border-radius:8px;background:var(--ac);color:#0b0c11;font:600 12px 'Schibsted Grotesk'">1080p</span><span style="padding:7px 13px;border-radius:8px;background:var(--ac);color:#0b0c11;font:600 12px 'Schibsted Grotesk'">720p</span><span style="padding:7px 13px;border-radius:8px;background:rgba(236,239,247,.05);color:#8c91a2;font:600 12px 'Schibsted Grotesk'">4K</span><span style="padding:7px 13px;border-radius:8px;background:rgba(236,239,247,.05);color:#8c91a2;font:600 12px 'Schibsted Grotesk'">480p</span></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span style="font:600 13px 'Schibsted Grotesk';color:#c1c6d3">Max remote bitrate</span><span style="font:600 12px 'JetBrains Mono',monospace;color:#eceef4">12 Mb/s</span></div>
+        <div style="position:relative;height:5px;border-radius:999px;background:rgba(236,239,247,.14)"><div style="position:absolute;left:0;top:0;bottom:0;width:55%;border-radius:999px;background:var(--ac)"></div><div style="position:absolute;top:50%;left:55%;transform:translate(-50%,-50%);width:15px;height:15px;border-radius:50%;background:var(--ac)"></div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

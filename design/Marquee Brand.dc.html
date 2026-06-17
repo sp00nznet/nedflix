@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#08090d}
+body{font-family:'Schibsted Grotesk',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+</style>
+</helmet>
+<div style="--ac:#fb7159;min-height:100vh;background:#08090d;padding:46px 48px 80px;color:#eceef4">
+  <div style="max-width:1180px;margin:0 auto">
+
+    <!-- header -->
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:42px;flex-wrap:wrap;gap:16px;border-bottom:1px solid rgba(236,239,247,.08);padding-bottom:30px">
+      <div>
+        <div style="font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.24em;color:#fb7159;margin-bottom:12px">BRAND &amp; APP ICON</div>
+        <h1 style="margin:0;font:700 44px/1 'Schibsted Grotesk';letter-spacing:-.03em;color:#f6f8fd">Marquee identity sheet</h1>
+      </div>
+      <div style="display:flex;align-items:center;gap:13px">
+        <div style="position:relative;width:60px;height:60px;border-radius:14px;background:linear-gradient(160deg,#1b1e29,#0d0e14);border:1.5px solid rgba(251,113,89,.45);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 22px -8px rgba(0,0,0,.7)">
+          <span style="font:700 34px/1 'Schibsted Grotesk';color:#fb7159;transform:translateX(-1px)">m</span>
+          <span style="position:absolute;top:10px;right:10px;width:8px;height:8px;border-radius:50%;background:#fb7159;box-shadow:0 0 9px 1px rgba(251,113,89,.7)"></span>
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:5px"><span style="font:700 28px/1 'Schibsted Grotesk';letter-spacing:-.025em;color:#f6f8fd">marquee</span><span style="width:8px;height:8px;border-radius:50%;background:#fb7159;margin-bottom:5px;box-shadow:0 0 11px 1px rgba(251,113,89,.6)"></span></div>
+      </div>
+    </div>
+
+    <!-- ROW: hero icon + construction -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-bottom:22px">
+      <!-- primary icon -->
+      <div style="border-radius:22px;border:1px solid rgba(236,239,247,.08);background:linear-gradient(160deg,#13151d,#0c0d13);padding:40px;display:flex;flex-direction:column;align-items:center;gap:26px">
+        <div style="font:500 10px 'JetBrains Mono',monospace;letter-spacing:.2em;color:#626878;align-self:flex-start">PRIMARY APP ICON</div>
+        <div style="position:relative;width:196px;height:196px;border-radius:44px;background:linear-gradient(160deg,#1b1e29,#0d0e14);border:3px solid rgba(251,113,89,.45);display:flex;align-items:center;justify-content:center;box-shadow:0 24px 60px -20px rgba(0,0,0,.8)">
+          <span style="font:700 112px/1 'Schibsted Grotesk';color:#fb7159;transform:translateX(-3px)">m</span>
+          <span style="position:absolute;top:33px;right:33px;width:27px;height:27px;border-radius:50%;background:#fb7159;box-shadow:0 0 26px 3px rgba(251,113,89,.6)"></span>
+        </div>
+        <div style="font:400 13px/1.5 'Schibsted Grotesk';color:#8c91a2;text-align:center;max-width:340px">The monogram <span style="color:#c1c6d3">m</span> on a dark theatre-tile, with the coral <span style="color:#fb7159">bulb dot</span> — the marquee light — at the upper right.</div>
+      </div>
+      <!-- construction / clearspace -->
+      <div style="border-radius:22px;border:1px solid rgba(236,239,247,.08);background:rgba(236,239,247,.02);padding:40px;display:flex;flex-direction:column;align-items:center;gap:26px">
+        <div style="font:500 10px 'JetBrains Mono',monospace;letter-spacing:.2em;color:#626878;align-self:flex-start">GRID · CLEAR SPACE · RADIUS</div>
+        <div style="position:relative;width:196px;height:196px">
+          <div style="position:absolute;inset:-24px;border:1px dashed rgba(236,239,247,.16);border-radius:14px"></div>
+          <div style="position:absolute;inset:-24px;display:flex;align-items:center;justify-content:center;font:500 9px 'JetBrains Mono',monospace;color:#626878"><span style="position:absolute;top:-9px;background:#0a0b10;padding:0 6px">clear space = 0.5×</span></div>
+          <div style="position:relative;width:196px;height:196px;border-radius:44px;background:linear-gradient(160deg,#1b1e29,#0d0e14);border:3px solid rgba(251,113,89,.45);display:flex;align-items:center;justify-content:center;overflow:hidden">
+            <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(127,178,217,.25)"></div>
+            <div style="position:absolute;top:50%;left:0;right:0;height:1px;background:rgba(127,178,217,.25)"></div>
+            <span style="font:700 112px/1 'Schibsted Grotesk';color:#fb7159;transform:translateX(-3px);position:relative">m</span>
+            <span style="position:absolute;top:33px;right:33px;width:27px;height:27px;border-radius:50%;background:#fb7159"></span>
+          </div>
+        </div>
+        <div style="display:flex;gap:22px;font:500 11px 'JetBrains Mono',monospace;color:#8c91a2"><span>corner R = <span style="color:#c1c6d3">0.22×</span></span><span>dot = <span style="color:#c1c6d3">0.14×</span></span><span>inset = <span style="color:#c1c6d3">0.17×</span></span></div>
+      </div>
+    </div>
+
+    <!-- ROW: size ramp -->
+    <div style="border-radius:22px;border:1px solid rgba(236,239,247,.08);background:rgba(236,239,247,.02);padding:34px 40px;margin-bottom:22px">
+      <div style="font:500 10px 'JetBrains Mono',monospace;letter-spacing:.2em;color:#626878;margin-bottom:28px">SIZE RAMP · STAYS LEGIBLE TO 16PX</div>
+      <div style="display:flex;align-items:flex-end;gap:40px;flex-wrap:wrap">
+        <!-- 128 -->
+        <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+          <div style="position:relative;width:128px;height:128px;border-radius:28px;background:linear-gradient(160deg,#1b1e29,#0d0e14);border:2px solid rgba(251,113,89,.45);display:flex;align-items:center;justify-content:center"><span style="font:700 74px/1 'Schibsted Grotesk';color:#fb7159;transform:translateX(-2px)">m</span><span style="position:absolute;top:22px;right:22px;width:18px;height:18px;border-radius:50%;background:#fb7159"></span></div>
+          <span style="font:500 10px 'JetBrains Mono',monospace;color:#626878">512 / 192</span>
+        </div>
+        <!-- 64 -->
+        <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+          <div style="position:relative;width:64px;height:64px;border-radius:15px;background:linear-gradient(160deg,#1b1e29,#0d0e14);border:1.5px solid rgba(251,113,89,.45);display:flex;align-items:center;justify-content:center"><span style="font:700 37px/1 'Schibsted Grotesk';color:#fb7159;transform:translateX(-1px)">m</span><span style="position:absolute;top:11px;right:11px;width:9px;height:9px;border-radius:50%;background:#fb7159"></span></div>
+          <span style="font:500 10px 'JetBrains Mono',monospace;color:#626878">apple-touch</span>
+        </div>
+        <!-- 40 -->
+        <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+          <div style="position:relative;width:40px;height:40px;border-radius:10px;background:linear-gradient(160deg,#1b1e29,#0d0e14);border:1px solid rgba(251,113,89,.5);display:flex;align-items:center;justify-content:center"><span style="font:700 23px/1 'Schibsted Grotesk';color:#fb7159">m</span><span style="position:absolute;top:7px;right:7px;width:6px;height:6px;border-radius:50%;background:#fb7159"></span></div>
+          <span style="font:500 10px 'JetBrains Mono',monospace;color:#626878">40</span>
+        </div>
+        <!-- 32 -->
+        <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+          <div style="position:relative;width:32px;height:32px;border-radius:8px;background:#15171f;border:1px solid rgba(251,113,89,.5);display:flex;align-items:center;justify-content:center"><span style="font:700 19px/1 'Schibsted Grotesk';color:#fb7159">m</span><span style="position:absolute;top:5px;right:5px;width:5px;height:5px;border-radius:50%;background:#fb7159"></span></div>
+          <span style="font:500 10px 'JetBrains Mono',monospace;color:#626878">favicon 32</span>
+        </div>
+        <!-- 16 -->
+        <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+          <div style="position:relative;width:16px;height:16px;border-radius:4px;background:#15171f;display:flex;align-items:center;justify-content:center"><span style="font:700 11px/1 'Schibsted Grotesk';color:#fb7159">m</span><span style="position:absolute;top:2px;right:2px;width:4px;height:4px;border-radius:50%;background:#fb7159"></span></div>
+          <span style="font:500 10px 'JetBrains Mono',monospace;color:#626878">favicon 16</span>
+        </div>
+        <div style="flex:1;min-width:200px;font:400 13px/1.6 'Schibsted Grotesk';color:#8c91a2">At <span style="color:#c1c6d3">32px and below</span> the border is dropped and the tile darkens so the coral <span style="color:#fb7159">m</span> + dot hold contrast. The dot never shrinks below 4px.</div>
+      </div>
+    </div>
+
+    <!-- ROW: maskable + variants -->
+    <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:22px;margin-bottom:22px">
+      <!-- maskable -->
+      <div style="border-radius:22px;border:1px solid rgba(236,239,247,.08);background:rgba(236,239,247,.02);padding:34px 40px;display:flex;flex-direction:column;gap:22px">
+        <div style="font:500 10px 'JetBrains Mono',monospace;letter-spacing:.2em;color:#626878">MASKABLE (PWA) · SAFE ZONE</div>
+        <div style="display:flex;align-items:center;gap:24px;justify-content:center">
+          <div style="position:relative;width:150px;height:150px;border-radius:18px;overflow:hidden;background:linear-gradient(160deg,#1b1e29,#0d0e14)">
+            <div style="position:absolute;inset:0;border-radius:50%;border:1px dashed rgba(127,178,217,.4)"></div>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><span style="font:700 60px/1 'Schibsted Grotesk';color:#fb7159;transform:translateX(-2px)">m</span></div>
+            <span style="position:absolute;top:46px;right:46px;width:14px;height:14px;border-radius:50%;background:#fb7159"></span>
+          </div>
+        </div>
+        <div style="font:400 12px/1.5 'Schibsted Grotesk';color:#8c91a2">Full-bleed dark tile; mark scaled to the <span style="color:#7fb2d9">circular safe zone</span> (~62%) so Android can crop to any shape.</div>
+      </div>
+      <!-- variants -->
+      <div style="border-radius:22px;border:1px solid rgba(236,239,247,.08);background:rgba(236,239,247,.02);padding:34px 40px">
+        <div style="font:500 10px 'JetBrains Mono',monospace;letter-spacing:.2em;color:#626878;margin-bottom:24px">VARIANTS</div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:11px">
+            <div style="position:relative;width:84px;height:84px;border-radius:19px;background:#fb7159;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 26px -10px rgba(251,113,89,.6)"><span style="font:700 49px/1 'Schibsted Grotesk';color:#0b0c11;transform:translateX(-1px)">m</span><span style="position:absolute;top:14px;right:14px;width:11px;height:11px;border-radius:50%;background:#0b0c11"></span></div>
+            <span style="font:500 9px 'JetBrains Mono',monospace;color:#626878">INVERSE</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:11px">
+            <div style="position:relative;width:84px;height:84px;border-radius:19px;background:#f6f8fd;display:flex;align-items:center;justify-content:center"><span style="font:700 49px/1 'Schibsted Grotesk';color:#0b0c11;transform:translateX(-1px)">m</span><span style="position:absolute;top:14px;right:14px;width:11px;height:11px;border-radius:50%;background:#fb7159"></span></div>
+            <span style="font:500 9px 'JetBrains Mono',monospace;color:#626878">LIGHT</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:11px">
+            <div style="position:relative;width:84px;height:84px;border-radius:19px;background:#15171f;border:1px solid rgba(236,239,247,.14);display:flex;align-items:center;justify-content:center"><span style="font:700 49px/1 'Schibsted Grotesk';color:#f6f8fd;transform:translateX(-1px)">m</span><span style="position:absolute;top:14px;right:14px;width:11px;height:11px;border-radius:50%;background:#f6f8fd"></span></div>
+            <span style="font:500 9px 'JetBrains Mono',monospace;color:#626878">MONO</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:11px">
+            <div style="position:relative;width:84px;height:84px;border-radius:19px;background:repeating-conic-gradient(#15171f 0% 25%,#191c25 0% 50%) 50%/16px 16px;display:flex;align-items:center;justify-content:center"><span style="font:700 49px/1 'Schibsted Grotesk';color:#fb7159;transform:translateX(-1px)">m</span><span style="position:absolute;top:14px;right:14px;width:11px;height:11px;border-radius:50%;background:#fb7159"></span></div>
+            <span style="font:500 9px 'JetBrains Mono',monospace;color:#626878">TRANSPARENT</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROW: wordmark lockups -->
+    <div style="border-radius:22px;border:1px solid rgba(236,239,247,.08);background:rgba(236,239,247,.02);padding:34px 40px;margin-bottom:22px">
+      <div style="font:500 10px 'JetBrains Mono',monospace;letter-spacing:.2em;color:#626878;margin-bottom:28px">WORDMARK LOCKUPS</div>
+      <div style="display:flex;gap:30px;flex-wrap:wrap;align-items:center">
+        <!-- horizontal lockup -->
+        <div style="flex:1;min-width:300px;display:flex;align-items:center;gap:16px;padding:26px 30px;border-radius:16px;background:linear-gradient(160deg,#13151d,#0c0d13)">
+          <div style="position:relative;width:54px;height:54px;border-radius:13px;background:linear-gradient(160deg,#1b1e29,#0d0e14);border:1.5px solid rgba(251,113,89,.45);display:flex;align-items:center;justify-content:center;flex:0 0 auto"><span style="font:700 31px/1 'Schibsted Grotesk';color:#fb7159">m</span><span style="position:absolute;top:9px;right:9px;width:7px;height:7px;border-radius:50%;background:#fb7159"></span></div>
+          <div style="display:flex;align-items:flex-end;gap:5px"><span style="font:700 34px/1 'Schibsted Grotesk';letter-spacing:-.025em;color:#f6f8fd">marquee</span><span style="width:9px;height:9px;border-radius:50%;background:#fb7159;margin-bottom:6px;box-shadow:0 0 11px 1px rgba(251,113,89,.6)"></span></div>
+        </div>
+        <!-- with domain -->
+        <div style="flex:1;min-width:300px;display:flex;flex-direction:column;gap:10px;padding:26px 30px;border-radius:16px;background:linear-gradient(160deg,#13151d,#0c0d13)">
+          <div style="display:flex;align-items:flex-end;gap:5px"><span style="font:700 34px/1 'Schibsted Grotesk';letter-spacing:-.025em;color:#f6f8fd">marquee</span><span style="width:9px;height:9px;border-radius:50%;background:#fb7159;margin-bottom:6px"></span></div>
+          <div style="font:500 13px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#8c91a2">marquee<span style="color:#fb7159">.mov</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROW: in context -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-bottom:22px">
+      <!-- browser tab -->
+      <div style="border-radius:22px;border:1px solid rgba(236,239,247,.08);background:rgba(236,239,247,.02);padding:34px 40px">
+        <div style="font:500 10px 'JetBrains Mono',monospace;letter-spacing:.2em;color:#626878;margin-bottom:24px">IN CONTEXT · BROWSER TAB</div>
+        <div style="background:#15171f;border-radius:12px 12px 0 0;padding:8px 8px 0;display:flex;align-items:flex-end;gap:6px">
+          <div style="display:flex;align-items:center;gap:9px;background:#0b0c11;border-radius:9px 9px 0 0;padding:11px 16px;min-width:200px">
+            <div style="position:relative;width:16px;height:16px;border-radius:4px;background:#15171f;display:flex;align-items:center;justify-content:center;flex:0 0 auto"><span style="font:700 11px/1 'Schibsted Grotesk';color:#fb7159">m</span><span style="position:absolute;top:2px;right:2px;width:4px;height:4px;border-radius:50%;background:#fb7159"></span></div>
+            <span style="font:500 13px 'Schibsted Grotesk';color:#c1c6d3">Marquee</span>
+            <span style="margin-left:auto;color:#626878;font-size:14px">×</span>
+          </div>
+        </div>
+        <div style="background:#0b0c11;border-radius:0 0 12px 12px;padding:10px 14px;display:flex;align-items:center;gap:8px;border-top:1px solid rgba(236,239,247,.06)"><div style="width:11px;height:11px;border-radius:50%;border:1.5px solid #626878"></div><span style="font:500 12px 'JetBrains Mono',monospace;color:#8c91a2">marquee<span style="color:#c1c6d3">.mov</span></span></div>
+      </div>
+      <!-- phone home -->
+      <div style="border-radius:22px;border:1px solid rgba(236,239,247,.08);background:rgba(236,239,247,.02);padding:34px 40px">
+        <div style="font:500 10px 'JetBrains Mono',monospace;letter-spacing:.2em;color:#626878;margin-bottom:24px">IN CONTEXT · HOME SCREEN</div>
+        <div style="display:flex;gap:26px;align-items:flex-start;justify-content:center;padding:18px 0;background:linear-gradient(160deg,#1d2433,#11151f);border-radius:16px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:9px">
+            <div style="position:relative;width:62px;height:62px;border-radius:15px;background:linear-gradient(160deg,#1b1e29,#0d0e14);border:1.5px solid rgba(251,113,89,.45);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px -6px rgba(0,0,0,.6)"><span style="font:700 36px/1 'Schibsted Grotesk';color:#fb7159">m</span><span style="position:absolute;top:10px;right:10px;width:8px;height:8px;border-radius:50%;background:#fb7159"></span></div>
+            <span style="font:500 11px 'Schibsted Grotesk';color:#eceef4">Marquee</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:9px;opacity:.5">
+            <div style="width:62px;height:62px;border-radius:15px;background:#2a2f3d"></div>
+            <span style="font:500 11px 'Schibsted Grotesk';color:#c1c6d3">Photos</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:9px;opacity:.5">
+            <div style="width:62px;height:62px;border-radius:15px;background:#2a2f3d"></div>
+            <span style="font:500 11px 'Schibsted Grotesk';color:#c1c6d3">Music</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROW: color + do/don't -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px">
+      <div style="border-radius:22px;border:1px solid rgba(236,239,247,.08);background:rgba(236,239,247,.02);padding:34px 40px">
+        <div style="font:500 10px 'JetBrains Mono',monospace;letter-spacing:.2em;color:#626878;margin-bottom:22px">CORE COLOR</div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap">
+          <div style="display:flex;flex-direction:column;gap:8px"><div style="width:104px;height:60px;border-radius:11px;background:#fb7159"></div><div style="font:500 10px 'JetBrains Mono',monospace;color:#c1c6d3">CORAL #fb7159</div></div>
+          <div style="display:flex;flex-direction:column;gap:8px"><div style="width:104px;height:60px;border-radius:11px;background:#0b0c11;border:1px solid rgba(236,239,247,.12)"></div><div style="font:500 10px 'JetBrains Mono',monospace;color:#c1c6d3">INK #0b0c11</div></div>
+          <div style="display:flex;flex-direction:column;gap:8px"><div style="width:104px;height:60px;border-radius:11px;background:linear-gradient(160deg,#1b1e29,#0d0e14)"></div><div style="font:500 10px 'JetBrains Mono',monospace;color:#c1c6d3">TILE grad</div></div>
+          <div style="display:flex;flex-direction:column;gap:8px"><div style="width:104px;height:60px;border-radius:11px;background:#f6f8fd"></div><div style="font:500 10px 'JetBrains Mono',monospace;color:#c1c6d3">PAPER #f6f8fd</div></div>
+        </div>
+      </div>
+      <div style="border-radius:22px;border:1px solid rgba(236,239,247,.08);background:rgba(236,239,247,.02);padding:34px 40px">
+        <div style="font:500 10px 'JetBrains Mono',monospace;letter-spacing:.2em;color:#626878;margin-bottom:22px">DO / DON'T</div>
+        <div style="display:flex;flex-direction:column;gap:13px">
+          <div style="display:flex;align-items:center;gap:12px"><span style="width:20px;height:20px;border-radius:50%;background:rgba(95,209,160,.16);color:#5fd0a0;display:flex;align-items:center;justify-content:center;font-size:12px;flex:0 0 auto">✓</span><span style="font:400 13px 'Schibsted Grotesk';color:#c1c6d3">Keep the bulb dot coral — it's the one constant.</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><span style="width:20px;height:20px;border-radius:50%;background:rgba(95,209,160,.16);color:#5fd0a0;display:flex;align-items:center;justify-content:center;font-size:12px;flex:0 0 auto">✓</span><span style="font:400 13px 'Schibsted Grotesk';color:#c1c6d3">Wordmark is lowercase; dot sits on the baseline-right.</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><span style="width:20px;height:20px;border-radius:50%;background:rgba(236,92,76,.16);color:#ec5c4c;display:flex;align-items:center;justify-content:center;font-size:12px;flex:0 0 auto">✕</span><span style="font:400 13px 'Schibsted Grotesk';color:#c1c6d3">Don't recolor the dot or add a gradient to the tile.</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><span style="width:20px;height:20px;border-radius:50%;background:rgba(236,92,76,.16);color:#ec5c4c;display:flex;align-items:center;justify-content:center;font-size:12px;flex:0 0 auto">✕</span><span style="font:400 13px 'Schibsted Grotesk';color:#c1c6d3">Don't capitalize or letter-space the wordmark.</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

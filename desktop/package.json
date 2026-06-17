@@ -11,8 +11,10 @@
   "author": "Nedflix",
   "license": "MIT",
   "scripts": {
+    "copy:web": "node -e \"const fs=require('fs');fs.rmSync('web-dist',{recursive:true,force:true});if(fs.existsSync('../web/dist'))fs.cpSync('../web/dist','web-dist',{recursive:true});else console.warn('web/dist not found — run `npm --prefix ../web run build` first');\"",
     "start": "electron .",
     "dev": "NODE_ENV=development electron .",
+    "prebuild": "npm run copy:web",
     "build": "electron-builder",
     "build:win": "electron-builder --win --x64",
     "build:win32": "electron-builder --win --ia32",
@@ -27,7 +29,8 @@
     "pack": "electron-builder --dir"
   },
   "dependencies": {
-    "express": "^4.18.2"
+    "express": "^4.18.2",
+    "music-metadata": "^11.13.0"
   },
   "devDependencies": {
     "electron": "^28.0.0",
@@ -44,17 +47,23 @@
       "main.js",
       "preload.js",
       "public/**/*",
+      "web-dist/**/*",
       "node_modules/**/*"
     ],
     "win": {
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64", "ia32"]
+          "arch": [
+            "x64",
+            "ia32"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "build/icon.ico",
@@ -64,15 +73,23 @@
       "target": [
         {
           "target": "deb",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         },
         {
           "target": "AppImage",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "tar.gz",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "icon": "build/icons",
@@ -115,11 +132,19 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64", "arm64", "universal"]
+          "arch": [
+            "x64",
+            "arm64",
+            "universal"
+          ]
         },
         {
           "target": "zip",
-          "arch": ["x64", "arm64", "universal"]
+          "arch": [
+            "x64",
+            "arm64",
+            "universal"
+          ]
         }
       ],
       "icon": "build/icon.icns",

@@ -28,3 +28,13 @@ logs/
 
 # Subtitle cache
 subtitle_cache/
+
+# Marquee build outputs (rebuilt from source)
+web/dist/
+desktop/web-dist/
+desktop/dist/
+mobile/www/
+mobile/ios/
+mobile/android/
+marquee-native/dist/
+users.db

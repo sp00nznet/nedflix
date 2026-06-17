@@ -1,0 +1,95 @@
+/* Marquee global base — tokens live in theme.ts; this file holds resets, keyframes,
+   the focus ring, and scrollbar styling. Fonts are loaded in index.html (Schibsted
+   Grotesk + JetBrains Mono). TODO: self-host the fonts per design/README.md "Assets". */
+
+:root {
+  --ac: #fb7159; /* accent — overridden on #marquee-root from the active profile */
+  --ac-ink: #ffffff;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: #0b0c11;
+  color: #eceef4;
+  font-family: 'Schibsted Grotesk', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* Spatial-focus ring — the primary affordance at 10 feet. Components may add lift/scale. */
+[data-focusable] {
+  outline: none;
+}
+[data-focusable]:focus-visible,
+[data-focusable]:focus {
+  box-shadow: 0 0 0 2px var(--ac);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(236, 239, 247, 0.12);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Motion */
+@keyframes nf-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes nf-eq {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+@keyframes nf-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.82);
+  }
+}
+
+.nf-rise {
+  animation: nf-rise 0.45s ease both;
+}

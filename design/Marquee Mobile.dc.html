@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#08090d}
+body{font-family:'Schibsted Grotesk',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+[data-scroll]{scrollbar-width:none}
+[data-scroll]::-webkit-scrollbar{width:0;height:0;display:none}
+@keyframes mq-eq{0%,100%{transform:scaleY(.3)}50%{transform:scaleY(1)}}
+@keyframes mq-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes mq-slide{from{transform:translateY(100%)}to{transform:translateY(0)}}
+</style>
+</helmet>
+<div style="--ac:#fb7159;min-height:100vh;background:radial-gradient(120% 80% at 50% -10%,#161922,#08090d 55%);display:flex;align-items:center;justify-content:center;padding:30px 20px;gap:40px;flex-wrap:wrap">
+
+  <!-- caption -->
+  <div style="max-width:230px;color:#8c91a2">
+    <div style="display:flex;align-items:flex-end;gap:4px;margin-bottom:16px"><span style="font:700 24px/1 'Schibsted Grotesk';letter-spacing:-.02em;color:#f6f8fd">marquee</span><span style="width:7px;height:7px;border-radius:50%;background:var(--ac);margin-bottom:4px"></span></div>
+    <div style="font:500 10px 'JetBrains Mono',monospace;letter-spacing:.18em;color:var(--ac);margin-bottom:12px">MOBILE · 390×844</div>
+    <p style="font:400 13px/1.6 'Schibsted Grotesk';margin:0 0 14px">Touch-native rebuild: bottom tab bar, a persistent mini-player, and layouts reshaped for one thumb. Tap around — it's live.</p>
+    <div style="font:500 11px 'JetBrains Mono',monospace;color:#626878;line-height:1.8">▸ Bottom nav, 5 tabs<br>▸ Mini-player → full player<br>▸ Live = "on now" list<br>▸ 44px+ hit targets</div>
+  </div>
+
+  <!-- ============ PHONE ============ -->
+  <div style="position:relative;width:390px;height:844px;border-radius:52px;background:#0b0c11;box-shadow:0 50px 120px -30px rgba(0,0,0,.85),0 0 0 11px #1c1f27,0 0 0 13px #2a2e38;overflow:hidden">
+
+    <!-- status bar -->
+    <div style="position:absolute;top:0;left:0;right:0;height:52px;z-index:60;display:flex;align-items:center;justify-content:space-between;padding:0 30px;pointer-events:none">
+      <span style="font:600 15px 'Schibsted Grotesk';color:#f6f8fd;margin-top:6px">9:41</span>
+      <div style="display:flex;align-items:center;gap:7px;margin-top:6px">
+        <svg width="18" height="12" viewBox="0 0 18 12" fill="#f6f8fd"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="5" y="4" width="3" height="8" rx="1"/><rect x="10" y="1.5" width="3" height="10.5" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1" opacity=".4"/></svg>
+        <svg width="17" height="12" viewBox="0 0 17 12" fill="#f6f8fd"><path d="M8.5 2.5c2.3 0 4.4.9 6 2.4l-1.4 1.4a6.6 6.6 0 0 0-9.2 0L2.5 4.9A8.6 8.6 0 0 1 8.5 2.5zM8.5 7c1 0 1.9.4 2.6 1.1L8.5 10.7 5.9 8.1A3.7 3.7 0 0 1 8.5 7z"/></svg>
+        <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="1" y="1" width="20" height="10" rx="3" stroke="#f6f8fd" stroke-opacity=".5"/><rect x="2.5" y="2.5" width="15" height="7" rx="1.5" fill="#f6f8fd"/><rect x="22.5" y="4" width="1.5" height="4" rx="1" fill="#f6f8fd" fill-opacity=".5"/></svg>
+      </div>
+    </div>
+
+    <!-- ===== BASE: tab content + miniplayer + nav ===== -->
+    <div style="position:absolute;inset:0;display:flex;flex-direction:column">
+      <div data-scroll style="flex:1;overflow-y:auto;overflow-x:hidden">
+
+        <!-- ---- HOME ---- -->
+        <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+        <div style="animation:mq-rise .4s ease both;padding-bottom:18px">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:60px 20px 14px">
+            <div style="display:flex;align-items:flex-end;gap:4px"><span style="font:700 23px/1 'Schibsted Grotesk';letter-spacing:-.02em;color:#f6f8fd">marquee</span><span style="width:7px;height:7px;border-radius:50%;background:var(--ac);margin-bottom:4px;box-shadow:0 0 9px 1px rgba(251,113,89,.6)"></span></div>
+            <div style="width:38px;height:38px;border-radius:50%;background:var(--ac);display:flex;align-items:center;justify-content:center;font:700 15px 'Schibsted Grotesk';color:#0b0c11">N</div>
+          </div>
+          <!-- hero -->
+          <div style="position:relative;margin:6px 16px 0;border-radius:24px;overflow:hidden;height:454px;background:{{ hero.grad }};box-shadow:0 20px 44px -20px rgba(0,0,0,.7)">
+            <div style="position:absolute;inset:0;background:radial-gradient(90% 60% at 70% 16%,rgba(255,255,255,.12),transparent 60%)"></div>
+            <div style="position:absolute;inset:0;background:linear-gradient(0deg,#0b0c11 4%,rgba(11,12,17,.2) 46%,transparent 72%)"></div>
+            <div style="position:absolute;top:16px;left:16px;font:500 9px 'JetBrains Mono',monospace;letter-spacing:.16em;color:rgba(236,239,247,.5)">FEATURED · ARTWORK</div>
+            <div style="position:absolute;left:0;right:0;bottom:0;padding:24px 22px">
+              <div style="font:500 10px 'JetBrains Mono',monospace;letter-spacing:.18em;color:var(--ac);margin-bottom:10px">IN YOUR LIBRARY</div>
+              <div style="font:700 40px/.98 'Schibsted Grotesk';letter-spacing:-.03em;color:#f6f8fd;margin-bottom:10px">{{ hero.title }}</div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:18px;font:600 12px 'Schibsted Grotesk';color:#c1c6d3"><span>{{ hero.year }}</span><span style="width:3px;height:3px;border-radius:50%;background:#626878"></span><span>{{ hero.genre }}</span><span style="width:3px;height:3px;border-radius:50%;background:#626878"></span><span>{{ hero.runtime }}</span></div>
+              <div style="display:flex;gap:10px">
+                <button onClick="{{ hero.play }}" style="flex:1;height:50px;border:0;border-radius:14px;background:var(--ac);color:#0b0c11;font:700 15px 'Schibsted Grotesk';cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="#0b0c11"><path d="M7 5 L19 12 L7 19 Z"/></svg>Play</button>
+                <button onClick="{{ hero.open }}" style="width:120px;height:50px;border:1px solid rgba(236,239,247,.2);border-radius:14px;background:rgba(11,12,17,.4);color:#f6f8fd;font:600 14px 'Schibsted Grotesk';cursor:pointer;backdrop-filter:blur(6px)">Info</button>
+              </div>
+            </div>
+          </div>
+          <!-- continue -->
+          <div style="margin-top:26px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;padding:0 20px 13px"><span style="font:600 18px 'Schibsted Grotesk';color:#f6f8fd">Continue</span></div>
+            <div data-scroll style="display:flex;gap:13px;overflow-x:auto;padding:0 20px 4px">
+              <sc-for list="{{ continueRow }}" as="m" hint-placeholder-count="4">
+                <div onClick="{{ m.open }}" style="flex:0 0 232px;cursor:pointer">
+                  <div style="position:relative;aspect-ratio:16/10;border-radius:14px;overflow:hidden;background:{{ m.grad }}">
+                    <div style="position:absolute;inset:0;background:linear-gradient(0deg,rgba(11,12,17,.8),transparent 60%)"></div>
+                    <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:42px;height:42px;border-radius:50%;background:rgba(11,12,17,.5);border:1.5px solid rgba(236,239,247,.7);display:flex;align-items:center;justify-content:center"><svg width="15" height="15" viewBox="0 0 24 24" fill="#f6f8fd"><path d="M7 5 L19 12 L7 19 Z"/></svg></div>
+                    <div style="position:absolute;left:12px;right:12px;bottom:13px"><div style="font:600 14px 'Schibsted Grotesk';color:#f6f8fd">{{ m.title }}</div><div style="font:500 10px 'JetBrains Mono',monospace;color:rgba(236,239,247,.6);margin-top:2px">{{ m.contextLine }}</div></div>
+                    <div style="position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.18)"><div style="height:100%;width:{{ m.progressPct }};background:var(--ac)"></div></div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <!-- films -->
+          <div style="margin-top:24px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;padding:0 20px 13px"><span style="font:600 18px 'Schibsted Grotesk';color:#f6f8fd">Films</span><span style="font:500 11px 'JetBrains Mono',monospace;color:#626878">ALL ›</span></div>
+            <div data-scroll style="display:flex;gap:13px;overflow-x:auto;padding:0 20px 4px">
+              <sc-for list="{{ filmsRow }}" as="m" hint-placeholder-count="5">
+                <div onClick="{{ m.open }}" style="flex:0 0 132px;cursor:pointer">
+                  <div style="position:relative;aspect-ratio:2/3;border-radius:13px;overflow:hidden;background:{{ m.grad }}"><div style="position:absolute;inset:0;background:radial-gradient(120% 80% at 50% 0%,rgba(255,255,255,.08),transparent 60%)"></div><div style="position:absolute;left:11px;right:11px;bottom:12px"><div style="font:600 15px/1.05 'Schibsted Grotesk';color:#f6f8fd">{{ m.title }}</div></div></div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <!-- series -->
+          <div style="margin-top:24px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;padding:0 20px 13px"><span style="font:600 18px 'Schibsted Grotesk';color:#f6f8fd">Series</span><span style="font:500 11px 'JetBrains Mono',monospace;color:#626878">ALL ›</span></div>
+            <div data-scroll style="display:flex;gap:13px;overflow-x:auto;padding:0 20px 4px">
+              <sc-for list="{{ seriesRow }}" as="m" hint-placeholder-count="4">
+                <div onClick="{{ m.open }}" style="flex:0 0 132px;cursor:pointer">
+                  <div style="position:relative;aspect-ratio:2/3;border-radius:13px;overflow:hidden;background:{{ m.grad }}"><div style="position:absolute;inset:0;background:radial-gradient(120% 80% at 50% 0%,rgba(255,255,255,.08),transparent 60%)"></div><div style="position:absolute;left:11px;right:11px;bottom:12px"><div style="font:600 15px/1.05 'Schibsted Grotesk';color:#f6f8fd">{{ m.title }}</div></div></div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ---- SEARCH ---- -->
+        <sc-if value="{{ isSearch }}" hint-placeholder-val="{{ false }}">
+        <div style="animation:mq-rise .4s ease both;padding:60px 20px 18px">
+          <div style="font:700 30px/1 'Schibsted Grotesk';letter-spacing:-.02em;color:#f6f8fd;margin-bottom:18px">Search</div>
+          <div style="display:flex;align-items:center;gap:11px;height:50px;padding:0 16px;border-radius:14px;background:rgba(236,239,247,.06);margin-bottom:20px"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#8c91a2" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="M16 16 L21 21"/></svg><span style="font:500 15px 'Schibsted Grotesk';color:#626878">Films, series, music, books…</span></div>
+          <div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:22px"><sc-for list="{{ genres }}" as="g" hint-placeholder-count="5"><div style="padding:8px 14px;border-radius:999px;background:rgba(236,239,247,.05);color:#c1c6d3;font:500 12px 'Schibsted Grotesk'">{{ g }}</div></sc-for></div>
+          <div style="font:600 15px 'Schibsted Grotesk';color:#f6f8fd;margin-bottom:14px">Your library</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <sc-for list="{{ allItems }}" as="m" hint-placeholder-count="8">
+              <div onClick="{{ m.open }}" style="cursor:pointer"><div style="position:relative;aspect-ratio:2/3;border-radius:13px;overflow:hidden;background:{{ m.grad }}"><div style="position:absolute;inset:0;background:radial-gradient(120% 80% at 50% 0%,rgba(255,255,255,.07),transparent 60%)"></div><div style="position:absolute;left:11px;right:11px;bottom:12px"><div style="font:500 9px 'JetBrains Mono',monospace;color:rgba(236,239,247,.55);margin-bottom:4px">{{ m.year }} · {{ m.kindShort }}</div><div style="font:600 16px/1.04 'Schibsted Grotesk';color:#f6f8fd">{{ m.title }}</div></div></div></div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ---- LISTEN ---- -->
+        <sc-if value="{{ isListen }}" hint-placeholder-val="{{ false }}">
+        <div style="animation:mq-rise .4s ease both;padding:60px 20px 18px">
+          <div style="font:700 30px/1 'Schibsted Grotesk';letter-spacing:-.02em;color:#f6f8fd;margin-bottom:18px">Listen</div>
+          <div style="display:flex;gap:8px;margin-bottom:22px">
+            <button onClick="{{ listen.showMusic }}" style="flex:1;height:40px;border-radius:11px;border:0;background:{{ listen.musicBg }};color:{{ listen.musicFg }};font:600 13px 'Schibsted Grotesk';cursor:pointer">Music</button>
+            <button onClick="{{ listen.showBooks }}" style="flex:1;height:40px;border-radius:11px;border:0;background:{{ listen.booksBg }};color:{{ listen.booksFg }};font:600 13px 'Schibsted Grotesk';cursor:pointer">Audiobooks</button>
+          </div>
+          <!-- now playing card -->
+          <div onClick="{{ openNow }}" style="position:relative;border-radius:22px;overflow:hidden;background:{{ nowMusic.grad }};padding:20px;height:188px;display:flex;flex-direction:column;justify-content:flex-end;cursor:pointer;margin-bottom:24px">
+            <div style="position:absolute;inset:0;background:radial-gradient(90% 70% at 70% 10%,rgba(255,255,255,.14),transparent 60%)"></div>
+            <div style="position:absolute;inset:0;background:linear-gradient(0deg,rgba(11,12,17,.55),transparent 60%)"></div>
+            <div style="position:absolute;top:16px;left:18px;font:500 9px 'JetBrains Mono',monospace;letter-spacing:.16em;color:var(--ac)">NOW PLAYING</div>
+            <div style="position:absolute;top:14px;right:16px;display:flex;align-items:flex-end;gap:2px;height:18px"><span style="width:3px;background:var(--ac);border-radius:2px;height:50%;transform-origin:bottom;animation:mq-eq .7s ease-in-out infinite"></span><span style="width:3px;background:var(--ac);border-radius:2px;height:100%;transform-origin:bottom;animation:mq-eq .9s ease-in-out .2s infinite"></span><span style="width:3px;background:var(--ac);border-radius:2px;height:40%;transform-origin:bottom;animation:mq-eq .6s ease-in-out .1s infinite"></span></div>
+            <div style="position:relative"><div style="font:700 26px/1 'Schibsted Grotesk';letter-spacing:-.02em;color:#f6f8fd">{{ nowMusic.title }}</div><div style="margin-top:6px;font:500 13px 'Schibsted Grotesk';color:rgba(236,239,247,.7)">{{ nowMusic.artist }} · {{ nowMusic.album }}</div></div>
+          </div>
+          <div style="font:600 15px 'Schibsted Grotesk';color:#f6f8fd;margin-bottom:14px">{{ listen.shelfTitle }}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <sc-for list="{{ albums }}" as="a" hint-placeholder-count="6">
+              <div onClick="{{ openNow }}" style="cursor:pointer"><div style="position:relative;aspect-ratio:1;border-radius:14px;overflow:hidden;background:{{ a.grad }}"><div style="position:absolute;inset:0;background:radial-gradient(110% 80% at 50% 0%,rgba(255,255,255,.08),transparent 60%)"></div></div><div style="margin-top:9px;font:600 14px 'Schibsted Grotesk';color:#f6f8fd">{{ a.title }}</div><div style="font:500 12px 'Schibsted Grotesk';color:#626878">{{ a.artist }}</div></div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ---- LIVE ---- -->
+        <sc-if value="{{ isLive }}" hint-placeholder-val="{{ false }}">
+        <div style="animation:mq-rise .4s ease both;padding:60px 20px 18px">
+          <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px"><span style="width:8px;height:8px;border-radius:50%;background:#ec5c4c"></span><span style="font:500 10px 'JetBrains Mono',monospace;letter-spacing:.18em;color:#ec5c4c">ON AIR · 20:14</span></div>
+          <div style="font:700 30px/1 'Schibsted Grotesk';letter-spacing:-.02em;color:#f6f8fd;margin-bottom:20px">Live TV</div>
+          <div style="font:500 10px 'JetBrains Mono',monospace;letter-spacing:.16em;color:#626878;margin-bottom:12px">FAVORITES</div>
+          <div data-scroll style="display:flex;gap:12px;overflow-x:auto;margin:0 -20px 24px;padding:0 20px 4px">
+            <sc-for list="{{ favChannels }}" as="c" hint-placeholder-count="3">
+              <div onClick="{{ c.open }}" style="flex:0 0 132px;cursor:pointer"><div style="position:relative;aspect-ratio:16/10;border-radius:13px;overflow:hidden;background:{{ c.grad }};display:flex;align-items:center;justify-content:center"><span style="font:700 22px 'Schibsted Grotesk';color:rgba(255,255,255,.85)">{{ c.num }}</span></div><div style="margin-top:8px;font:600 13px 'Schibsted Grotesk';color:#f6f8fd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</div></div>
+            </sc-for>
+          </div>
+          <div style="font:500 10px 'JetBrains Mono',monospace;letter-spacing:.16em;color:#626878;margin-bottom:12px">ON NOW</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <sc-for list="{{ channels }}" as="c" hint-placeholder-count="6">
+              <div onClick="{{ c.open }}" style="display:flex;align-items:center;gap:14px;padding:11px;border-radius:15px;background:rgba(236,239,247,.03);cursor:pointer">
+                <div style="position:relative;width:54px;height:54px;flex:0 0 auto;border-radius:12px;overflow:hidden;background:{{ c.grad }};display:flex;align-items:center;justify-content:center"><span style="font:700 17px 'Schibsted Grotesk';color:rgba(255,255,255,.85)">{{ c.num }}</span></div>
+                <div style="flex:1;min-width:0"><div style="font:600 14px 'Schibsted Grotesk';color:#f6f8fd">{{ c.name }}</div><div style="font:500 12px 'Schibsted Grotesk';color:#8c91a2;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.now }}</div><div style="margin-top:8px;height:3px;border-radius:999px;background:rgba(236,239,247,.14)"><div style="height:100%;width:{{ c.nowPct }};border-radius:999px;background:var(--ac)"></div></div></div>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--ac)" stroke-width="1.7"><circle cx="12" cy="12" r="10" stroke="rgba(251,113,89,.3)"/><path d="M10 8 L16 12 L10 16 Z" fill="var(--ac)"/></svg>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ---- YOU ---- -->
+        <sc-if value="{{ isYou }}" hint-placeholder-val="{{ false }}">
+        <div style="animation:mq-rise .4s ease both;padding:60px 20px 18px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:14px;margin-bottom:30px">
+            <div style="width:84px;height:84px;border-radius:50%;background:var(--ac);display:flex;align-items:center;justify-content:center;font:700 34px 'Schibsted Grotesk';color:#0b0c11">N</div>
+            <div style="font:700 22px 'Schibsted Grotesk';color:#f6f8fd">Ned</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <sc-for list="{{ youRows }}" as="r" hint-placeholder-count="5">
+              <div onClick="{{ r.onClick }}" style="display:flex;align-items:center;gap:14px;padding:16px 14px;border-radius:14px;background:rgba(236,239,247,.03);cursor:pointer"><div style="color:var(--ac)">{{ r.icon }}</div><span style="flex:1;font:600 15px 'Schibsted Grotesk';color:#eceef4">{{ r.label }}</span><span style="color:#626878">›</span></div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+      </div>
+
+      <!-- mini player -->
+      <sc-if value="{{ showMini }}" hint-placeholder-val="{{ true }}">
+      <div onClick="{{ openNow }}" style="margin:0 10px;border-radius:16px;background:rgba(30,33,43,.92);backdrop-filter:blur(14px);border:1px solid rgba(236,239,247,.08);display:flex;align-items:center;gap:12px;padding:8px 10px;cursor:pointer;box-shadow:0 12px 30px -12px rgba(0,0,0,.7)">
+        <div style="width:42px;height:42px;border-radius:10px;background:{{ nowMusic.grad }};flex:0 0 auto"></div>
+        <div style="flex:1;min-width:0"><div style="font:600 13px 'Schibsted Grotesk';color:#f6f8fd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ nowMusic.title }}</div><div style="font:500 11px 'Schibsted Grotesk';color:#8c91a2">{{ nowMusic.artist }}</div></div>
+        <button onClick="{{ toggleMusicStop }}" style="width:42px;height:42px;border-radius:11px;border:0;background:transparent;color:#f6f8fd;cursor:pointer;display:flex;align-items:center;justify-content:center">
+          <sc-if value="{{ musicPlaying }}" hint-placeholder-val="{{ true }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="#f6f8fd"><rect x="6" y="4" width="4.2" height="16" rx="1"/><rect x="13.8" y="4" width="4.2" height="16" rx="1"/></svg></sc-if>
+          <sc-if value="{{ musicPaused }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="#f6f8fd"><path d="M8 5 L20 12 L8 19 Z"/></svg></sc-if>
+        </button>
+      </div>
+      </sc-if>
+
+      <!-- bottom nav -->
+      <div style="display:flex;align-items:stretch;padding:8px 8px 26px;background:rgba(11,12,17,.92);backdrop-filter:blur(14px);border-top:1px solid rgba(236,239,247,.06)">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+          <button onClick="{{ t.onClick }}" style="flex:1;border:0;background:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 0;color:{{ t.color }}">
+            <div>{{ t.icon }}</div>
+            <span style="font:500 10px 'Schibsted Grotesk';letter-spacing:.01em">{{ t.label }}</span>
+          </button>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- ===== OVERLAY: DETAIL ===== -->
+    <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
+    <div data-scroll style="position:absolute;inset:0;z-index:70;background:#0b0c11;overflow-y:auto;animation:mq-slide .32s cubic-bezier(.2,.7,.3,1) both">
+      <div style="position:relative;height:420px;background:{{ detail.grad }}">
+        <div style="position:absolute;inset:0;background:radial-gradient(80% 60% at 70% 14%,rgba(255,255,255,.12),transparent 58%)"></div>
+        <div style="position:absolute;inset:0;background:linear-gradient(0deg,#0b0c11 3%,transparent 60%)"></div>
+        <button onClick="{{ back }}" style="position:absolute;top:60px;left:18px;width:40px;height:40px;border-radius:50%;border:0;background:rgba(11,12,17,.5);backdrop-filter:blur(8px);color:#f6f8fd;cursor:pointer;display:flex;align-items:center;justify-content:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 L8 12 L15 19"/></svg></button>
+        <div style="position:absolute;left:20px;right:20px;bottom:20px">
+          <div style="font:500 10px 'JetBrains Mono',monospace;letter-spacing:.18em;color:var(--ac);margin-bottom:10px">{{ detail.kindShort }} · IN YOUR LIBRARY</div>
+          <div style="font:700 38px/.98 'Schibsted Grotesk';letter-spacing:-.03em;color:#f6f8fd">{{ detail.title }}</div>
+        </div>
+      </div>
+      <div style="padding:18px 20px 40px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;font:600 12px 'Schibsted Grotesk';color:#c1c6d3"><span>{{ detail.year }}</span><span style="width:3px;height:3px;border-radius:50%;background:#626878"></span><span>{{ detail.genre }}</span><span style="width:3px;height:3px;border-radius:50%;background:#626878"></span><span>{{ detail.runtime }}</span><span style="font:600 11px 'JetBrains Mono',monospace;padding:3px 7px;border:1px solid rgba(236,239,247,.2);border-radius:6px">{{ detail.rating }}</span></div>
+        <div style="display:flex;gap:10px;margin-bottom:22px">
+          <button onClick="{{ openPlayer }}" style="flex:1;height:52px;border:0;border-radius:14px;background:var(--ac);color:#0b0c11;font:700 15px 'Schibsted Grotesk';cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="#0b0c11"><path d="M7 5 L19 12 L7 19 Z"/></svg>Play</button>
+          <button style="width:52px;height:52px;border:1px solid rgba(236,239,247,.2);border-radius:14px;background:rgba(236,239,247,.05);color:#f6f8fd;cursor:pointer;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5 V19 M5 12 H19"/></svg></button>
+          <button style="width:52px;height:52px;border:1px solid rgba(236,239,247,.2);border-radius:14px;background:rgba(236,239,247,.05);color:#f6f8fd;cursor:pointer;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 V15 M7 11 L12 16 L17 11 M5 19 H19"/></svg></button>
+        </div>
+        <p style="margin:0 0 24px;font:400 15px/1.6 'Schibsted Grotesk';color:#b3b9c7">{{ detail.synopsis }}</p>
+        <sc-if value="{{ detail.isSeries }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-bottom:24px">
+          <div style="font:600 16px 'Schibsted Grotesk';color:#f6f8fd;margin-bottom:14px">Episodes · Season 1</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <sc-for list="{{ detail.episodes }}" as="ep" hint-placeholder-count="4">
+              <div onClick="{{ openPlayer }}" style="display:flex;gap:13px;cursor:pointer">
+                <div style="position:relative;width:128px;flex:0 0 auto;aspect-ratio:16/9;border-radius:11px;overflow:hidden;background:{{ ep.grad }}"><div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;background:rgba(11,12,17,.5);border:1.4px solid rgba(236,239,247,.7);display:flex;align-items:center;justify-content:center"><svg width="12" height="12" viewBox="0 0 24 24" fill="#f6f8fd"><path d="M7 5 L19 12 L7 19 Z"/></svg></div></div>
+                <div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;gap:8px"><div style="font:600 14px 'Schibsted Grotesk';color:#f6f8fd">{{ ep.n }} · {{ ep.title }}</div></div><div style="font:500 11px 'JetBrains Mono',monospace;color:#626878;margin:3px 0 5px">{{ ep.dur }}</div><div style="font:400 12px/1.4 'Schibsted Grotesk';color:#8c91a2;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">{{ ep.synopsis }}</div></div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+        <div style="font:600 16px 'Schibsted Grotesk';color:#f6f8fd;margin-bottom:14px">More like this</div>
+        <div data-scroll style="display:flex;gap:13px;overflow-x:auto;margin:0 -20px;padding:0 20px">
+          <sc-for list="{{ moreLike }}" as="m" hint-placeholder-count="4">
+            <div onClick="{{ m.open }}" style="flex:0 0 116px;cursor:pointer"><div style="position:relative;aspect-ratio:2/3;border-radius:12px;overflow:hidden;background:{{ m.grad }}"><div style="position:absolute;left:10px;right:10px;bottom:11px"><div style="font:600 14px/1.04 'Schibsted Grotesk';color:#f6f8fd">{{ m.title }}</div></div></div></div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ===== OVERLAY: VIDEO PLAYER ===== -->
+    <sc-if value="{{ isPlayer }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;z-index:80;background:#000;animation:mq-rise .3s ease both">
+      <div style="position:absolute;inset:0;background:{{ detail.grad }};opacity:.5"></div>
+      <div style="position:absolute;inset:0;background:radial-gradient(60% 50% at 50% 42%,transparent,rgba(0,0,0,.66))"></div>
+      <div style="position:absolute;top:58px;left:16px;right:16px;display:flex;align-items:center;gap:12px">
+        <button onClick="{{ back }}" style="width:40px;height:40px;border-radius:50%;border:0;background:rgba(0,0,0,.4);backdrop-filter:blur(8px);color:#f6f8fd;cursor:pointer;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9 L12 4 L18 9 M12 4 V20" transform="rotate(-90 12 12)"/></svg></button>
+        <div style="flex:1"><div style="font:500 9px 'JetBrains Mono',monospace;letter-spacing:.16em;color:var(--ac)">NOW PLAYING</div><div style="font:600 15px 'Schibsted Grotesk';color:#f6f8fd">{{ detail.title }}</div></div>
+      </div>
+      <button onClick="{{ togglePlay }}" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:74px;height:74px;border-radius:50%;border:1.5px solid rgba(236,239,247,.5);background:rgba(0,0,0,.32);backdrop-filter:blur(8px);color:#f6f8fd;cursor:pointer;display:flex;align-items:center;justify-content:center">
+        <sc-if value="{{ vplaying }}" hint-placeholder-val="{{ true }}"><svg width="30" height="30" viewBox="0 0 24 24" fill="#f6f8fd"><rect x="6" y="4" width="4.2" height="16" rx="1"/><rect x="13.8" y="4" width="4.2" height="16" rx="1"/></svg></sc-if>
+        <sc-if value="{{ vpaused }}" hint-placeholder-val="{{ false }}"><svg width="30" height="30" viewBox="0 0 24 24" fill="#f6f8fd"><path d="M8 5 L20 12 L8 19 Z"/></svg></sc-if>
+      </button>
+      <div style="position:absolute;left:0;right:0;bottom:0;padding:30px 20px 34px;background:linear-gradient(0deg,rgba(0,0,0,.8),transparent)">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px"><span style="font:500 12px 'JetBrains Mono',monospace;color:#c1c6d3">{{ vcur }}</span><div style="position:relative;flex:1;height:5px;border-radius:999px;background:rgba(236,239,247,.2)"><div style="position:absolute;left:0;top:0;bottom:0;width:{{ vpct }};border-radius:999px;background:var(--ac)"></div><div style="position:absolute;top:50%;left:{{ vpct }};transform:translate(-50%,-50%);width:14px;height:14px;border-radius:50%;background:var(--ac)"></div></div><span style="font:500 12px 'JetBrains Mono',monospace;color:#8c91a2">{{ vrem }}</span></div>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div style="display:flex;align-items:center;gap:8px"><span style="font:500 11px 'JetBrains Mono',monospace;color:#c1c6d3;padding:7px 11px;border:1px solid rgba(236,239,247,.18);border-radius:9px">SUBS</span><span style="font:500 11px 'JetBrains Mono',monospace;color:#c1c6d3;padding:7px 11px;border:1px solid rgba(236,239,247,.18);border-radius:9px">5.1</span></div>
+          <div style="display:flex;align-items:center;gap:18px"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#f6f8fd" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 a7 7 0 1 1 -6 3.5"/><path d="M5 4 V9 H10"/></svg><button onClick="{{ togglePlay }}" style="width:54px;height:54px;border-radius:50%;border:0;background:var(--ac);color:#0b0c11;cursor:pointer;display:flex;align-items:center;justify-content:center"><sc-if value="{{ vplaying }}" hint-placeholder-val="{{ true }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="#0b0c11"><rect x="6" y="4" width="4.2" height="16" rx="1"/><rect x="13.8" y="4" width="4.2" height="16" rx="1"/></svg></sc-if><sc-if value="{{ vpaused }}" hint-placeholder-val="{{ false }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="#0b0c11"><path d="M8 5 L20 12 L8 19 Z"/></svg></sc-if></button><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#f6f8fd" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5 a7 7 0 1 0 6 3.5"/><path d="M19 4 V9 H14"/></svg></div>
+          <button style="width:38px;height:38px;border:0;background:none;color:#f6f8fd;cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9 V5 H8 M16 5 H20 V9 M20 15 V19 H16 M8 19 H4 V15"/></svg></button>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ===== OVERLAY: NOW PLAYING (music) ===== -->
+    <sc-if value="{{ isNow }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;z-index:80;background:linear-gradient(180deg,#1a1d27,#0b0c11 60%);animation:mq-slide .32s cubic-bezier(.2,.7,.3,1) both;display:flex;flex-direction:column;padding:58px 24px 40px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:30px">
+        <button onClick="{{ back }}" style="width:40px;height:40px;border-radius:50%;border:0;background:rgba(236,239,247,.06);color:#f6f8fd;cursor:pointer;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9 L12 15 L18 9"/></svg></button>
+        <span style="font:500 10px 'JetBrains Mono',monospace;letter-spacing:.16em;color:#8c91a2">FROM · LOW TIDE</span>
+        <div style="width:40px"></div>
+      </div>
+      <div style="position:relative;width:100%;aspect-ratio:1;border-radius:24px;overflow:hidden;background:{{ nowMusic.grad }};box-shadow:0 30px 60px -24px rgba(0,0,0,.7);margin-bottom:30px">
+        <div style="position:absolute;inset:0;background:radial-gradient(90% 70% at 50% 10%,rgba(255,255,255,.14),transparent 60%)"></div>
+        <div style="position:absolute;left:0;right:0;bottom:0;height:80px;padding:0 24px 18px;display:flex;align-items:flex-end;gap:4px">
+          <sc-for list="{{ vizBars }}" as="b" hint-placeholder-count="20"><div style="flex:1;height:{{ b.h }};background:var(--ac);border-radius:3px;transform-origin:bottom;animation:mq-eq {{ b.dur }} ease-in-out {{ b.del }} infinite"></div></sc-for>
+        </div>
+      </div>
+      <div style="margin-bottom:22px"><div style="font:700 28px/1.05 'Schibsted Grotesk';letter-spacing:-.02em;color:#f6f8fd">{{ nowMusic.title }}</div><div style="margin-top:7px;font:500 15px 'Schibsted Grotesk';color:#8c91a2">{{ nowMusic.artist }}</div></div>
+      <div style="margin-bottom:24px"><div style="position:relative;height:5px;border-radius:999px;background:rgba(236,239,247,.16)"><div style="position:absolute;left:0;top:0;bottom:0;width:{{ nowMusic.pct }};border-radius:999px;background:var(--ac)"></div><div style="position:absolute;top:50%;left:{{ nowMusic.pct }};transform:translate(-50%,-50%);width:13px;height:13px;border-radius:50%;background:var(--ac)"></div></div><div style="display:flex;justify-content:space-between;margin-top:9px;font:500 11px 'JetBrains Mono',monospace;color:#626878"><span>{{ nowMusic.cur }}</span><span>{{ nowMusic.dur }}</span></div></div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8c91a2" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4 H20 V8 M20 4 L14 10 M8 20 H4 V16 M4 20 L10 14 M16 20 H20 V16 M20 20 L14 14 M8 4 H4 V8 M4 4 L10 10"/></svg>
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="#f6f8fd"><path d="M7 6 V18 M19 6 L9 12 L19 18 Z"/></svg>
+        <button onClick="{{ toggleMusic }}" style="width:74px;height:74px;border-radius:50%;border:0;background:var(--ac);color:#0b0c11;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 14px 30px -10px rgba(251,113,89,.6)"><sc-if value="{{ musicPlaying }}" hint-placeholder-val="{{ true }}"><svg width="28" height="28" viewBox="0 0 24 24" fill="#0b0c11"><rect x="6" y="4" width="4.4" height="16" rx="1"/><rect x="13.6" y="4" width="4.4" height="16" rx="1"/></svg></sc-if><sc-if value="{{ musicPaused }}" hint-placeholder-val="{{ false }}"><svg width="28" height="28" viewBox="0 0 24 24" fill="#0b0c11"><path d="M8 5 L20 12 L8 19 Z"/></svg></sc-if></button>
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="#f6f8fd"><path d="M17 6 V18 M5 6 L15 12 L5 18 Z"/></svg>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8c91a2" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2 L21 6 L17 10 M3 12 V10 a4 4 0 0 1 4 -4 H21 M7 22 L3 18 L7 14 M21 12 v2 a4 4 0 0 1 -4 4 H3"/></svg>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ===== OVERLAY: MY LIST ===== -->
+    <sc-if value="{{ isMyList }}" hint-placeholder-val="{{ false }}">
+    <div data-scroll style="position:absolute;inset:0;z-index:70;background:#0b0c11;overflow-y:auto;animation:mq-slide .32s cubic-bezier(.2,.7,.3,1) both;padding:54px 20px 24px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px"><button onClick="{{ back }}" style="width:38px;height:38px;border-radius:50%;border:0;background:rgba(236,239,247,.06);color:#f6f8fd;cursor:pointer;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 L8 12 L15 19"/></svg></button><div style="font:700 26px/1 'Schibsted Grotesk';letter-spacing:-.02em;color:#f6f8fd">My List</div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <sc-for list="{{ myList }}" as="m" hint-placeholder-count="4">
+          <div onClick="{{ m.open }}" style="cursor:pointer"><div style="position:relative;aspect-ratio:2/3;border-radius:13px;overflow:hidden;background:{{ m.grad }}"><div style="position:absolute;top:9px;right:9px;width:26px;height:26px;border-radius:50%;background:rgba(11,12,17,.55);display:flex;align-items:center;justify-content:center"><svg width="13" height="13" viewBox="0 0 24 24" fill="var(--ac)"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z"/></svg></div><div style="position:absolute;left:10px;right:10px;bottom:11px;font:600 15px/1.05 'Schibsted Grotesk';color:#f6f8fd">{{ m.title }}</div></div></div>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ===== OVERLAY: DOWNLOADS ===== -->
+    <sc-if value="{{ isDownloads }}" hint-placeholder-val="{{ false }}">
+    <div data-scroll style="position:absolute;inset:0;z-index:70;background:#0b0c11;overflow-y:auto;animation:mq-slide .32s cubic-bezier(.2,.7,.3,1) both;padding:54px 20px 24px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px"><div style="display:flex;align-items:center;gap:12px"><button onClick="{{ back }}" style="width:38px;height:38px;border-radius:50%;border:0;background:rgba(236,239,247,.06);color:#f6f8fd;cursor:pointer;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 L8 12 L15 19"/></svg></button><div style="font:700 26px/1 'Schibsted Grotesk';letter-spacing:-.02em;color:#f6f8fd">Downloads</div></div><span style="font:500 10px 'JetBrains Mono',monospace;color:#8c91a2">4.2 GB</span></div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <sc-for list="{{ downloads }}" as="d" hint-placeholder-count="3">
+          <div style="display:flex;align-items:center;gap:13px"><div style="width:54px;height:54px;border-radius:11px;background:{{ d.grad }};flex:0 0 auto"></div><div style="flex:1;min-width:0"><div style="font:600 14px 'Schibsted Grotesk';color:#eceef4">{{ d.title }}</div><div style="font:500 10px 'JetBrains Mono',monospace;color:#8c91a2">{{ d.meta }}</div></div></div>
+        </sc-for>
+      </div>
+      <div style="border-radius:14px;border:1px solid rgba(236,239,247,.08);background:rgba(236,239,247,.02);overflow:hidden;margin-top:22px">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 15px;border-bottom:1px solid rgba(236,239,247,.06)"><span style="font:600 13px 'Schibsted Grotesk';color:#c1c6d3">Download quality</span><span style="font:600 12px 'JetBrains Mono',monospace;color:var(--ac)">1080p</span></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 15px"><span style="font:600 13px 'Schibsted Grotesk';color:#c1c6d3">Wi-Fi only</span><div style="position:relative;width:42px;height:25px;border-radius:999px;background:var(--ac)"><span style="position:absolute;top:3px;left:20px;width:19px;height:19px;border-radius:50%;background:#0b0c11"></span></div></div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ===== OVERLAY: ONBOARDING ===== -->
+    <sc-if value="{{ isOnboarding }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;z-index:85;background:#0b0c11;animation:mq-rise .3s ease both;padding:64px 26px 30px">
+      <sc-if value="{{ obConnect }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;flex-direction:column;height:100%">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:14px;margin-top:14px;margin-bottom:32px">
+          <div style="position:relative;width:64px;height:64px;border-radius:16px;background:linear-gradient(160deg,#1b1e29,#0d0e14);border:1.5px solid rgba(251,113,89,.45);display:flex;align-items:center;justify-content:center"><span style="font:700 36px/1 'Schibsted Grotesk';color:var(--ac)">m</span><span style="position:absolute;top:11px;right:11px;width:8px;height:8px;border-radius:50%;background:var(--ac)"></span></div>
+          <div style="display:flex;align-items:flex-end;gap:4px"><span style="font:700 22px/1 'Schibsted Grotesk';letter-spacing:-.02em;color:#f6f8fd">marquee</span><span style="width:6px;height:6px;border-radius:50%;background:var(--ac);margin-bottom:4px"></span></div>
+        </div>
+        <div style="font:700 24px/1.1 'Schibsted Grotesk';color:#f6f8fd;margin-bottom:8px">Connect your server</div>
+        <div style="font:400 13px/1.5 'Schibsted Grotesk';color:#8c91a2;margin-bottom:22px">Point Marquee at your media server.</div>
+        <div style="font:500 9px 'JetBrains Mono',monospace;letter-spacing:.14em;color:#626878;margin-bottom:8px">SERVER ADDRESS</div>
+        <div style="display:flex;align-items:center;height:48px;padding:0 14px;border-radius:12px;background:rgba(236,239,247,.05);border:1px solid rgba(251,113,89,.5);font:500 13px 'JetBrains Mono',monospace;color:#eceef4;margin-bottom:14px">https://media.local<span style="color:#626878">:8096</span></div>
+        <div style="display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:11px;background:rgba(95,209,160,.08);border:1px solid rgba(95,209,160,.25);margin-bottom:auto"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5fd0a0" stroke-width="2"><path d="M20 6 L9 17 L4 12" stroke-linecap="round" stroke-linejoin="round"/></svg><div style="flex:1"><div style="font:600 12px 'Schibsted Grotesk';color:#cfeede">Found on your network</div><div style="font:500 10px 'JetBrains Mono',monospace;color:#8c91a2">NAS · media.local</div></div></div>
+        <button onClick="{{ obNext }}" style="height:52px;border:0;border-radius:13px;background:var(--ac);color:#0b0c11;font:700 15px 'Schibsted Grotesk';cursor:pointer">Connect</button>
+      </div>
+      </sc-if>
+      <sc-if value="{{ obProfiles }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;align-items:center;height:100%">
+        <div style="font:500 10px 'JetBrains Mono',monospace;letter-spacing:.2em;color:var(--ac);margin-top:18px;margin-bottom:12px">MARQUEE</div>
+        <div style="font:700 26px/1.1 'Schibsted Grotesk';color:#f6f8fd;margin-bottom:38px">Who's watching?</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:26px 30px">
+          <button onClick="{{ obFinish }}" style="border:0;background:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:11px"><div style="width:84px;height:84px;border-radius:20px;background:#fb7159;display:flex;align-items:center;justify-content:center;font:700 34px 'Schibsted Grotesk';color:#0b0c11">N</div><span style="font:600 14px 'Schibsted Grotesk';color:#f6f8fd">Ned</span></button>
+          <button onClick="{{ obFinish }}" style="border:0;background:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:11px"><div style="width:84px;height:84px;border-radius:20px;background:#7fb2d9;display:flex;align-items:center;justify-content:center;font:700 34px 'Schibsted Grotesk';color:#0b0c11">S</div><span style="font:600 14px 'Schibsted Grotesk';color:#c1c6d3">Sam</span></button>
+          <button onClick="{{ obFinish }}" style="border:0;background:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:11px"><div style="width:84px;height:84px;border-radius:20px;background:#8fce9b;display:flex;align-items:center;justify-content:center;font:700 34px 'Schibsted Grotesk';color:#0b0c11">K</div><span style="font:600 14px 'Schibsted Grotesk';color:#c1c6d3">Kids</span></button>
+          <button onClick="{{ obFinish }}" style="border:0;background:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:11px"><div style="width:84px;height:84px;border-radius:20px;border:2px dashed rgba(236,239,247,.2);display:flex;align-items:center;justify-content:center;color:#626878"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div><span style="font:600 14px 'Schibsted Grotesk';color:#626878">Add</span></button>
+        </div>
+      </div>
+      </sc-if>
+    </div>
+    </sc-if>
+
+    <!-- home indicator -->
+    <div style="position:absolute;bottom:9px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:rgba(236,239,247,.4);z-index:90;pointer-events:none"></div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const GRAD={indigo:'linear-gradient(155deg,#2b3350,#171a2b 55%,#0c0d15)',plum:'linear-gradient(155deg,#3c2438,#231527 55%,#120b12)',rust:'linear-gradient(155deg,#45301f,#2a1c12 55%,#140d08)',forest:'linear-gradient(155deg,#22361f,#152213 55%,#0b120a)',teal:'linear-gradient(155deg,#1f3b3a,#132423 55%,#0a1312)',wine:'linear-gradient(155deg,#43222a,#28151a 55%,#140a0c)',sand:'linear-gradient(155deg,#3a3326,#241f16 55%,#12100b)',slate:'linear-gradient(155deg,#2c2f38,#191b21 55%,#0c0d10)'};
+const C={
+  meridian:{title:'Meridian',year:2024,type:'Film',genre:'Sci-Fi',runtime:'2h 08m',rating:'TV-MA',grad:GRAD.indigo,synopsis:'A salvage crew chasing a derelict freighter to the edge of charted space finds its last broadcast still looping — and someone, impossibly, still answering.'},
+  nightjar:{title:'Nightjar',year:2023,type:'Series',genre:'Mystery',runtime:'S2 · 16 eps',rating:'TV-14',grad:GRAD.plum,synopsis:'A coastal town wakes to find the tide has gone out and never come back. A returning detective works the case the locals would rather forget.'},
+  slowlight:{title:'Slow Light',year:2025,type:'Film',genre:'Romance',runtime:'1h 47m',rating:'R',grad:GRAD.wine,synopsis:'Two strangers keep meeting in the same all-night diner, certain they have met before but never able to say where.'},
+  foxglove:{title:'Foxglove',year:2024,type:'Series',genre:'Crime',runtime:'S1 · 8 eps',rating:'TV-MA',grad:GRAD.forest,synopsis:'A botanist with a perfect memory is pulled into a string of poisonings that trace back to her own garden.'},
+  harbor:{title:'Harbor Lights',year:2021,type:'Film',genre:'Drama',runtime:'2h 02m',rating:'PG-13',grad:GRAD.teal,synopsis:'A lighthouse keeper\u2019s daughter returns to sell the family station and finds the lamp still burning.'},
+  ember:{title:'Ember',year:2023,type:'Film',genre:'Thriller',runtime:'1h 58m',rating:'R',grad:GRAD.wine,synopsis:'A wildfire crew is cut off from the line as the wind turns. The only way down is through.'},
+  saltpath:{title:'The Salt Path',year:2022,type:'Film',genre:'Drama',runtime:'1h 54m',rating:'PG-13',grad:GRAD.rust,synopsis:'After losing everything, a couple walks six hundred miles of coastline with only what they can carry.'},
+  staticbloom:{title:'Static Bloom',year:2025,type:'Series',genre:'Sci-Fi',runtime:'S1 · 10 eps',rating:'TV-MA',grad:GRAD.slate,synopsis:'In a city where memories grow like flowers, a black-market gardener starts losing her own.'}
+};
+function ic(p){return React.createElement('svg',{width:24,height:24,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:1.7,strokeLinecap:'round',strokeLinejoin:'round'},p);}
+const ICONS={
+  home:ic([React.createElement('path',{key:1,d:'M4 11 L12 4 L20 11'}),React.createElement('path',{key:2,d:'M6 10 V20 H18 V10'})]),
+  search:ic([React.createElement('circle',{key:1,cx:11,cy:11,r:6}),React.createElement('path',{key:2,d:'M16 16 L21 21'})]),
+  listen:ic([React.createElement('path',{key:1,d:'M5 16 V11 a7 7 0 0 1 14 0 V16'}),React.createElement('rect',{key:2,x:3,y:15,width:4,height:6,rx:1.5}),React.createElement('rect',{key:3,x:17,y:15,width:4,height:6,rx:1.5})]),
+  live:ic([React.createElement('circle',{key:1,cx:12,cy:13,r:2}),React.createElement('path',{key:2,d:'M8.5 9.5 a5 5 0 0 0 0 7 M15.5 9.5 a5 5 0 0 1 0 7 M6 7 a8 8 0 0 0 0 12 M18 7 a8 8 0 0 1 0 12'})]),
+  you:ic([React.createElement('circle',{key:1,cx:12,cy:8,r:4}),React.createElement('path',{key:2,d:'M4 21 a8 8 0 0 1 16 0'})])
+};
+
+class Component extends DCLogic{
+  state={tab:'home',route:null,ob:1,detailId:'meridian',vplaying:true,vcur:3263,vdur:7680,musicPlaying:true,listenTab:'music'};
+  setTab=(t)=>{this.setState({tab:t,route:null});this.scrollTop();};
+  openDetail=(id)=>{this.setState({detailId:id,route:'detail'});this.scrollTop();};
+  openPlayer=()=>this.setState({route:'player',vplaying:true});
+  openNow=()=>this.setState({route:'now'});
+  obNext=()=>this.setState({ob:2});
+  obFinish=()=>this.setState({ob:0});
+  back=()=>{const s=this.state;if(s.route==='player')this.setState({route:'detail'});else this.setState({route:null});this.scrollTop();};
+  togglePlay=()=>this.setState(s=>({vplaying:!s.vplaying}));
+  toggleMusic=()=>this.setState(s=>({musicPlaying:!s.musicPlaying}));
+  setListen=(t)=>this.setState({listenTab:t});
+  scrollTop(){requestAnimationFrame(()=>{const e=document.querySelector('[data-scroll]');if(e)e.scrollTop=0;});}
+  componentDidMount(){this._t=setInterval(()=>{if(this.state.vplaying&&this.state.route==='player')this.setState(s=>({vcur:s.vcur+1>s.vdur?s.vdur:s.vcur+1}));},1000);}
+  componentWillUnmount(){clearInterval(this._t);}
+  fmt(s){s=Math.max(0,Math.round(s));const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=s%60;return (h?h+':':'')+(h?String(m).padStart(2,'0'):m)+':'+String(ss).padStart(2,'0');}
+  enrich(id){const m=C[id];return Object.assign({},m,{kindShort:m.type==='Series'?'SERIES':'FILM',open:()=>this.openDetail(id)});}
+
+  renderVals(){
+    const s=this.state;
+    const tabColor=t=>s.tab===t&&!s.route?'var(--ac)':'#626878';
+    const mkTab=(k,label)=>({label,icon:ICONS[k],color:tabColor(k),onClick:()=>this.setTab(k)});
+    const d=this.enrich(s.detailId);const isSeries=C[s.detailId].type==='Series';
+    const epTitles=['Cold Open','The Undertow','Salt & Static','Low Water'];
+    const episodes=isSeries?epTitles.map((t,i)=>({n:'0'+(i+1),title:t,dur:(42+i)+' min',grad:d.grad,synopsis:'A returning face, a missing hour, and a town that would rather not remember.'})):[];
+    const moreIds=(isSeries?['foxglove','staticbloom','nightjar','harbor']:['ember','slowlight','saltpath','harbor']).filter(x=>x!==s.detailId);
+    const albumList=[['Low Tide','Hale',GRAD.teal],['Paper Moons','The Veldt',GRAD.plum],['Northern Soil','Bram Ode',GRAD.forest],['Glasshouse','Mira Sound',GRAD.indigo],['Driftwood','Hale',GRAD.sand],['The Keeper','Lune',GRAD.wine]];
+    const bookList=[['A History of Quiet','Edith Crane',GRAD.sand],['The Night Garden','Sela Okonkwo',GRAD.forest],['Salt Roads','Idris Cole',GRAD.rust],['Tideline','Mara Vance',GRAD.wine]];
+    const chans=[['01','Marquee Classics',GRAD.rust,'Harbor Lights','62%'],['02','Noir 24/7',GRAD.slate,'Pale Fire','40%'],['03','Cartoon Vault',GRAD.teal,'Morning Loops','55%'],['04','Concert Hall',GRAD.plum,'Hale — Live at Low Tide','70%'],['05','Nature Loop',GRAD.forest,'Coastlines','48%'],['06','The Salt Channel',GRAD.sand,'The Salt Path','80%']];
+    const isMusic=s.listenTab==='music';
+    const vb=[];for(let i=0;i<20;i++)vb.push({h:(30+Math.round(Math.random()*55))+'%',dur:(0.6+Math.random()*0.7).toFixed(2)+'s',del:(Math.random()*0.8).toFixed(2)+'s'});
+    return{
+      isHome:s.tab==='home'&&!s.route,isSearch:s.tab==='search'&&!s.route,isListen:s.tab==='listen'&&!s.route,isLive:s.tab==='live'&&!s.route,isYou:s.tab==='you'&&!s.route,
+      isDetail:s.route==='detail',isPlayer:s.route==='player',isNow:s.route==='now',
+      isMyList:s.route==='mylist',isDownloads:s.route==='downloads',
+      isOnboarding:s.ob>0,obConnect:s.ob===1,obProfiles:s.ob===2,obNext:this.obNext,obFinish:this.obFinish,
+      tabs:[mkTab('home','Home'),mkTab('search','Search'),mkTab('listen','Listen'),mkTab('live','Live'),mkTab('you','You')],
+      hero:Object.assign({},this.enrich('meridian'),{play:()=>this.openPlayer(),open:()=>this.openDetail('meridian')}),
+      continueRow:[['meridian','42%','42 min left'],['nightjar','68%','S2 E11 · 18 min left'],['harbor','90%','9 min left'],['foxglove','15%','S1 E2 · 41 min left']].map(([id,p,ctx])=>Object.assign({},this.enrich(id),{progressPct:p,contextLine:ctx})),
+      filmsRow:['slowlight','saltpath','ember','harbor','meridian'].map(id=>this.enrich(id)),
+      seriesRow:['nightjar','foxglove','staticbloom'].map(id=>this.enrich(id)),
+      allItems:['slowlight','nightjar','saltpath','foxglove','ember','harbor','staticbloom','meridian'].map(id=>this.enrich(id)),
+      genres:['Sci-Fi','Drama','Thriller','Mystery','Crime','Romance'],
+      detail:Object.assign({},d,{isSeries,episodes}),
+      moreLike:moreIds.map(id=>this.enrich(id)),
+      openDetail:this.openDetail,openPlayer:this.openPlayer,openNow:this.openNow,back:this.back,togglePlay:this.togglePlay,toggleMusic:this.toggleMusic,toggleMusicStop:(e)=>{if(e&&e.stopPropagation)e.stopPropagation();this.toggleMusic();},
+      vplaying:s.vplaying,vpaused:!s.vplaying,vcur:this.fmt(s.vcur),vrem:'-'+this.fmt(s.vdur-s.vcur),vpct:(s.vcur/s.vdur*100)+'%',
+      musicPlaying:s.musicPlaying,musicPaused:!s.musicPlaying,showMini:true,
+      nowMusic:{title:'Undertow',artist:'Hale',album:'Low Tide',grad:GRAD.teal,cur:'2:41',dur:'4:58',pct:'54%'},
+      vizBars:vb,
+      listen:{showMusic:()=>this.setListen('music'),showBooks:()=>this.setListen('books'),musicBg:isMusic?'var(--ac)':'rgba(236,239,247,.05)',musicFg:isMusic?'#0b0c11':'#c1c6d3',booksBg:!isMusic?'var(--ac)':'rgba(236,239,247,.05)',booksFg:!isMusic?'#0b0c11':'#c1c6d3',shelfTitle:isMusic?'Your albums':'Your audiobooks'},
+      albums:(isMusic?albumList:bookList).map(([t,a,g])=>({title:t,artist:a,grad:g})),
+      favChannels:[chans[0],chans[3],chans[2]].map(c=>({num:c[0],name:c[1],grad:c[2],open:()=>this.openPlayer()})),
+      channels:chans.map(c=>({num:c[0],name:c[1],grad:c[2],now:c[3],nowPct:c[4],open:()=>this.openPlayer()})),
+      myList:['meridian','nightjar','slowlight','foxglove'].map(id=>this.enrich(id)),
+      downloads:[{title:'Meridian',meta:'1080p · 2.1 GB',grad:GRAD.indigo,done:true},{title:'Foxglove · S1 E2',meta:'Downloading · 64% · 410 MB',grad:GRAD.forest,prog:'64%'},{title:'A History of Quiet',meta:'Audiobook · 240 MB',grad:GRAD.sand,done:true}],
+      youRows:[{icon:'★',label:'My List',onClick:()=>{this.setState({route:'mylist'});this.scrollTop();}},{icon:'⤓',label:'Downloads',onClick:()=>{this.setState({route:'downloads'});this.scrollTop();}},{icon:'◷',label:'Watch history'},{icon:'⚙',label:'Settings'},{icon:'⏻',label:'Sign out'}]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,6 +1,15 @@
 # Nedflix - Personal Video Streaming Platform
 # Dockerfile for containerized deployment
 
+# Stage 1: build the Marquee web SPA (served by server.js from web/dist)
+FROM node:20-alpine AS web
+WORKDIR /web
+COPY web/package*.json ./
+RUN npm install
+COPY web/ ./
+RUN npm run build
+
+# Stage 2: runtime image
 FROM node:20-alpine
 
 # Install OpenSSL for certificate generation and FFmpeg for audio track support
@@ -26,6 +35,9 @@ RUN npm ci --only=production
 
 # Copy application source
 COPY --chown=nedflix:nedflix . .
+
+# Bake in the built SPA from the web stage (server.js serves web/dist when present)
+COPY --from=web --chown=nedflix:nedflix /web/dist ./web/dist
 
 # Create directories for certs and ensure proper permissions
 RUN mkdir -p /app/certs && chown -R nedflix:nedflix /app

@@ -36,3 +36,15 @@ docker-compose*.yml
 
 # Subtitle cache
 subtitle_cache/
+
+# Build artifacts / non-server trees (web/dist is rebuilt in the web stage)
+web/dist
+web/node_modules
+mobile/
+desktop/
+archive/
+design/
+marquee-native/
+ports/
+appletv/
+androidtv/

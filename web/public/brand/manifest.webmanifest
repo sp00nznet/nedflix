@@ -1,0 +1,14 @@
+{
+  "name": "Marquee",
+  "short_name": "Marquee",
+  "description": "Your library, now showing.",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#0b0c11",
+  "background_color": "#0b0c11",
+  "icons": [
+    { "src": "/brand/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/brand/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/brand/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

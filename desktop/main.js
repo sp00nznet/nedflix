@@ -4,13 +4,14 @@
  * Supports Windows and Linux
  */
 
-const { app, BrowserWindow, ipcMain, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, dialog } = require('electron');
 const path = require('path');
 const express = require('express');
 const fs = require('fs');
 const http = require('http');
 const https = require('https');
 const zlib = require('zlib');
+const registerMarqueeDesktop = require('./marquee-desktop');
 
 // Configuration
 const PORT = 3000;
@@ -29,6 +30,21 @@ let ersatztvSettings = {
 // Remote Nedflix server settings
 let remoteServers = [];  // Array of {url, name, enabled}
 
+// User playback settings (persisted to config). streaming holds defaults applied to
+// every player, including audioLanguage / subtitleLanguage.
+let userSettings = {
+    theme: 'dark',
+    streaming: {
+        quality: 'auto',
+        volume: 80,
+        playbackSpeed: 1,
+        autoplay: false,
+        subtitles: true,
+        audioLanguage: 'eng',
+        subtitleLanguage: 'off'
+    }
+};
+
 // IPTV cache
 let iptvChannelsCache = null;
 let iptvEpgCache = null;
@@ -44,6 +60,9 @@ function loadConfig() {
             iptvSettings = config.iptv || { playlistUrl: '', epgUrl: '' };
             ersatztvSettings = config.ersatztv || { url: '' };
             remoteServers = config.remoteServers || [];
+            if (config.userSettings) {
+                userSettings = { ...userSettings, ...config.userSettings, streaming: { ...userSettings.streaming, ...(config.userSettings.streaming || {}) } };
+            }
         }
     } catch (error) {
         console.error('Failed to load config:', error);
@@ -79,7 +98,8 @@ function saveConfig() {
             mediaPaths,
             iptv: iptvSettings,
             ersatztv: ersatztvSettings,
-            remoteServers
+            remoteServers,
+            userSettings
         }, null, 2));
     } catch (error) {
         console.error('Failed to save config:', error);
@@ -93,6 +113,17 @@ function saveConfig() {
  */
 function fetchContent(urlOrPath) {
     return new Promise((resolve, reject) => {
+        // Local file (or file:// URL) — read from disk instead of over HTTP.
+        if (!/^https?:\/\//i.test(urlOrPath)) {
+            try {
+                let filePath = urlOrPath.replace(/^file:\/\//i, '');
+                if (/^\/[A-Za-z]:/.test(filePath)) filePath = filePath.slice(1); // /C:/... -> C:/...
+                const buf = fs.readFileSync(filePath);
+                const data = /\.gz$/i.test(filePath) ? zlib.gunzipSync(buf) : buf;
+                return resolve(data.toString('utf8'));
+            } catch (e) { return reject(e); }
+        }
+
         const client = urlOrPath.startsWith('https') ? https : http;
 
         client.get(urlOrPath, { timeout: 30000 }, (res) => {
@@ -402,11 +433,17 @@ let mainWindow;
 let server;
 
 // Create Express server (embedded)
+// UI directory: prefer the bundled Marquee SPA build (web-dist, copied from web/dist at
+// build time); fall back to the legacy desktop public/ app when it isn't present.
+const UI_DIR = fs.existsSync(path.join(__dirname, 'web-dist', 'index.html'))
+    ? path.join(__dirname, 'web-dist')
+    : path.join(__dirname, 'public');
+
 function createServer() {
     const expressApp = express();
 
-    // Static files
-    expressApp.use(express.static(path.join(__dirname, 'public')));
+    // Static files (Marquee SPA when available)
+    expressApp.use(express.static(UI_DIR));
     expressApp.use(express.json());
 
     // API: Get libraries (directories)
@@ -423,6 +460,47 @@ function createServer() {
         });
         res.json(libraries);
     });
+
+    const librariesList = () => mediaPaths.map(p => ({ path: p, name: path.basename(p) }));
+
+    // API: Add a media library path (validates it's an existing directory)
+    expressApp.post('/api/media-paths', (req, res) => {
+        const p = req.body && req.body.path && path.normalize(req.body.path);
+        if (!p) return res.status(400).json({ error: 'path required' });
+        try {
+            if (!fs.existsSync(p) || !fs.statSync(p).isDirectory()) return res.status(400).json({ error: 'Not an existing folder' });
+        } catch { return res.status(400).json({ error: 'Invalid path' }); }
+        if (!mediaPaths.includes(p)) { mediaPaths.push(p); saveConfig(); }
+        res.json(librariesList());
+    });
+
+    // API: Remove a media library path
+    expressApp.delete('/api/media-paths', (req, res) => {
+        const p = req.query.path && path.normalize(req.query.path);
+        mediaPaths = mediaPaths.filter(mp => mp !== p);
+        saveConfig();
+        res.json(librariesList());
+    });
+
+    // API: Open a native folder picker and add the chosen folder(s)
+    expressApp.post('/api/media-paths/pick', async (req, res) => {
+        try {
+            const result = await dialog.showOpenDialog(mainWindow, { title: 'Add media library', properties: ['openDirectory', 'multiSelections'] });
+            if (!result.canceled) {
+                for (const p of result.filePaths) if (!mediaPaths.includes(p)) mediaPaths.push(p);
+                saveConfig();
+            }
+            res.json(librariesList());
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    // ---- Window controls (frameless window) ----
+    expressApp.post('/api/app/minimize', (req, res) => { if (mainWindow) mainWindow.minimize(); res.json({ ok: true }); });
+    expressApp.post('/api/app/toggle-maximize', (req, res) => {
+        if (mainWindow) { mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize(); }
+        res.json({ ok: true, maximized: mainWindow ? mainWindow.isMaximized() : false });
+    });
+    expressApp.post('/api/app/quit', (req, res) => { res.json({ ok: true }); app.quit(); });
 
     // API: Browse directory
     expressApp.get('/api/browse', (req, res) => {
@@ -598,23 +676,13 @@ function createServer() {
     });
 
     // API: Get/save settings
-    let userSettings = {
-        theme: 'dark',
-        streaming: {
-            quality: 'auto',
-            volume: 80,
-            playbackSpeed: 1,
-            autoplay: false,
-            subtitles: true
-        }
-    };
-
     expressApp.get('/api/settings', (req, res) => {
         res.json(userSettings);
     });
 
     expressApp.post('/api/settings', (req, res) => {
         userSettings = { ...userSettings, ...req.body };
+        saveConfig();
         res.json({ success: true, settings: userSettings });
     });
 
@@ -707,6 +775,40 @@ function createServer() {
         lastEpgUpdate = 0;
         saveConfig();
         res.json({ success: true, settings: iptvSettings });
+    });
+
+    // API: Pick a local M3U playlist file via native dialog
+    expressApp.post('/api/iptv/pick-playlist', async (req, res) => {
+        try {
+            const r = await dialog.showOpenDialog(mainWindow, {
+                title: 'Select M3U playlist',
+                properties: ['openFile'],
+                filters: [{ name: 'Playlists', extensions: ['m3u', 'm3u8'] }, { name: 'All files', extensions: ['*'] }],
+            });
+            if (!r.canceled && r.filePaths[0]) {
+                iptvSettings.playlistUrl = r.filePaths[0];
+                iptvChannelsCache = null; lastPlaylistUpdate = 0;
+                saveConfig();
+            }
+            res.json(iptvSettings);
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    // API: Pick a local XMLTV EPG file via native dialog
+    expressApp.post('/api/iptv/pick-epg', async (req, res) => {
+        try {
+            const r = await dialog.showOpenDialog(mainWindow, {
+                title: 'Select XMLTV EPG',
+                properties: ['openFile'],
+                filters: [{ name: 'XMLTV', extensions: ['xml', 'xmltv', 'gz'] }, { name: 'All files', extensions: ['*'] }],
+            });
+            if (!r.canceled && r.filePaths[0]) {
+                iptvSettings.epgUrl = r.filePaths[0];
+                iptvEpgCache = null; lastEpgUpdate = 0;
+                saveConfig();
+            }
+            res.json(iptvSettings);
+        } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
     // ==================== ErsatzTV/Channels API Endpoints ====================
@@ -967,9 +1069,16 @@ function createServer() {
         });
     });
 
+    // Marquee SPA endpoints (library titles, music, audiobooks, profiles, resume, favorites)
+    // backed by the real local filesystem under mediaPaths. Must precede the SPA catch-all.
+    registerMarqueeDesktop(expressApp, {
+        getMediaPaths: () => mediaPaths,
+        dataDir: app.getPath('userData'),
+    });
+
     // Serve index for SPA
     expressApp.get('*', (req, res) => {
-        res.sendFile(path.join(__dirname, 'public', 'index.html'));
+        res.sendFile(path.join(UI_DIR, 'index.html'));
     });
 
     return expressApp;
@@ -988,8 +1097,8 @@ function createWindow() {
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js')
         },
-        frame: true,
-        titleBarStyle: 'default',
+        frame: false,
+        backgroundColor: '#0b0c11',
         icon: path.join(__dirname, 'icon.png')
     });
 

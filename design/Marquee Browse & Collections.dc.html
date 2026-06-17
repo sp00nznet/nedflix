@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#08090d}
+body{font-family:'Schibsted Grotesk',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+</style>
+</helmet>
+<div style="--ac:#fb7159;min-height:100vh;background:#08090d;padding:42px 40px 70px">
+  <div style="max-width:1120px;margin:0 auto">
+    <div style="margin-bottom:32px">
+      <div style="font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.24em;color:var(--ac);margin-bottom:12px">SCREENS 07 · BROWSE &amp; COLLECTIONS</div>
+      <h1 style="margin:0 0 10px;font:700 38px/1 'Schibsted Grotesk';letter-spacing:-.03em;color:#f6f8fd">Filtered browse &amp; Collections</h1>
+      <p style="margin:0;font:400 14px/1.6 'Schibsted Grotesk';color:#8c91a2;max-width:720px">The last two gaps: drilling a library by genre/year/rating with a sort, and grouping franchises into boxsets. Wired as <span style="color:#c1c6d3">/films?genre=…</span> and <span style="color:#c1c6d3">/collection/:id</span>.</p>
+    </div>
+
+    <!-- ===== FILTERED BROWSE ===== -->
+    <div style="font:600 13px 'Schibsted Grotesk';color:#c1c6d3;margin-bottom:12px">Filtered browse</div>
+    <div style="border-radius:22px;overflow:hidden;border:1px solid rgba(236,239,247,.08);background:#0b0c11;padding:26px 30px 32px;margin-bottom:42px">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:20px"><h2 style="margin:0;font:700 28px/1 'Schibsted Grotesk';letter-spacing:-.02em;color:#f6f8fd">Films</h2><span style="font:500 12px 'JetBrains Mono',monospace;color:#626878">· SCI-FI · 18 TITLES</span></div>
+      <!-- filter bar -->
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:10px;border:1px solid rgba(251,113,89,.4);background:rgba(251,113,89,.08);color:var(--ac);font:600 12px 'Schibsted Grotesk';cursor:pointer">Genre · Sci-Fi <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:10px;border:1px solid rgba(236,239,247,.14);background:rgba(236,239,247,.04);color:#c1c6d3;font:600 12px 'Schibsted Grotesk';cursor:pointer">Year · 2020s <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:10px;border:1px solid rgba(236,239,247,.14);background:rgba(236,239,247,.04);color:#c1c6d3;font:600 12px 'Schibsted Grotesk';cursor:pointer">Rating · Any <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:10px;border:1px solid rgba(236,239,247,.14);background:rgba(236,239,247,.04);color:#c1c6d3;font:600 12px 'Schibsted Grotesk';cursor:pointer">Quality · 4K <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></div>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:10px;border:1px solid rgba(236,239,247,.14);background:rgba(236,239,247,.04);color:#c1c6d3;font:600 12px 'Schibsted Grotesk';cursor:pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h18M6 12h12M10 18h4"/></svg>Sort · Recently added</div>
+        <div style="display:flex;border-radius:10px;border:1px solid rgba(236,239,247,.14);overflow:hidden"><span style="display:flex;align-items:center;justify-content:center;width:38px;height:38px;background:var(--ac);color:#0b0c11;cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span><span style="display:flex;align-items:center;justify-content:center;width:38px;height:38px;background:rgba(236,239,247,.04);color:#8c91a2;cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></span></div>
+      </div>
+      <!-- active filters -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:22px"><span style="font:500 9px 'JetBrains Mono',monospace;letter-spacing:.14em;color:#626878">ACTIVE</span><span style="display:flex;align-items:center;gap:7px;padding:6px 11px;border-radius:999px;background:rgba(251,113,89,.12);color:var(--ac);font:600 11px 'Schibsted Grotesk'">Sci-Fi <span style="font-size:13px">✕</span></span><span style="display:flex;align-items:center;gap:7px;padding:6px 11px;border-radius:999px;background:rgba(251,113,89,.12);color:var(--ac);font:600 11px 'Schibsted Grotesk'">4K <span style="font-size:13px">✕</span></span><span style="display:flex;align-items:center;gap:7px;padding:6px 11px;border-radius:999px;background:rgba(251,113,89,.12);color:var(--ac);font:600 11px 'Schibsted Grotesk'">2020s <span style="font-size:13px">✕</span></span><span style="font:600 11px 'Schibsted Grotesk';color:#8c91a2;cursor:pointer;margin-left:4px">Clear all</span></div>
+      <!-- grid -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:18px">
+        <sc-for list="{{ grid }}" as="m" hint-placeholder-count="10">
+          <div style="cursor:pointer"><div style="position:relative;aspect-ratio:2/3;border-radius:12px;overflow:hidden;background:{{ m.grad }};box-shadow:0 12px 30px -14px rgba(0,0,0,.75)"><div style="position:absolute;inset:0;background:radial-gradient(120% 80% at 50% 0%,rgba(255,255,255,.07),transparent 58%)"></div><div style="position:absolute;left:14px;right:14px;bottom:16px"><div style="font:500 10px 'JetBrains Mono',monospace;color:rgba(236,239,247,.55);margin-bottom:5px">{{ m.year }} · {{ m.tag }}</div><div style="font:600 19px/1.03 'Schibsted Grotesk';color:#f6f8fd">{{ m.title }}</div></div></div></div>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- ===== COLLECTIONS ===== -->
+    <div style="font:600 13px 'Schibsted Grotesk';color:#c1c6d3;margin-bottom:12px">Collections</div>
+    <div style="border-radius:22px;overflow:hidden;border:1px solid rgba(236,239,247,.08);background:#0b0c11;padding:26px 30px 32px;margin-bottom:42px">
+      <h2 style="margin:0 0 18px;font:700 24px/1 'Schibsted Grotesk';letter-spacing:-.02em;color:#f6f8fd">Boxsets &amp; franchises</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px">
+        <sc-for list="{{ collections }}" as="c" hint-placeholder-count="4">
+          <div style="cursor:pointer;border-radius:16px;overflow:hidden">
+            <div style="position:relative;height:150px;background:{{ c.grad }}">
+              <div style="position:absolute;inset:0;background:radial-gradient(80% 90% at 75% 10%,rgba(255,255,255,.12),transparent 55%)"></div>
+              <div style="position:absolute;inset:0;background:linear-gradient(0deg,rgba(11,12,17,.85),transparent 60%)"></div>
+              <div style="position:absolute;top:12px;right:12px;display:flex;align-items:center;gap:6px;padding:5px 9px;border-radius:7px;background:rgba(11,12,17,.55);font:600 10px 'JetBrains Mono',monospace;color:#eceef4"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>{{ c.count }}</div>
+              <div style="position:absolute;left:16px;right:16px;bottom:14px"><div style="font:700 22px/1 'Schibsted Grotesk';color:#f6f8fd;margin-bottom:4px">{{ c.title }}</div><div style="font:500 11px 'JetBrains Mono',monospace;color:rgba(236,239,247,.6)">{{ c.meta }}</div></div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- ===== COLLECTION DETAIL ===== -->
+    <div style="font:600 13px 'Schibsted Grotesk';color:#c1c6d3;margin-bottom:12px">Collection detail</div>
+    <div style="border-radius:22px;overflow:hidden;border:1px solid rgba(236,239,247,.08);background:#0b0c11">
+      <div style="position:relative;padding:30px 32px 26px;background:linear-gradient(160deg,#1f3b3a,#132423 60%,#0b0c11)">
+        <div style="position:absolute;inset:0;background:radial-gradient(70% 90% at 16% 20%,rgba(255,255,255,.1),transparent 55%)"></div>
+        <div style="position:relative"><div style="font:500 10px 'JetBrains Mono',monospace;letter-spacing:.2em;color:var(--ac);margin-bottom:10px">COLLECTION · 3 FILMS</div><div style="font:700 48px/.98 'Schibsted Grotesk';letter-spacing:-.03em;color:#f6f8fd;margin-bottom:14px">The Coastal Trilogy</div><p style="margin:0 0 18px;font:400 14px/1.6 'Schibsted Grotesk';color:#b3b9c7;max-width:560px">Three films following the same stretch of shoreline across forty years — best watched in order.</p><div style="display:flex;gap:12px"><button style="display:flex;align-items:center;gap:9px;padding:13px 26px;border:0;border-radius:12px;background:var(--ac);color:#0b0c11;font:700 14px 'Schibsted Grotesk';cursor:pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="#0b0c11"><path d="M7 5 L19 12 L7 19 Z"/></svg>Play all</button><button style="padding:13px 22px;border:1px solid rgba(236,239,247,.2);border-radius:12px;background:rgba(236,239,247,.05);color:#f6f8fd;font:600 14px 'Schibsted Grotesk';cursor:pointer">Shuffle</button></div></div>
+      </div>
+      <div style="padding:24px 32px 32px;display:flex;flex-direction:column;gap:12px">
+        <sc-for list="{{ collectionItems }}" as="m" hint-placeholder-count="3">
+          <div style="display:grid;grid-template-columns:34px 130px 1fr auto;gap:18px;align-items:center;padding:10px;border-radius:14px;border:1px solid rgba(236,239,247,.06);background:rgba(236,239,247,.02);cursor:pointer">
+            <div style="font:600 18px 'JetBrains Mono',monospace;color:#626878;text-align:center">{{ m.n }}</div>
+            <div style="position:relative;aspect-ratio:16/9;border-radius:9px;overflow:hidden;background:{{ m.grad }}"><div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;background:rgba(11,12,17,.5);border:1.4px solid rgba(236,239,247,.7);display:flex;align-items:center;justify-content:center"><svg width="12" height="12" viewBox="0 0 24 24" fill="#f6f8fd"><path d="M7 5 L19 12 L7 19 Z"/></svg></div></div>
+            <div><div style="font:600 16px 'Schibsted Grotesk';color:#f6f8fd;margin-bottom:3px">{{ m.title }}</div><div style="font:500 12px 'JetBrains Mono',monospace;color:#626878">{{ m.year }} · {{ m.runtime }}</div></div>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#626878" stroke-width="1.8" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const G={indigo:'linear-gradient(155deg,#2b3350,#171a2b 55%,#0c0d15)',plum:'linear-gradient(155deg,#3c2438,#231527 55%,#120b12)',rust:'linear-gradient(155deg,#45301f,#2a1c12 55%,#140d08)',forest:'linear-gradient(155deg,#22361f,#152213 55%,#0b120a)',teal:'linear-gradient(155deg,#1f3b3a,#132423 55%,#0a1312)',wine:'linear-gradient(155deg,#43222a,#28151a 55%,#140a0c)',sand:'linear-gradient(155deg,#3a3326,#241f16 55%,#12100b)',slate:'linear-gradient(155deg,#2c2f38,#191b21 55%,#0c0d10)'};
+class Component extends DCLogic{
+  renderVals(){
+    return {
+      grid:[['Meridian',2024,'4K',G.indigo],['Static Bloom',2025,'4K',G.slate],['Slow Light',2025,'HDR',G.wine],['Ember',2023,'4K',G.wine],['Foxglove',2024,'4K',G.forest],['Pale Fire',2020,'4K',G.indigo],['Nightjar',2023,'4K',G.plum],['Harbor Lights',2021,'4K',G.teal],['The Far Field',2022,'4K',G.teal],['Coastlines',2023,'HDR',G.forest]].map(([title,year,tag,grad])=>({title,year,tag,grad})),
+      collections:[['The Coastal Trilogy','3 films · 2018–2024',G.teal,'3'],['Nightjar: Complete','2 seasons · 32 eps',G.plum,'S2'],['Hale — Discography','4 albums · 52 tracks',G.forest,'4'],['The Salt Cycle','3 films',G.rust,'3']].map(([title,meta,grad,count])=>({title,meta,grad,count})),
+      collectionItems:[['01','Harbor Lights',2021,'2h 02m',G.teal],['02','The Quiet Coast',2022,'1h 31m',G.forest],['03','Coastal',2023,'1h 49m',G.sand]].map(([n,title,year,runtime,grad])=>({n,title,year,runtime,grad}))
+    };
+  }
+}
+</script>
+</body>
+</html>

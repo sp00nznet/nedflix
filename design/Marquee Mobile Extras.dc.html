@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#08090d}
+body{font-family:'Schibsted Grotesk',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+</style>
+</helmet>
+<div style="--ac:#fb7159;min-height:100vh;background:#08090d;padding:42px 40px 70px">
+  <div style="max-width:1000px;margin:0 auto 34px">
+    <div style="font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.24em;color:var(--ac);margin-bottom:12px">SCREENS 06 · MOBILE EXTRAS</div>
+    <h1 style="margin:0 0 10px;font:700 38px/1 'Schibsted Grotesk';letter-spacing:-.03em;color:#f6f8fd">My List &amp; Downloads</h1>
+    <p style="margin:0;font:400 14px/1.6 'Schibsted Grotesk';color:#8c91a2;max-width:680px">The "My List" button finally has a home, and the download hooks in the plugin get a UI. Both live under the mobile <span style="color:#c1c6d3">You</span> tab (and as a desktop route).</p>
+  </div>
+
+  <div style="display:flex;gap:50px;justify-content:center;flex-wrap:wrap">
+
+    <!-- MY LIST -->
+    <div style="flex:0 0 auto">
+      <div style="font:600 13px 'Schibsted Grotesk';color:#c1c6d3;margin-bottom:13px">My List</div>
+      <div style="position:relative;width:320px;height:660px;border-radius:42px;background:#0b0c11;border:1px solid rgba(236,239,247,.1);box-shadow:0 30px 70px -24px rgba(0,0,0,.8);overflow:hidden;padding:54px 20px 24px">
+        <div style="font:700 28px/1 'Schibsted Grotesk';letter-spacing:-.02em;color:#f6f8fd;margin-bottom:16px">My List</div>
+        <div style="display:flex;gap:8px;margin-bottom:20px"><span style="padding:7px 14px;border-radius:999px;background:var(--ac);color:#0b0c11;font:600 12px 'Schibsted Grotesk'">All</span><span style="padding:7px 14px;border-radius:999px;background:rgba(236,239,247,.05);color:#c1c6d3;font:600 12px 'Schibsted Grotesk'">Films</span><span style="padding:7px 14px;border-radius:999px;background:rgba(236,239,247,.05);color:#c1c6d3;font:600 12px 'Schibsted Grotesk'">Series</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div style="position:relative"><div style="aspect-ratio:2/3;border-radius:13px;background:linear-gradient(155deg,#2b3350,#171a2b 55%,#0c0d15);position:relative;overflow:hidden"><div style="position:absolute;top:9px;right:9px;width:26px;height:26px;border-radius:50%;background:rgba(11,12,17,.55);display:flex;align-items:center;justify-content:center"><svg width="13" height="13" viewBox="0 0 24 24" fill="var(--ac)"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z"/></svg></div><div style="position:absolute;left:10px;right:10px;bottom:11px;font:600 15px/1.05 'Schibsted Grotesk';color:#f6f8fd">Meridian</div></div></div>
+          <div style="position:relative"><div style="aspect-ratio:2/3;border-radius:13px;background:linear-gradient(155deg,#3c2438,#231527 55%,#120b12);position:relative;overflow:hidden"><div style="position:absolute;top:9px;right:9px;width:26px;height:26px;border-radius:50%;background:rgba(11,12,17,.55);display:flex;align-items:center;justify-content:center"><svg width="13" height="13" viewBox="0 0 24 24" fill="var(--ac)"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z"/></svg></div><div style="position:absolute;left:10px;right:10px;bottom:11px;font:600 15px/1.05 'Schibsted Grotesk';color:#f6f8fd">Nightjar</div></div></div>
+          <div style="position:relative"><div style="aspect-ratio:2/3;border-radius:13px;background:linear-gradient(155deg,#43222a,#28151a 55%,#140a0c);position:relative;overflow:hidden"><div style="position:absolute;top:9px;right:9px;width:26px;height:26px;border-radius:50%;background:rgba(11,12,17,.55);display:flex;align-items:center;justify-content:center"><svg width="13" height="13" viewBox="0 0 24 24" fill="var(--ac)"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z"/></svg></div><div style="position:absolute;left:10px;right:10px;bottom:11px;font:600 15px/1.05 'Schibsted Grotesk';color:#f6f8fd">Slow Light</div></div></div>
+          <div style="position:relative"><div style="aspect-ratio:2/3;border-radius:13px;background:linear-gradient(155deg,#22361f,#152213 55%,#0b120a);position:relative;overflow:hidden"><div style="position:absolute;top:9px;right:9px;width:26px;height:26px;border-radius:50%;background:rgba(11,12,17,.55);display:flex;align-items:center;justify-content:center"><svg width="13" height="13" viewBox="0 0 24 24" fill="var(--ac)"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z"/></svg></div><div style="position:absolute;left:10px;right:10px;bottom:11px;font:600 15px/1.05 'Schibsted Grotesk';color:#f6f8fd">Foxglove</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DOWNLOADS -->
+    <div style="flex:0 0 auto">
+      <div style="font:600 13px 'Schibsted Grotesk';color:#c1c6d3;margin-bottom:13px">Downloads · offline</div>
+      <div style="position:relative;width:320px;height:660px;border-radius:42px;background:#0b0c11;border:1px solid rgba(236,239,247,.1);box-shadow:0 30px 70px -24px rgba(0,0,0,.8);overflow:hidden;padding:54px 20px 24px;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px"><div style="font:700 28px/1 'Schibsted Grotesk';letter-spacing:-.02em;color:#f6f8fd">Downloads</div><span style="font:500 10px 'JetBrains Mono',monospace;color:#8c91a2">4.2 GB</span></div>
+        <div style="display:flex;flex-direction:column;gap:11px;margin-bottom:auto">
+          <div style="display:flex;align-items:center;gap:13px"><div style="width:54px;height:54px;border-radius:11px;background:linear-gradient(155deg,#2b3350,#171a2b);flex:0 0 auto"></div><div style="flex:1;min-width:0"><div style="font:600 14px 'Schibsted Grotesk';color:#eceef4">Meridian</div><div style="font:500 10px 'JetBrains Mono',monospace;color:#626878">1080p · 2.1 GB</div></div><div style="width:24px;height:24px;border-radius:50%;background:rgba(95,209,160,.15);display:flex;align-items:center;justify-content:center;color:#5fd0a0"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 L9 17 L4 12"/></svg></div></div>
+          <div style="display:flex;align-items:center;gap:13px"><div style="position:relative;width:54px;height:54px;border-radius:11px;background:linear-gradient(155deg,#22361f,#152213);flex:0 0 auto;overflow:hidden"><div style="position:absolute;inset:0;background:rgba(11,12,17,.5);display:flex;align-items:center;justify-content:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f6f8fd" stroke-width="1.8"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></div></div><div style="flex:1;min-width:0"><div style="font:600 14px 'Schibsted Grotesk';color:#eceef4">Foxglove · S1 E2</div><div style="margin:6px 0 4px;height:4px;border-radius:999px;background:rgba(236,239,247,.14)"><div style="height:100%;width:64%;border-radius:999px;background:var(--ac)"></div></div><div style="font:500 10px 'JetBrains Mono',monospace;color:var(--ac)">Downloading · 64% · 410 MB</div></div></div>
+          <div style="display:flex;align-items:center;gap:13px"><div style="width:54px;height:54px;border-radius:11px;background:linear-gradient(155deg,#3a3326,#241f16);flex:0 0 auto"></div><div style="flex:1;min-width:0"><div style="font:600 14px 'Schibsted Grotesk';color:#eceef4">A History of Quiet</div><div style="font:500 10px 'JetBrains Mono',monospace;color:#626878">Audiobook · 240 MB</div></div><div style="width:24px;height:24px;border-radius:50%;background:rgba(95,209,160,.15);display:flex;align-items:center;justify-content:center;color:#5fd0a0"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 L9 17 L4 12"/></svg></div></div>
+        </div>
+        <div style="border-radius:14px;border:1px solid rgba(236,239,247,.08);background:rgba(236,239,247,.02);overflow:hidden;margin-top:18px">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 15px;border-bottom:1px solid rgba(236,239,247,.06)"><span style="font:600 13px 'Schibsted Grotesk';color:#c1c6d3">Download quality</span><span style="font:600 12px 'JetBrains Mono',monospace;color:var(--ac)">1080p</span></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 15px"><span style="font:600 13px 'Schibsted Grotesk';color:#c1c6d3">Wi-Fi only</span><div style="position:relative;width:42px;height:25px;border-radius:999px;background:var(--ac)"><span style="position:absolute;top:3px;left:20px;width:19px;height:19px;border-radius:50%;background:#0b0c11"></span></div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

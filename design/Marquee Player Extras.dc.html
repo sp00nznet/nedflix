@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#08090d}
+body{font-family:'Schibsted Grotesk',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+</style>
+</helmet>
+<div style="--ac:#fb7159;min-height:100vh;background:#08090d;padding:42px 40px 70px">
+  <div style="max-width:1200px;margin:0 auto">
+    <div style="margin-bottom:32px">
+      <div style="font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.24em;color:var(--ac);margin-bottom:12px">SCREENS 05 · PLAYER EXTRAS</div>
+      <h1 style="margin:0 0 10px;font:700 38px/1 'Schibsted Grotesk';letter-spacing:-.03em;color:#f6f8fd">Track picker · Cast · Up Next</h1>
+      <p style="margin:0;font:400 14px/1.6 'Schibsted Grotesk';color:#8c91a2;max-width:740px">Overlays the player surfaces. The player chips (SUBS / AUDIO) open the track picker; the cast button opens "Play on"; the music player opens the queue.</p>
+    </div>
+
+    <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">
+
+      <!-- TRACK PICKER -->
+      <div style="flex:1;min-width:360px">
+        <div style="font:600 13px 'Schibsted Grotesk';color:#c1c6d3;margin-bottom:12px">Subtitle &amp; audio picker</div>
+        <div style="border-radius:20px;border:1px solid rgba(236,239,247,.1);background:#14161d;overflow:hidden;box-shadow:0 30px 60px -24px rgba(0,0,0,.8)">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 20px 0"><div style="font:700 18px 'Schibsted Grotesk';color:#f6f8fd">Audio &amp; Subtitles</div><div style="width:30px;height:30px;border-radius:50%;background:rgba(236,239,247,.06);display:flex;align-items:center;justify-content:center;color:#8c91a2;font-size:15px">✕</div></div>
+          <div style="display:flex;gap:6px;padding:16px 20px 4px"><span style="padding:9px 16px;border-radius:10px;background:rgba(236,239,247,.05);color:#8c91a2;font:600 13px 'Schibsted Grotesk'">Audio · 5.1</span><span style="padding:9px 16px;border-radius:10px;background:var(--ac);color:#0b0c11;font:600 13px 'Schibsted Grotesk'">Subtitles</span></div>
+          <div style="padding:10px 12px 8px">
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:11px"><span style="width:18px;color:#626878"></span><span style="flex:1;font:600 14px 'Schibsted Grotesk';color:#c1c6d3">Off</span></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:11px;background:rgba(251,113,89,.1)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ac)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 L9 17 L4 12"/></svg><div style="flex:1"><div style="font:600 14px 'Schibsted Grotesk';color:var(--ac)">English</div></div><span style="font:500 10px 'JetBrains Mono',monospace;color:#8c91a2">EMBEDDED</span></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:11px"><span style="width:18px"></span><div style="flex:1"><div style="font:600 14px 'Schibsted Grotesk';color:#eceef4">English (SDH)</div></div><span style="font:500 10px 'JetBrains Mono',monospace;color:#626878">EMBEDDED</span></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:11px"><span style="width:18px"></span><div style="flex:1"><div style="font:600 14px 'Schibsted Grotesk';color:#eceef4">Spanish</div></div><span style="font:500 10px 'JetBrains Mono',monospace;color:#626878">EXTERNAL</span></div>
+          </div>
+          <div style="margin:4px 12px 12px;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:11px;border:1px dashed rgba(236,239,247,.16);color:#c1c6d3;cursor:pointer"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="M16 16 L21 21"/></svg><span style="font:600 13px 'Schibsted Grotesk'">Search OpenSubtitles…</span></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-top:1px solid rgba(236,239,247,.07)"><span style="font:600 13px 'Schibsted Grotesk';color:#c1c6d3">Subtitle delay</span><div style="display:flex;align-items:center;gap:12px"><span style="width:26px;height:26px;border-radius:7px;background:rgba(236,239,247,.06);color:#eceef4;display:flex;align-items:center;justify-content:center;font-size:15px">−</span><span style="font:600 12px 'JetBrains Mono',monospace;color:#eceef4;min-width:46px;text-align:center">+0.0s</span><span style="width:26px;height:26px;border-radius:7px;background:rgba(236,239,247,.06);color:#eceef4;display:flex;align-items:center;justify-content:center;font-size:15px">+</span></div></div>
+        </div>
+      </div>
+
+      <!-- CAST -->
+      <div style="flex:1;min-width:320px">
+        <div style="font:600 13px 'Schibsted Grotesk';color:#c1c6d3;margin-bottom:12px">Play on · device picker</div>
+        <div style="border-radius:20px;border:1px solid rgba(236,239,247,.1);background:#14161d;overflow:hidden;box-shadow:0 30px 60px -24px rgba(0,0,0,.8)">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 20px 16px"><div style="font:700 18px 'Schibsted Grotesk';color:#f6f8fd">Play on</div><div style="width:30px;height:30px;border-radius:50%;background:rgba(236,239,247,.06);display:flex;align-items:center;justify-content:center;color:#8c91a2;font-size:15px">✕</div></div>
+          <div style="padding:0 12px 14px">
+            <div style="display:flex;align-items:center;gap:13px;padding:13px 14px;border-radius:11px;background:rgba(251,113,89,.1)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ac)" stroke-width="1.7"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M11 18h2"/></svg><div style="flex:1"><div style="font:600 14px 'Schibsted Grotesk';color:var(--ac)">This device</div><div style="font:500 10px 'JetBrains Mono',monospace;color:#8c91a2">iPhone</div></div><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ac)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 L9 17 L4 12"/></svg></div>
+            <div style="display:flex;align-items:center;gap:13px;padding:13px 14px;border-radius:11px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c1c6d3" stroke-width="1.7"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg><div style="flex:1"><div style="font:600 14px 'Schibsted Grotesk';color:#eceef4">Living Room TV</div><div style="font:500 10px 'JetBrains Mono',monospace;color:#626878">Chromecast</div></div></div>
+            <div style="display:flex;align-items:center;gap:13px;padding:13px 14px;border-radius:11px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c1c6d3" stroke-width="1.7"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21l4-4 4 4"/></svg><div style="flex:1"><div style="font:600 14px 'Schibsted Grotesk';color:#eceef4">Den Apple TV</div><div style="font:500 10px 'JetBrains Mono',monospace;color:#626878">AirPlay</div></div></div>
+            <div style="display:flex;align-items:center;gap:13px;padding:13px 14px;border-radius:11px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c1c6d3" stroke-width="1.7"><rect x="6" y="2" width="12" height="20" rx="4"/><circle cx="12" cy="16" r="3"/></svg><div style="flex:1"><div style="font:600 14px 'Schibsted Grotesk';color:#eceef4">Kitchen HomePod</div><div style="font:500 10px 'JetBrains Mono',monospace;color:#626878">AirPlay · audio</div></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- UP NEXT -->
+      <div style="flex:1;min-width:340px">
+        <div style="font:600 13px 'Schibsted Grotesk';color:#c1c6d3;margin-bottom:12px">Up Next · queue</div>
+        <div style="border-radius:20px;border:1px solid rgba(236,239,247,.1);background:#14161d;overflow:hidden;box-shadow:0 30px 60px -24px rgba(0,0,0,.8)">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 20px 14px"><div style="font:700 18px 'Schibsted Grotesk';color:#f6f8fd">Up Next</div><span style="font:500 11px 'JetBrains Mono',monospace;color:#8c91a2">CLEAR</span></div>
+          <div style="padding:0 12px 6px">
+            <div style="font:500 9px 'JetBrains Mono',monospace;letter-spacing:.14em;color:#626878;padding:6px 8px">NOW PLAYING</div>
+            <div style="display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:11px;background:rgba(251,113,89,.1)"><div style="width:40px;height:40px;border-radius:8px;background:linear-gradient(155deg,#1f3b3a,#0a1312)"></div><div style="flex:1"><div style="font:600 13px 'Schibsted Grotesk';color:var(--ac)">Undertow</div><div style="font:500 11px 'Schibsted Grotesk';color:#8c91a2">Hale</div></div><span style="display:flex;align-items:flex-end;gap:1.5px;height:14px"><span style="width:3px;background:var(--ac);border-radius:2px;height:60%"></span><span style="width:3px;background:var(--ac);border-radius:2px;height:100%"></span><span style="width:3px;background:var(--ac);border-radius:2px;height:45%"></span></span></div>
+            <div style="font:500 9px 'JetBrains Mono',monospace;letter-spacing:.14em;color:#626878;padding:12px 8px 6px">NEXT FROM · LOW TIDE</div>
+            <div style="display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:11px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#626878" stroke-width="1.8" stroke-linecap="round"><path d="M4 8h16M4 12h16M4 16h16"/></svg><div style="width:40px;height:40px;border-radius:8px;background:linear-gradient(155deg,#1f3b3a,#0a1312)"></div><div style="flex:1"><div style="font:600 13px 'Schibsted Grotesk';color:#eceef4">Saltmarsh</div><div style="font:500 11px 'Schibsted Grotesk';color:#626878">Hale</div></div><span style="font:500 11px 'JetBrains Mono',monospace;color:#626878">3:42</span></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:11px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#626878" stroke-width="1.8" stroke-linecap="round"><path d="M4 8h16M4 12h16M4 16h16"/></svg><div style="width:40px;height:40px;border-radius:8px;background:linear-gradient(155deg,#1f3b3a,#0a1312)"></div><div style="flex:1"><div style="font:600 13px 'Schibsted Grotesk';color:#eceef4">Low Water</div><div style="font:500 11px 'Schibsted Grotesk';color:#626878">Hale</div></div><span style="font:500 11px 'JetBrains Mono',monospace;color:#626878">5:11</span></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:9px 10px 14px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#626878" stroke-width="1.8" stroke-linecap="round"><path d="M4 8h16M4 12h16M4 16h16"/></svg><div style="width:40px;height:40px;border-radius:8px;background:linear-gradient(155deg,#1f3b3a,#0a1312)"></div><div style="flex:1"><div style="font:600 13px 'Schibsted Grotesk';color:#eceef4">The Narrows</div><div style="font:500 11px 'Schibsted Grotesk';color:#626878">Hale</div></div><span style="font:500 11px 'JetBrains Mono',monospace;color:#626878">4:03</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

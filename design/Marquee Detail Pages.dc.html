@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#08090d}
+body{font-family:'Schibsted Grotesk',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+</style>
+</helmet>
+<div style="--ac:#fb7159;min-height:100vh;background:#08090d;padding:42px 40px 70px">
+  <div style="max-width:1120px;margin:0 auto">
+    <div style="margin-bottom:32px">
+      <div style="font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.24em;color:var(--ac);margin-bottom:12px">SCREENS 02 · DETAIL PAGES</div>
+      <h1 style="margin:0 0 10px;font:700 38px/1 'Schibsted Grotesk';letter-spacing:-.03em;color:#f6f8fd">Album, Artist &amp; Audiobook detail</h1>
+      <p style="margin:0;font:400 14px/1.6 'Schibsted Grotesk';color:#8c91a2;max-width:720px">The dead-ends in the current build: tapping an album, artist, or audiobook. Each mirrors the title-detail two-column shell, wired as <span style="color:#c1c6d3">/album/:id</span>, <span style="color:#c1c6d3">/artist/:id</span>, <span style="color:#c1c6d3">/audiobook/:id</span>.</p>
+    </div>
+
+    <!-- ===== ALBUM DETAIL ===== -->
+    <div style="font:600 13px 'Schibsted Grotesk';color:#c1c6d3;margin-bottom:12px">Album detail · tracklist</div>
+    <div style="border-radius:22px;overflow:hidden;border:1px solid rgba(236,239,247,.08);background:#0b0c11;margin-bottom:40px">
+      <div style="position:relative;padding:28px 32px;background:linear-gradient(160deg,#1f3b3a,#132423 60%,#0b0c11)">
+        <div style="position:absolute;inset:0;background:radial-gradient(70% 90% at 12% 20%,rgba(255,255,255,.12),transparent 55%)"></div>
+        <div style="position:relative;display:flex;gap:26px;align-items:flex-end">
+          <div style="position:relative;width:200px;height:200px;border-radius:16px;flex:0 0 auto;background:linear-gradient(155deg,#2a5350,#0e1a19);box-shadow:0 22px 48px -18px rgba(0,0,0,.8)"><div style="position:absolute;inset:0;background:radial-gradient(110% 80% at 50% 0%,rgba(255,255,255,.12),transparent 60%)"></div><div style="position:absolute;top:14px;left:14px;font:500 8px 'JetBrains Mono',monospace;letter-spacing:.16em;color:rgba(236,239,247,.5)">ALBUM ART</div></div>
+          <div style="padding-bottom:6px">
+            <div style="font:500 10px 'JetBrains Mono',monospace;letter-spacing:.2em;color:var(--ac);margin-bottom:12px">ALBUM</div>
+            <div style="font:700 52px/.98 'Schibsted Grotesk';letter-spacing:-.03em;color:#f6f8fd;margin-bottom:14px">Low Tide</div>
+            <div style="display:flex;align-items:center;gap:9px;font:600 13px 'Schibsted Grotesk';color:#c1c6d3"><div style="width:24px;height:24px;border-radius:50%;background:linear-gradient(145deg,#2a5350,#0e1a19)"></div>Hale<span style="width:3px;height:3px;border-radius:50%;background:#626878"></span>2023<span style="width:3px;height:3px;border-radius:50%;background:#626878"></span>11 tracks<span style="width:3px;height:3px;border-radius:50%;background:#626878"></span>44 min</div>
+          </div>
+        </div>
+        <div style="position:relative;display:flex;align-items:center;gap:12px;margin-top:24px">
+          <button style="display:flex;align-items:center;gap:9px;padding:13px 26px;border:0;border-radius:12px;background:var(--ac);color:#0b0c11;font:700 14px 'Schibsted Grotesk';cursor:pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="#0b0c11"><path d="M7 5 L19 12 L7 19 Z"/></svg>Play</button>
+          <button style="display:flex;align-items:center;gap:8px;padding:13px 22px;border:1px solid rgba(236,239,247,.2);border-radius:12px;background:rgba(236,239,247,.05);color:#f6f8fd;font:600 14px 'Schibsted Grotesk';cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2 L21 6 L17 10 M3 12 V10 a4 4 0 0 1 4 -4 H21 M7 22 L3 18 L7 14 M21 12 v2 a4 4 0 0 1 -4 4 H3"/></svg>Shuffle</button>
+          <button style="width:46px;height:46px;border:1px solid rgba(236,239,247,.2);border-radius:12px;background:rgba(236,239,247,.05);color:#f6f8fd;cursor:pointer;display:flex;align-items:center;justify-content:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5 V19 M5 12 H19"/></svg></button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 260px;gap:36px;padding:24px 32px 30px">
+        <div style="display:flex;flex-direction:column">
+          <div style="display:grid;grid-template-columns:28px 1fr 60px;gap:16px;padding:0 12px 10px;border-bottom:1px solid rgba(236,239,247,.07);font:500 9px 'JetBrains Mono',monospace;letter-spacing:.14em;color:#626878"><span>#</span><span>TITLE</span><span style="text-align:right">TIME</span></div>
+          <div style="display:grid;grid-template-columns:28px 1fr 60px;gap:16px;align-items:center;padding:11px 12px;border-radius:10px;background:rgba(251,113,89,.08)"><span style="display:flex;align-items:flex-end;gap:1.5px;height:14px"><span style="width:3px;background:var(--ac);border-radius:2px;height:60%"></span><span style="width:3px;background:var(--ac);border-radius:2px;height:100%"></span><span style="width:3px;background:var(--ac);border-radius:2px;height:45%"></span></span><div><div style="font:600 14px 'Schibsted Grotesk';color:var(--ac)">Undertow</div></div><span style="text-align:right;font:500 12px 'JetBrains Mono',monospace;color:#8c91a2">4:58</span></div>
+          <div style="display:grid;grid-template-columns:28px 1fr 60px;gap:16px;align-items:center;padding:11px 12px;border-radius:10px"><span style="font:500 13px 'JetBrains Mono',monospace;color:#626878">2</span><div style="font:600 14px 'Schibsted Grotesk';color:#eceef4">Saltmarsh</div><span style="text-align:right;font:500 12px 'JetBrains Mono',monospace;color:#8c91a2">3:42</span></div>
+          <div style="display:grid;grid-template-columns:28px 1fr 60px;gap:16px;align-items:center;padding:11px 12px;border-radius:10px"><span style="font:500 13px 'JetBrains Mono',monospace;color:#626878">3</span><div style="font:600 14px 'Schibsted Grotesk';color:#eceef4">Low Water</div><span style="text-align:right;font:500 12px 'JetBrains Mono',monospace;color:#8c91a2">5:11</span></div>
+          <div style="display:grid;grid-template-columns:28px 1fr 60px;gap:16px;align-items:center;padding:11px 12px;border-radius:10px"><span style="font:500 13px 'JetBrains Mono',monospace;color:#626878">4</span><div style="font:600 14px 'Schibsted Grotesk';color:#eceef4">The Narrows</div><span style="text-align:right;font:500 12px 'JetBrains Mono',monospace;color:#8c91a2">4:03</span></div>
+          <div style="display:grid;grid-template-columns:28px 1fr 60px;gap:16px;align-items:center;padding:11px 12px;border-radius:10px"><span style="font:500 13px 'JetBrains Mono',monospace;color:#626878">5</span><div style="font:600 14px 'Schibsted Grotesk';color:#eceef4">Glasshouse</div><span style="text-align:right;font:500 12px 'JetBrains Mono',monospace;color:#8c91a2">3:29</span></div>
+          <div style="display:grid;grid-template-columns:28px 1fr 60px;gap:16px;align-items:center;padding:11px 12px;border-radius:10px"><span style="font:500 13px 'JetBrains Mono',monospace;color:#626878">6</span><div style="font:600 14px 'Schibsted Grotesk';color:#eceef4">Driftwood</div><span style="text-align:right;font:500 12px 'JetBrains Mono',monospace;color:#8c91a2">4:47</span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:18px">
+          <div style="padding:18px;border-radius:14px;border:1px solid rgba(236,239,247,.08);background:rgba(236,239,247,.02)"><div style="font:500 9px 'JetBrains Mono',monospace;letter-spacing:.18em;color:#626878;margin-bottom:12px">ABOUT</div><p style="margin:0;font:400 13px/1.6 'Schibsted Grotesk';color:#a6acbc">Recorded over a winter on the north coast, Hale's third record trades the band's earlier brightness for something tidal and patient.</p></div>
+          <div style="padding:18px;border-radius:14px;border:1px solid rgba(236,239,247,.08);background:rgba(236,239,247,.02);font-family:'JetBrains Mono',monospace"><div style="display:flex;justify-content:space-between;margin-bottom:9px"><span style="font:400 11px;color:#626878">GENRE</span><span style="font:500 11px;color:#c1c6d3">Folk</span></div><div style="display:flex;justify-content:space-between;margin-bottom:9px"><span style="font:400 11px;color:#626878">FORMAT</span><span style="font:500 11px;color:#c1c6d3">FLAC · 24-bit</span></div><div style="display:flex;justify-content:space-between"><span style="font:400 11px;color:#626878">ADDED</span><span style="font:500 11px;color:#c1c6d3">Mar 2024</span></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== ARTIST DETAIL ===== -->
+    <div style="font:600 13px 'Schibsted Grotesk';color:#c1c6d3;margin-bottom:12px">Artist detail · discography</div>
+    <div style="border-radius:22px;overflow:hidden;border:1px solid rgba(236,239,247,.08);background:#0b0c11;margin-bottom:40px">
+      <div style="position:relative;padding:34px 32px;background:linear-gradient(160deg,#22361f,#152213 60%,#0b0c11)">
+        <div style="position:absolute;inset:0;background:radial-gradient(70% 90% at 14% 24%,rgba(255,255,255,.1),transparent 55%)"></div>
+        <div style="position:relative;display:flex;gap:24px;align-items:center">
+          <div style="width:128px;height:128px;border-radius:50%;flex:0 0 auto;background:linear-gradient(155deg,#36502f,#101a0d);box-shadow:0 18px 40px -16px rgba(0,0,0,.8)"></div>
+          <div><div style="font:500 10px 'JetBrains Mono',monospace;letter-spacing:.2em;color:var(--ac);margin-bottom:10px">ARTIST</div><div style="font:700 56px/.96 'Schibsted Grotesk';letter-spacing:-.03em;color:#f6f8fd;margin-bottom:12px">Hale</div><div style="font:500 13px 'JetBrains Mono',monospace;color:#8c91a2">4 albums · 52 tracks · 3h 41m</div></div>
+        </div>
+        <div style="position:relative;display:flex;gap:12px;margin-top:22px"><button style="display:flex;align-items:center;gap:9px;padding:13px 26px;border:0;border-radius:12px;background:var(--ac);color:#0b0c11;font:700 14px 'Schibsted Grotesk';cursor:pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="#0b0c11"><path d="M7 5 L19 12 L7 19 Z"/></svg>Play</button><button style="display:flex;align-items:center;gap:8px;padding:13px 22px;border:1px solid rgba(236,239,247,.2);border-radius:12px;background:rgba(236,239,247,.05);color:#f6f8fd;font:600 14px 'Schibsted Grotesk';cursor:pointer">Shuffle</button></div>
+      </div>
+      <div style="padding:24px 32px 30px">
+        <div style="font:600 16px 'Schibsted Grotesk';color:#f6f8fd;margin-bottom:14px">Popular</div>
+        <div style="display:flex;flex-direction:column;margin-bottom:28px">
+          <div style="display:grid;grid-template-columns:24px 1fr 60px;gap:16px;align-items:center;padding:9px 12px;border-radius:10px"><span style="font:500 13px 'JetBrains Mono',monospace;color:#626878">1</span><div style="font:600 14px 'Schibsted Grotesk';color:#eceef4">Undertow<span style="font:500 11px 'Schibsted Grotesk';color:#626878;margin-left:10px">Low Tide</span></div><span style="text-align:right;font:500 12px 'JetBrains Mono',monospace;color:#8c91a2">4:58</span></div>
+          <div style="display:grid;grid-template-columns:24px 1fr 60px;gap:16px;align-items:center;padding:9px 12px;border-radius:10px"><span style="font:500 13px 'JetBrains Mono',monospace;color:#626878">2</span><div style="font:600 14px 'Schibsted Grotesk';color:#eceef4">Driftwood<span style="font:500 11px 'Schibsted Grotesk';color:#626878;margin-left:10px">Driftwood</span></div><span style="text-align:right;font:500 12px 'JetBrains Mono',monospace;color:#8c91a2">4:47</span></div>
+          <div style="display:grid;grid-template-columns:24px 1fr 60px;gap:16px;align-items:center;padding:9px 12px;border-radius:10px"><span style="font:500 13px 'JetBrains Mono',monospace;color:#626878">3</span><div style="font:600 14px 'Schibsted Grotesk';color:#eceef4">Saltmarsh<span style="font:500 11px 'Schibsted Grotesk';color:#626878;margin-left:10px">Low Tide</span></div><span style="text-align:right;font:500 12px 'JetBrains Mono',monospace;color:#8c91a2">3:42</span></div>
+        </div>
+        <div style="font:600 16px 'Schibsted Grotesk';color:#f6f8fd;margin-bottom:14px">Albums</div>
+        <div style="display:flex;gap:18px">
+          <div style="flex:0 0 150px"><div style="aspect-ratio:1;border-radius:13px;background:linear-gradient(155deg,#2a5350,#0e1a19)"></div><div style="margin-top:9px;font:600 14px 'Schibsted Grotesk';color:#eceef4">Low Tide</div><div style="font:500 11px 'JetBrains Mono',monospace;color:#626878">2023</div></div>
+          <div style="flex:0 0 150px"><div style="aspect-ratio:1;border-radius:13px;background:linear-gradient(155deg,#3a3326,#241f16)"></div><div style="margin-top:9px;font:600 14px 'Schibsted Grotesk';color:#eceef4">Driftwood</div><div style="font:500 11px 'JetBrains Mono',monospace;color:#626878">2021</div></div>
+          <div style="flex:0 0 150px"><div style="aspect-ratio:1;border-radius:13px;background:linear-gradient(155deg,#43222a,#28151a)"></div><div style="margin-top:9px;font:600 14px 'Schibsted Grotesk';color:#eceef4">The Keeper</div><div style="font:500 11px 'JetBrains Mono',monospace;color:#626878">2019</div></div>
+          <div style="flex:0 0 150px"><div style="aspect-ratio:1;border-radius:13px;background:linear-gradient(155deg,#2b3350,#171a2b)"></div><div style="margin-top:9px;font:600 14px 'Schibsted Grotesk';color:#eceef4">First Light</div><div style="font:500 11px 'JetBrains Mono',monospace;color:#626878">2017</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== AUDIOBOOK DETAIL ===== -->
+    <div style="font:600 13px 'Schibsted Grotesk';color:#c1c6d3;margin-bottom:12px">Audiobook detail · chapters</div>
+    <div style="border-radius:22px;overflow:hidden;border:1px solid rgba(236,239,247,.08);background:#0b0c11">
+      <div style="display:grid;grid-template-columns:1fr 280px;gap:36px;padding:32px">
+        <div>
+          <div style="display:flex;gap:24px;margin-bottom:26px">
+            <div style="position:relative;width:180px;height:270px;border-radius:14px;flex:0 0 auto;background:linear-gradient(155deg,#3a3326,#241f16);box-shadow:0 22px 48px -18px rgba(0,0,0,.8)"><div style="position:absolute;inset:0;background:radial-gradient(110% 70% at 50% 0%,rgba(255,255,255,.1),transparent 55%)"></div><div style="position:absolute;left:16px;right:16px;bottom:18px"><div style="font:700 22px/1.05 'Schibsted Grotesk';color:#f6f8fd">A History of Quiet</div></div></div>
+            <div style="padding-top:6px">
+              <div style="font:500 10px 'JetBrains Mono',monospace;letter-spacing:.2em;color:var(--ac);margin-bottom:12px">AUDIOBOOK</div>
+              <div style="font:700 34px/1 'Schibsted Grotesk';letter-spacing:-.02em;color:#f6f8fd;margin-bottom:10px">A History of Quiet</div>
+              <div style="font:500 14px 'Schibsted Grotesk';color:#c1c6d3;margin-bottom:4px">Edith Crane</div>
+              <div style="font:500 12px 'JetBrains Mono',monospace;color:#8c91a2;margin-bottom:20px">Narrated by Tom Vale</div>
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><div style="flex:1;max-width:200px;height:5px;border-radius:999px;background:rgba(236,239,247,.16)"><div style="height:100%;width:46%;border-radius:999px;background:var(--ac)"></div></div><span style="font:500 11px 'JetBrains Mono',monospace;color:#8c91a2">46% · 4h 58m left</span></div>
+              <div style="display:flex;gap:12px"><button style="display:flex;align-items:center;gap:9px;padding:13px 26px;border:0;border-radius:12px;background:var(--ac);color:#0b0c11;font:700 14px 'Schibsted Grotesk';cursor:pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="#0b0c11"><path d="M7 5 L19 12 L7 19 Z"/></svg>Resume</button><button style="width:46px;height:46px;border:1px solid rgba(236,239,247,.2);border-radius:12px;background:rgba(236,239,247,.05);color:#f6f8fd;cursor:pointer;display:flex;align-items:center;justify-content:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 V15 M7 11 L12 16 L17 11 M5 19 H19"/></svg></button></div>
+            </div>
+          </div>
+          <p style="margin:0 0 24px;font:400 15px/1.65 'Schibsted Grotesk';color:#a6acbc;max-width:620px">A meditation on silence — the kind we keep, the kind that's kept from us — tracing a single coastal house across four generations of the women who lived in it.</p>
+          <div style="font:600 16px 'Schibsted Grotesk';color:#f6f8fd;margin-bottom:14px">Chapters</div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="display:grid;grid-template-columns:30px 1fr auto;gap:14px;align-items:center;padding:11px 12px;border-radius:10px"><span style="font:600 13px 'JetBrains Mono',monospace;color:#626878">01</span><span style="font:600 14px 'Schibsted Grotesk';color:#626878">The House by the Water</span><span style="font:500 11px 'JetBrains Mono',monospace;color:#626878">18:24</span></div>
+            <div style="display:grid;grid-template-columns:30px 1fr auto;gap:14px;align-items:center;padding:11px 12px;border-radius:10px"><span style="font:600 13px 'JetBrains Mono',monospace;color:#626878">02</span><span style="font:600 14px 'Schibsted Grotesk';color:#626878">Inventories</span><span style="font:500 11px 'JetBrains Mono',monospace;color:#626878">25:07</span></div>
+            <div style="display:grid;grid-template-columns:30px 1fr auto;gap:14px;align-items:center;padding:11px 12px;border-radius:10px;background:rgba(251,113,89,.08);box-shadow:inset 0 0 0 1px rgba(251,113,89,.4)"><span style="font:600 13px 'JetBrains Mono',monospace;color:var(--ac)">05</span><span style="font:600 14px 'Schibsted Grotesk';color:var(--ac)">What the Tide Left</span><span style="display:flex;align-items:center;gap:8px;font:500 11px 'JetBrains Mono',monospace;color:var(--ac)">12:34 / 28:40 <svg width="13" height="13" viewBox="0 0 24 24" fill="var(--ac)"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg></span></div>
+            <div style="display:grid;grid-template-columns:30px 1fr auto;gap:14px;align-items:center;padding:11px 12px;border-radius:10px"><span style="font:600 13px 'JetBrains Mono',monospace;color:#8c91a2">06</span><span style="font:600 14px 'Schibsted Grotesk';color:#c1c6d3">Letters Never Sent</span><span style="font:500 11px 'JetBrains Mono',monospace;color:#8c91a2">31:02</span></div>
+            <div style="display:grid;grid-template-columns:30px 1fr auto;gap:14px;align-items:center;padding:11px 12px;border-radius:10px"><span style="font:600 13px 'JetBrains Mono',monospace;color:#8c91a2">07</span><span style="font:600 14px 'Schibsted Grotesk';color:#c1c6d3">The Far Shore</span><span style="font:500 11px 'JetBrains Mono',monospace;color:#8c91a2">22:48</span></div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:18px">
+          <div style="padding:18px;border-radius:14px;border:1px solid rgba(236,239,247,.08);background:rgba(236,239,247,.02);font-family:'JetBrains Mono',monospace">
+            <div style="font:500 9px;letter-spacing:.18em;color:#626878;margin-bottom:14px;font-family:'JetBrains Mono',monospace">DETAILS</div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:10px"><span style="font:400 11px;color:#626878">LENGTH</span><span style="font:500 11px;color:#c1c6d3">9h 12m</span></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:10px"><span style="font:400 11px;color:#626878">CHAPTERS</span><span style="font:500 11px;color:#c1c6d3">10</span></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:10px"><span style="font:400 11px;color:#626878">NARRATOR</span><span style="font:500 11px;color:#c1c6d3">Tom Vale</span></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:10px"><span style="font:400 11px;color:#626878">RELEASED</span><span style="font:500 11px;color:#c1c6d3">2019</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="font:400 11px;color:#626878">GENRE</span><span style="font:500 11px;color:#c1c6d3">Memoir</span></div>
+          </div>
+          <div style="padding:16px 18px;border-radius:14px;border:1px solid rgba(236,239,247,.08);background:rgba(236,239,247,.02);display:flex;align-items:center;justify-content:space-between"><span style="font:600 13px 'Schibsted Grotesk';color:#c1c6d3">Speed</span><span style="font:600 13px 'JetBrains Mono',monospace;color:var(--ac)">1.0×</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

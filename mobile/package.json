@@ -1,0 +1,28 @@
+{
+  "name": "marquee-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Capacitor shell wrapping the Marquee web build (web/dist) for iOS + Android.",
+  "scripts": {
+    "copy:web": "node -e \"const fs=require('fs');fs.rmSync('www',{recursive:true,force:true});if(fs.existsSync('../web/dist'))fs.cpSync('../web/dist','www',{recursive:true});else{console.error('web/dist missing — run `npm --prefix ../web run build`');process.exit(1);}\"",
+    "sync": "npm run copy:web && cap sync",
+    "add:ios": "cap add ios",
+    "add:android": "cap add android",
+    "ios": "npm run sync && cap open ios",
+    "android": "npm run sync && cap open android"
+  },
+  "dependencies": {
+    "@capacitor/app": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/preferences": "^6.0.0",
+    "@capacitor/push-notifications": "^6.0.0",
+    "@capacitor/splash-screen": "^6.0.0",
+    "@capacitor/status-bar": "^6.0.0",
+    "marquee-native": "file:../marquee-native"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/cli": "^6.0.0",
+    "@capacitor/ios": "^6.0.0"
+  }
+}

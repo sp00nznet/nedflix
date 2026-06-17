@@ -36,14 +36,21 @@ variables:
   extends: .desktop-cache
   before_script:
     - export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
+    # Build the Marquee SPA so the desktop shell bundles it (web-dist)
+    - npm --prefix web install
+    - npm --prefix web run build
     - cd desktop
     - npm install
+    - npm run copy:web
 
 .desktop-base-windows:
   extends: .desktop-cache
   before_script:
+    - npm --prefix web install
+    - npm --prefix web run build
     - cd desktop
     - npm install
+    - npm run copy:web
 
 .web-base:
   before_script:
@@ -163,6 +170,32 @@ lint-web:
         - package.json
         - server.js
         - public/**/*
+        - web/**/*
+
+# Build + typecheck the Marquee SPA (web/dist), published as an artifact for deploy.
+build-marquee-web:
+  stage: build-web
+  tags:
+    - linux
+  cache:
+    key: marquee-web
+    paths:
+      - web/node_modules/
+  script:
+    - cd web
+    - npm install
+    - npm run build
+  artifacts:
+    name: marquee-web-$CI_COMMIT_REF_SLUG
+    paths:
+      - web/dist/
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - changes:
+        - web/**/*
 
 lint-android:
   stage: test
@@ -442,7 +475,42 @@ build-desktop-macos-universal:
     - if: $CI_PIPELINE_SOURCE == "web"
 
 # =============================================================================
-# Mobile Builds - Android (requires JDK 17+ and Android SDK on runner)
+# Mobile Builds
+#
+# Mobile is now a Capacitor shell (mobile/) wrapping the same Marquee web build — one UI
+# across web/desktop/mobile. The job below assembles the web payload (mobile/www) and runs
+# `cap sync`. The legacy native Android/iOS jobs further down are RETIRED: their source was
+# moved to archive/ and they are allow_failure (non-blocking). Full native packaging is
+# done locally via `npm --prefix mobile run ios|android` until cap-generated platform
+# projects (ios/, android/) are committed under mobile/.
+# =============================================================================
+
+build-mobile-capacitor:
+  stage: build-mobile
+  tags:
+    - linux
+  script:
+    - npm --prefix web install
+    - npm --prefix web run build
+    - cd mobile
+    - npm install
+    - npm run copy:web
+    - npx cap sync || echo "cap sync needs committed ios/android projects under mobile/ — skipping"
+  artifacts:
+    name: marquee-mobile-www-$CI_COMMIT_REF_SLUG
+    paths:
+      - mobile/www/
+    expire_in: 7 days
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - changes:
+        - mobile/**/*
+        - web/**/*
+  allow_failure: true
+
+# =============================================================================
+# Mobile Builds - Android — RETIRED (source in archive/, allow_failure)
 # =============================================================================
 
 build-android-debug:
@@ -856,6 +924,7 @@ deploy-server-linux:
   script:
     - mkdir -p /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/server
     - cp -r dist/nedflix-server-*.tar.gz /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/server/
+    - chmod -R 755 /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/server/
   rules:
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -870,6 +939,7 @@ deploy-desktop-linux:
   script:
     - mkdir -p /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/desktop/linux
     - cp -r desktop/dist/*.deb desktop/dist/*.AppImage desktop/dist/*.tar.gz /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/desktop/linux/ 2>/dev/null || true
+    - chmod -R 755 /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/desktop/linux/
   rules:
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -929,6 +999,7 @@ deploy-mobile-android:
   script:
     - mkdir -p /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/mobile/android
     - cp -r android/app/build/outputs/apk/debug/*.apk /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/mobile/android/
+    - chmod -R 755 /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/mobile/android/
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
@@ -942,6 +1013,7 @@ deploy-tv-android:
   script:
     - mkdir -p /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/tv/androidtv
     - cp -r androidtv/app/build/outputs/apk/debug/*.apk /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/tv/androidtv/
+    - chmod -R 755 /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/tv/androidtv/
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
@@ -956,6 +1028,7 @@ deploy-tv-android-manual:
   script:
     - mkdir -p /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/tv/androidtv
     - cp -r androidtv/app/build/outputs/apk/debug/*.apk /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/tv/androidtv/
+    - chmod -R 755 /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/tv/androidtv/
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_PIPELINE_SOURCE == "web"
@@ -970,6 +1043,7 @@ deploy-web:
   script:
     - mkdir -p /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/web
     - cp -r dist/web/* /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/web/
+    - chmod -R 755 /mnt/releases/$CI_PROJECT_NAME/$CI_COMMIT_REF_NAME/web/
   rules:
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

@@ -18,6 +18,28 @@
 
 ---
 
+## Screenshots
+
+The **Marquee** interface — one redesigned UI shared across web, desktop, and mobile,
+built for both mouse and 10-foot gamepad navigation.
+
+| Home | Films | Series |
+|:---:|:---:|:---:|
+| ![Home](screenshots/01-home.png) | ![Films](screenshots/02-movies.png) | ![Series](screenshots/03-series.png) |
+
+| Music | Audiobooks | Live TV |
+|:---:|:---:|:---:|
+| ![Music](screenshots/04-music.png) | ![Audiobooks](screenshots/05-books.png) | ![Live TV](screenshots/06-live.png) |
+
+| Settings |
+|:---:|
+| ![Settings](screenshots/07-settings.png) |
+
+> Artwork shows the design's gradient placeholders; real posters/art come from local image
+> files, embedded tags, or a metadata provider (TMDB/iTunes) at runtime.
+
+---
+
 ## Features
 
 - **Multi-User Support** - User accounts with individual permissions and profiles

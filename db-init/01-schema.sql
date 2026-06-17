@@ -67,6 +67,41 @@ CREATE INDEX IF NOT EXISTS idx_file_library ON file_index(library);
 CREATE INDEX IF NOT EXISTS idx_file_parent ON file_index(parent_path);
 CREATE INDEX IF NOT EXISTS idx_scan_status ON scan_logs(status);
 
+-- ==================== Marquee surfaces ====================
+-- Profiles (per user account). Resume points + accent are per-profile.
+CREATE TABLE IF NOT EXISTS profiles (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    initial TEXT,
+    color TEXT DEFAULT 'var(--ac)',
+    accent TEXT DEFAULT 'coral',
+    created_at INTEGER
+);
+
+-- Resume / continue-watching (video + audiobooks). Keyed per user+profile+file.
+CREATE TABLE IF NOT EXISTS watch_progress (
+    user_id TEXT NOT NULL,
+    profile_id TEXT DEFAULT '',
+    file_path TEXT NOT NULL,
+    title_id TEXT,
+    kind TEXT DEFAULT 'video',
+    position_sec REAL DEFAULT 0,
+    duration_sec REAL DEFAULT 0,
+    updated_at INTEGER,
+    PRIMARY KEY (user_id, profile_id, file_path)
+);
+
+-- Per-user Live TV channel favorites.
+CREATE TABLE IF NOT EXISTS channel_favorites (
+    user_id TEXT NOT NULL,
+    channel_id TEXT NOT NULL,
+    PRIMARY KEY (user_id, channel_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_progress_user ON watch_progress(user_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_profiles_user ON profiles(user_id);
+
 -- Create default admin user (will be updated by the app if needed)
 INSERT INTO users (id, provider, display_name, avatar, is_admin, is_allowed)
 VALUES ('local-admin', 'local', 'Admin', 'bear', TRUE, TRUE)
