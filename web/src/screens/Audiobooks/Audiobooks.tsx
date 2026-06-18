@@ -7,7 +7,11 @@ import { SeekBar } from '../../components/SeekBar';
 import { ArtPlaceholder } from '../../components/ArtPlaceholder';
 import { listBooks, getBook, saveBookProgress } from '../../api/audiobooks';
 import { useAudioPlayer, type QueueItem } from '../../state/audioPlayer';
+import { infoProps, useInfo } from '../../state/info';
+import { decodePathId } from '../../api/ids';
 import type { Audiobook, Chapter } from '../../api/types';
+
+const bookInfo = (b: Audiobook) => { let path: string | undefined; try { path = decodePathId(b.id); } catch { /* ignore */ } return { id: b.id, path, kind: 'book' as const, title: b.title, subtitle: b.author, artUrl: b.coverUrl }; };
 
 type Tab = 'library' | 'listening';
 const pct = (s: string) => (parseInt(s, 10) || 0) / 100;
@@ -35,6 +39,7 @@ export function Audiobooks() {
 
 function Library({ onOpen }: { onOpen: (id: string) => void }) {
   const q = useQuery({ queryKey: ['books'], queryFn: listBooks });
+  const { open } = useInfo();
   const books = q.data ?? [];
   const inProgress = books.filter((b) => pct(b.progressPct) > 0);
 
@@ -62,7 +67,7 @@ function Library({ onOpen }: { onOpen: (id: string) => void }) {
       <div style={{ font: `500 11px ${font.mono}`, letterSpacing: '.2em', color: colors.ink4, marginBottom: 14 }}>ALL AUDIOBOOKS</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 22 }}>
         {books.map((b) => (
-          <div key={b.id} data-focusable tabIndex={0} onClick={() => onOpen(b.id)} style={{ cursor: 'pointer' }}>
+          <div key={b.id} data-focusable tabIndex={0} onClick={() => onOpen(b.id)} {...infoProps(bookInfo(b), open)} style={{ cursor: 'pointer' }}>
             <div style={{ position: 'relative', aspectRatio: '2/3', borderRadius: 10, overflow: 'hidden' }}>
               <ArtPlaceholder label="Cover" grad={gradFor(b.title)} src={b.coverUrl} />
               {pct(b.progressPct) > 0 && <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}><ProgressBar value={pct(b.progressPct)} height={3} /></div>}

@@ -19,6 +19,7 @@ export function startGamepad(): () => void {
     right: { key: 'ArrowRight', pressed: false, last: 0 },
     a: { key: 'Enter', pressed: false, last: 0 },
     b: { key: 'Escape', pressed: false, last: 0 },
+    y: { key: 'i', pressed: false, last: 0 }, // Y → "more info" on the focused item
   };
 
   const fire = (key: string) => {
@@ -56,6 +57,7 @@ export function startGamepad(): () => void {
       edge('right', !!dpadRight, now, true);
       edge('a', !!gp.buttons[0]?.pressed, now, false);
       edge('b', !!gp.buttons[1]?.pressed, now, false);
+      edge('y', !!gp.buttons[3]?.pressed, now, false);
       break; // first connected pad wins
     }
     raf = requestAnimationFrame(poll);

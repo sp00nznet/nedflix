@@ -8,6 +8,8 @@ import { Equalizer, MiniEq, type VizMode } from '../../components/Equalizer';
 import { ArtPlaceholder } from '../../components/ArtPlaceholder';
 import { listAlbums, listArtists, albumTracks } from '../../api/music';
 import { useAudioPlayer, type QueueItem } from '../../state/audioPlayer';
+import { infoProps, useInfo } from '../../state/info';
+import { decodePathId } from '../../api/ids';
 import type { Album } from '../../api/types';
 
 type Tab = 'now' | 'albums' | 'artists';
@@ -98,6 +100,8 @@ function TransportBtn({ children, onClick, label }: { children: React.ReactNode;
 function AlbumGrid({ onPlay }: { onPlay: () => void }) {
   const q = useQuery({ queryKey: ['albums'], queryFn: listAlbums });
   const player = useAudioPlayer();
+  const { open } = useInfo();
+  const albumInfo = (a: Album) => { let path: string | undefined; try { path = decodePathId(a.id); } catch { /* ignore */ } return { id: a.id, path, kind: 'music' as const, title: a.title, subtitle: a.artist, artUrl: a.artUrl }; };
 
   const openAlbum = async (a: Album) => {
     const tracks = await albumTracks(a.id);
@@ -109,7 +113,7 @@ function AlbumGrid({ onPlay }: { onPlay: () => void }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 22 }}>
       {(q.data ?? []).map((a) => (
-        <div key={a.id} data-focusable tabIndex={0} onClick={() => openAlbum(a)} style={{ cursor: 'pointer' }}>
+        <div key={a.id} data-focusable tabIndex={0} onClick={() => openAlbum(a)} {...infoProps(albumInfo(a), open)} style={{ cursor: 'pointer' }}>
           <div style={{ position: 'relative', aspectRatio: '1', borderRadius: 12, overflow: 'hidden' }}>
             <ArtPlaceholder label="Album art" grad={gradFor(a.title)} src={a.artUrl} />
           </div>

@@ -56,6 +56,25 @@ export async function getGuide(): Promise<(Channel & { logoUrl?: string; url?: s
   }
 }
 
+// ErsatzTV ("your channels") — same shape, loaded from ErsatzTV's own M3U/XMLTV.
+export async function getErsatzGuide(): Promise<(Channel & { logoUrl?: string; url?: string })[]> {
+  try {
+    const [ch, epg, favs] = await Promise.all([
+      api.get<{ configured: boolean; channels: RawChannel[] }>('/api/ersatztv/iptv-channels'),
+      api.get<RawEpg>('/api/ersatztv/iptv-epg'),
+      api.get<string[]>('/api/livetv/favorites').catch(() => [] as string[]),
+    ]);
+    if (!ch.configured || !ch.channels?.length) return [];
+    return merge(ch.channels, epg, new Set(favs));
+  } catch {
+    return [];
+  }
+}
+
+// Built-in local channels (standalone "your TV", generated from the library).
+export const getLocalGuide = () =>
+  api.get<(Channel & { logoUrl?: string })[]>('/api/channels/local-guide').catch(() => [] as Channel[]);
+
 export const toggleFavorite = (channelId: string, favorite: boolean) =>
   api.put(`/api/livetv/channels/${channelId}/favorite`, { favorite }).catch(() => {});
 

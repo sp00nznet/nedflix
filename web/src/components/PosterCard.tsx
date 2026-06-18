@@ -1,6 +1,7 @@
 import { colors, font, shadow } from '../theme';
 import { ArtPlaceholder } from './ArtPlaceholder';
 import { ProgressBar } from './ProgressBar';
+import { infoProps, useInfo, type InfoItem } from '../state/info';
 
 export interface PosterCardProps {
   title: string;
@@ -11,15 +12,18 @@ export interface PosterCardProps {
   width?: number;
   progress?: number; // 0..1, shows resume bar when > 0
   onClick?: () => void;
+  info?: InfoItem; // enables right-click / `i` / Y-button "more info"
 }
 
 /** 2:3 poster card (Home rails, Browse, Search) with focus lift/scale + accent ring. */
-export function PosterCard({ title, meta, posterUrl, grad, seed, width = 186, progress = 0, onClick }: PosterCardProps) {
+export function PosterCard({ title, meta, posterUrl, grad, seed, width = 186, progress = 0, onClick, info }: PosterCardProps) {
+  const { open } = useInfo();
   return (
     <div
       data-focusable
       tabIndex={0}
       onClick={onClick}
+      {...(info ? infoProps(info, open) : {})}
       style={{ position: 'relative', flex: `0 0 ${width}px`, width, cursor: 'pointer', borderRadius: 12 }}
       className="poster-card"
     >

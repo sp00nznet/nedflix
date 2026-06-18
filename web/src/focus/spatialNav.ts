@@ -5,8 +5,11 @@
 export type Dir = 'up' | 'down' | 'left' | 'right';
 
 export function focusables(): HTMLElement[] {
+  // If a modal sets [data-focus-trap], confine navigation to within it.
+  const trap = document.querySelector<HTMLElement>('[data-focus-trap]');
+  const root: ParentNode = trap ?? document;
   return Array.prototype.slice
-    .call(document.querySelectorAll<HTMLElement>('[data-focusable]'))
+    .call(root.querySelectorAll<HTMLElement>('[data-focusable]'))
     .filter((el: HTMLElement) => el.offsetParent !== null);
 }
 

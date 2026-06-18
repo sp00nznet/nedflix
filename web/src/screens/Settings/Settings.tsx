@@ -7,6 +7,7 @@ import {
   isDesktop, getLibraries, addMediaPath, removeMediaPath, pickMediaPath,
   getIptvSettings, saveIptvSettings, pickPlaylist, pickEpg,
   getArtworkConfig, saveArtworkKey,
+  getErsatzSettings, saveErsatzSettings,
 } from '../../api/settings';
 import { LANGUAGES } from '../../api/languages';
 import { useActiveProfile } from '../../state/activeProfile';
@@ -74,6 +75,16 @@ export function Settings() {
   const [scanMsg, setScanMsg] = useState('');
   const scan = async () => { setScanMsg('Scanning…'); try { await triggerScan(); setScanMsg('Scan started'); } catch { setScanMsg('Scan unavailable (handled per-folder on desktop)'); } };
 
+  // "Your own TV" — built-in local channels, or an external ErsatzTV server.
+  const ersatz = useQuery({ queryKey: ['ersatz-settings'], queryFn: getErsatzSettings, enabled: desktop });
+  const [ersatzUrl, setErsatzUrl] = useState<string | null>(null);
+  const ersatzUrlVal = ersatzUrl ?? ersatz.data?.url ?? '';
+  const ersatzMode = (ersatz.data?.mode ?? 'off') as 'off' | 'local' | 'server';
+  const saveErsatz = async (patch: { url?: string; mode?: 'off' | 'local' | 'server' }) => {
+    await saveErsatzSettings({ url: ersatzUrlVal, mode: ersatzMode, ...patch });
+    qc.invalidateQueries({ queryKey: ['ersatz-settings'] });
+  };
+
   // Artwork (TMDB)
   const art = useQuery({ queryKey: ['artwork-config'], queryFn: getArtworkConfig, enabled: desktop });
   const [tmdbKey, setTmdbKey] = useState('');
@@ -126,6 +137,28 @@ export function Settings() {
               {iptvMsg && <span style={{ font: `400 12px ${font.ui}`, color: colors.ink3 }}>{iptvMsg}</span>}
             </div>
           </div>
+        </Group>
+      )}
+
+      {desktop && (
+        <Group title="Your own TV" subtitle="24/7 channels shown as a second view in Live TV">
+          <Row label="Source">
+            <div style={{ display: 'inline-flex', gap: 4, padding: 4, borderRadius: 999, background: 'rgba(236,239,247,.05)', border: '1px solid rgba(236,239,247,.08)' }}>
+              {([['off', 'Off'], ['local', 'Built-in'], ['server', 'Server']] as ['off' | 'local' | 'server', string][]).map(([m, label]) => (
+                <button key={m} data-focusable tabIndex={0} onClick={() => saveErsatz({ mode: m })} style={{ border: 0, cursor: 'pointer', padding: '7px 14px', borderRadius: 999, font: `600 12px ${font.ui}`, background: ersatzMode === m ? 'var(--ac)' : 'transparent', color: ersatzMode === m ? colors.acInk : colors.ink2 }}>{label}</button>
+              ))}
+            </div>
+          </Row>
+          {ersatzMode === 'local' && <Row label={<span style={{ color: colors.ink4 }}>Built-in channels are generated from your library — no extra software needed.</span>}>{null}</Row>}
+          {ersatzMode === 'server' && (
+            <div style={{ padding: '14px 22px' }}>
+              <div style={{ font: `500 12px ${font.mono}`, color: colors.ink4, marginBottom: 6 }}>ERSATZTV SERVER URL</div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <input data-focusable value={ersatzUrlVal} onChange={(e) => setErsatzUrl(e.target.value)} placeholder="http://192.168.1.100:8409" style={input} />
+                <button data-focusable tabIndex={0} onClick={() => saveErsatz({})} style={btn(true)}>Save</button>
+              </div>
+            </div>
+          )}
         </Group>
       )}
 

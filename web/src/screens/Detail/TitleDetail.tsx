@@ -4,6 +4,8 @@ import { colors, font, radius } from '../../theme';
 import { ArtPlaceholder } from '../../components/ArtPlaceholder';
 import { getTitle } from '../../api/library';
 import { decodePathId } from '../../api/ids';
+import { titleToInfo } from '../../state/info';
+import { useMyList } from '../../state/myList';
 import type { Title } from '../../api/types';
 
 const Back = () => (
@@ -27,8 +29,10 @@ export function TitleDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const q = useQuery({ queryKey: ['title', id], queryFn: () => getTitle(id) });
+  const myList = useMyList();
   const t = q.data as Title | undefined;
   if (!t) return <div style={{ padding: 40, color: colors.ink3 }} className="nf-rise">Loading…</div>;
+  const inList = myList.has(t.id);
 
   const ext = (t.path ? t.path.split('.').pop() : '')?.toUpperCase() || '—';
 
@@ -55,7 +59,9 @@ export function TitleDetail() {
             <button data-focusable tabIndex={0} onClick={() => navigate(`/watch/${t.id}`)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '15px 30px', border: 0, borderRadius: 12, background: 'var(--ac)', color: colors.acInk, font: `700 15px ${font.ui}`, cursor: 'pointer' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5 L19 12 L7 19 Z" /></svg> Play
             </button>
-            <button data-focusable tabIndex={0} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '15px 22px', border: '1px solid rgba(236,239,247,.2)', borderRadius: 12, background: 'rgba(236,239,247,.06)', color: colors.ink1, font: `600 14px ${font.ui}`, cursor: 'pointer' }}>My List</button>
+            <button data-focusable tabIndex={0} onClick={() => myList.toggle(titleToInfo(t))} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '15px 22px', border: '1px solid rgba(236,239,247,.2)', borderRadius: 12, background: inList ? 'rgba(251,113,89,.14)' : 'rgba(236,239,247,.06)', color: colors.ink1, font: `600 14px ${font.ui}`, cursor: 'pointer' }}>
+              {inList ? '✓ In My List' : '+ My List'}
+            </button>
           </div>
           <p style={{ font: `400 17px/1.6 ${font.ui}`, color: colors.ink2, maxWidth: 680 }}>{t.synopsis || 'No synopsis available.'}</p>
         </div>

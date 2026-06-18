@@ -2,6 +2,8 @@ import { Routes, Route } from 'react-router-dom';
 import { SpatialFocusProvider } from './focus/SpatialFocusProvider';
 import { ActiveProfileProvider } from './state/activeProfile';
 import { AudioPlayerProvider } from './state/audioPlayer';
+import { InfoProvider } from './state/info';
+import { MyListProvider } from './state/myList';
 import { AppShell } from './shell/AppShell';
 import { Home } from './screens/Home/Home';
 import { BrowseGrid } from './screens/Browse/BrowseGrid';
@@ -9,6 +11,7 @@ import { TitleDetail } from './screens/Detail/TitleDetail';
 import { VideoPlayer } from './screens/Player/VideoPlayer';
 import { Music } from './screens/Music/Music';
 import { Audiobooks } from './screens/Audiobooks/Audiobooks';
+import { Podcasts } from './screens/Podcasts/Podcasts';
 import { LiveTV } from './screens/Live/LiveTV';
 import { Settings } from './screens/Settings/Settings';
 import { Profiles } from './screens/Profiles/Profiles';
@@ -21,6 +24,8 @@ export default function App() {
     <ActiveProfileProvider>
       <AudioPlayerProvider>
       <SpatialFocusProvider>
+      <MyListProvider>
+      <InfoProvider>
         <Routes>
           <Route element={<AppShell />}>
             <Route path="/" element={<Home />} />
@@ -30,6 +35,7 @@ export default function App() {
             <Route path="/watch/:id" element={<VideoPlayer />} />
             <Route path="/music" element={<Music />} />
             <Route path="/audiobooks" element={<Audiobooks />} />
+            <Route path="/podcasts" element={<Podcasts />} />
             <Route path="/live" element={<LiveTV />} />
             <Route path="/search" element={<Search />} />
             <Route path="/settings" element={<Settings />} />
@@ -37,6 +43,8 @@ export default function App() {
             <Route path="*" element={<Placeholder title="Not found" note="No surface at this route." />} />
           </Route>
         </Routes>
+      </InfoProvider>
+      </MyListProvider>
       </SpatialFocusProvider>
       </AudioPlayerProvider>
     </ActiveProfileProvider>

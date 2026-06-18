@@ -24,7 +24,8 @@ let iptvSettings = {
     epgUrl: ''
 };
 let ersatztvSettings = {
-    url: ''  // e.g., 'http://192.168.1.100:8409'
+    url: '',      // external ErsatzTV server, e.g. 'http://192.168.1.100:8409'
+    mode: 'off'   // 'off' | 'local' (built-in) | 'server' (external URL)
 };
 
 // Remote Nedflix server settings
@@ -812,6 +813,26 @@ function createServer() {
     });
 
     // ==================== ErsatzTV/Channels API Endpoints ====================
+
+    // ErsatzTV channels + EPG as IPTV-shaped data, so the Live TV guide can render
+    // "your channels" with the exact same UI as IPTV.
+    expressApp.get('/api/ersatztv/iptv-channels', async (req, res) => {
+        if (!ersatztvSettings.url) return res.json({ configured: false, channels: [] });
+        try {
+            const content = await fetchContent(`${ersatztvSettings.url}/iptv/channels.m3u`);
+            res.json({ configured: true, enabled: !!ersatztvSettings.enabled, channels: parseM3U(content) });
+        } catch (e) {
+            res.json({ configured: false, channels: [], error: e.message });
+        }
+    });
+    expressApp.get('/api/ersatztv/iptv-epg', async (req, res) => {
+        if (!ersatztvSettings.url) return res.json({ channels: {}, programs: {} });
+        try {
+            res.json(parseEPG(await fetchContent(`${ersatztvSettings.url}/iptv/xmltv.xml`)));
+        } catch {
+            res.json({ channels: {}, programs: {} });
+        }
+    });
 
     // API: Get ErsatzTV status and channels
     expressApp.get('/api/ersatztv/status', async (req, res) => {

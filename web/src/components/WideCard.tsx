@@ -1,6 +1,7 @@
 import { colors, font, shadow } from '../theme';
 import { ArtPlaceholder } from './ArtPlaceholder';
 import { ProgressBar } from './ProgressBar';
+import { infoProps, useInfo, type InfoItem } from '../state/info';
 
 export interface WideCardProps {
   title: string;
@@ -11,15 +12,18 @@ export interface WideCardProps {
   width?: number;
   progress?: number; // 0..1
   onClick?: () => void;
+  info?: InfoItem;
 }
 
 /** 16:9 continue-watching card: progress bar + resume play overlay. */
-export function WideCard({ title, context, backdropUrl, grad, seed, width = 300, progress = 0, onClick }: WideCardProps) {
+export function WideCard({ title, context, backdropUrl, grad, seed, width = 300, progress = 0, onClick, info }: WideCardProps) {
+  const { open } = useInfo();
   return (
     <div
       data-focusable
       tabIndex={0}
       onClick={onClick}
+      {...(info ? infoProps(info, open) : {})}
       style={{ position: 'relative', flex: `0 0 ${width}px`, width, cursor: 'pointer', borderRadius: 12 }}
       className="wide-card"
     >

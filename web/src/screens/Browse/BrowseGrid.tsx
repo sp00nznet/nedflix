@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { colors, font } from '../../theme';
 import { PosterCard } from '../../components/PosterCard';
 import { listTitles } from '../../api/library';
+import { titleToInfo } from '../../state/info';
 
 // Full library grid for one media type (Films / Series).
 export function BrowseGrid({ type }: { type: 'film' | 'series' }) {
@@ -19,7 +20,7 @@ export function BrowseGrid({ type }: { type: 'film' | 'series' }) {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(176px, 1fr))', gap: 20 }}>
         {items.map((t) => (
-          <PosterCard key={t.id} title={t.title} meta={[t.year, t.genre].filter(Boolean).join(' · ')} seed={t.id} posterUrl={t.posterUrl} width={176} onClick={() => navigate(`/title/${t.id}`)} />
+          <PosterCard key={t.id} title={t.title} meta={[t.year, t.genre].filter(Boolean).join(' · ')} seed={t.id} posterUrl={t.posterUrl} width={176} info={titleToInfo(t)} onClick={() => navigate(`/title/${t.id}`)} />
         ))}
       </div>
     </div>

@@ -36,6 +36,8 @@ export function SpatialFocusProvider({ children }: { children: ReactNode }) {
         }
       } else if (k === 'Backspace' || k === 'Escape') {
         if (typing && k === 'Backspace') return;
+        // An open overlay (e.g. the info panel) handles Escape itself.
+        if ((window as unknown as { __marqueeOverlayOpen?: boolean }).__marqueeOverlayOpen) return;
         e.preventDefault();
         if (location.pathname !== '/') navigate(-1);
       } else if (k === ' ' && location.pathname.startsWith('/watch')) {

@@ -4,6 +4,8 @@ import { NavRail } from './NavRail';
 import { BottomTabBar } from './BottomTabBar';
 import { DpadHint } from './DpadHint';
 import { WindowControls } from './WindowControls';
+import { MiniPlayer } from '../components/MiniPlayer';
+import { useAudioPlayer } from '../state/audioPlayer';
 import { useIsMobile } from './useIsMobile';
 
 /**
@@ -13,7 +15,9 @@ import { useIsMobile } from './useIsMobile';
 export function AppShell() {
   const { pathname } = useLocation();
   const isMobile = useIsMobile();
+  const { current } = useAudioPlayer();
   const fullBleed = pathname.startsWith('/watch') || pathname === '/profiles';
+  const miniShown = !!current && !fullBleed;
 
   if (fullBleed) {
     return (
@@ -43,12 +47,13 @@ export function AppShell() {
           height: '100%',
           overflowY: 'auto',
           overflowX: 'hidden',
-          paddingBottom: isMobile ? 'calc(58px + env(safe-area-inset-bottom))' : 0,
+          paddingBottom: `calc(${isMobile ? '58px + env(safe-area-inset-bottom)' : '0px'} + ${miniShown ? '64px' : '0px'})`,
         }}
       >
         <Outlet />
       </main>
-      {isMobile ? <BottomTabBar /> : <DpadHint />}
+      <MiniPlayer />
+      {isMobile ? <BottomTabBar /> : !miniShown && <DpadHint />}
     </div>
   );
 }

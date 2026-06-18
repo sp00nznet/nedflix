@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { colors, font } from '../../theme';
 import { PosterCard } from '../../components/PosterCard';
 import { search } from '../../api/search';
+import { decodePathId } from '../../api/ids';
+import type { InfoItem } from '../../state/info';
 
 const SUGGESTIONS = ['Films', 'Series', '4K', 'Drama', 'Sci-Fi', 'Documentary'];
 
@@ -39,9 +41,11 @@ export function Search() {
         <>
           <div style={{ font: `500 11px ${font.mono}`, letterSpacing: '.2em', color: colors.ink4, marginBottom: 18 }}>{results.isLoading ? 'SEARCHING…' : `${hits.length} RESULTS`}</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(176px, 1fr))', gap: 20 }}>
-            {hits.map((h) => (
-              <PosterCard key={h.id} title={h.title} meta={h.meta} seed={h.id} posterUrl={h.posterUrl} width={176} onClick={() => navigate(`/title/${h.id}`)} />
-            ))}
+            {hits.map((h) => {
+              const path = (() => { try { return decodePathId(h.id); } catch { return undefined; } })();
+              const info: InfoItem = { id: h.id, path, kind: 'movie', title: h.title, subtitle: h.meta, artUrl: `/api/artwork?kind=movie&path=${encodeURIComponent(path ?? '')}&title=${encodeURIComponent(h.title)}` };
+              return <PosterCard key={h.id} title={h.title} meta={h.meta} seed={h.id} posterUrl={h.posterUrl} width={176} info={info} onClick={() => navigate(`/title/${h.id}`)} />;
+            })}
           </div>
         </>
       )}

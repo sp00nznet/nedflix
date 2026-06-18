@@ -26,6 +26,11 @@ export const saveIptvSettings = (s: IptvSettings) => api.post('/api/iptv/setting
 export const pickPlaylist = () => api.post<IptvSettings>('/api/iptv/pick-playlist');
 export const pickEpg = () => api.post<IptvSettings>('/api/iptv/pick-epg');
 
+// ErsatzTV ("your own TV" auto-channels).
+export interface ErsatzSettings { url?: string; mode?: 'off' | 'local' | 'server'; enabled?: boolean }
+export const getErsatzSettings = () => api.get<ErsatzSettings>('/api/ersatztv/settings').catch(() => ({} as ErsatzSettings));
+export const saveErsatzSettings = (s: ErsatzSettings) => api.post('/api/ersatztv/settings', s);
+
 // Artwork provider (desktop): a TMDB API key enables real movie/TV posters.
 export const getArtworkConfig = () => api.get<{ hasKey: boolean }>('/api/artwork/config').catch(() => ({ hasKey: false }));
 export const saveArtworkKey = (tmdbKey: string) => api.put('/api/artwork/config', { tmdbKey });

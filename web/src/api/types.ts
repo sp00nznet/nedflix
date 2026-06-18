@@ -104,6 +104,7 @@ export interface Program {
   endTime: string;
   isLive: boolean;
   widthWeight: number;
+  titleId?: string; // built-in local channels: the library title to play
 }
 export interface Channel {
   id: string;

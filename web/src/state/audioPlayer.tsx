@@ -14,6 +14,9 @@ import {
 import { audioUrl } from '../api/playback';
 import { isNativeShell, nativeMedia } from '../native/bridge';
 
+// Local library files stream via /api/audio; podcast episodes are already absolute URLs.
+const srcFor = (path: string) => (/^https?:\/\//i.test(path) ? path : audioUrl(path));
+
 export interface QueueItem {
   id: string;
   path: string;
@@ -69,7 +72,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     if (!current) return;
     if (native) {
       native
-        .load({ id: current.id, url: audioUrl(current.path), type: 'audio', title: current.title, artist: current.artist, album: current.album, artworkUrl: current.artUrl })
+        .load({ id: current.id, url: srcFor(current.path), type: 'audio', title: current.title, artist: current.artist, album: current.album, artworkUrl: current.artUrl })
         .then(() => native.play())
         .then(() => setPlaying(true))
         .catch(() => setPlaying(false));
@@ -77,7 +80,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     }
     const a = ref.current;
     if (!a) return;
-    a.src = audioUrl(current.path);
+    a.src = srcFor(current.path);
     a.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
   }, [current, native]);
 
